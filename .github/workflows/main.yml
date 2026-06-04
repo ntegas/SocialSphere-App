@@ -33,11 +33,11 @@ jobs:
           yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1
           $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.9
         run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.11.1-bin.zip
-          unzip -q gradle-8.11.1-bin.zip -d $HOME
-          echo "$HOME/gradle-8.11.1/bin" >> $GITHUB_PATH
+          wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          unzip -q gradle-8.9-bin.zip -d $HOME
+          echo "$HOME/gradle-8.9/bin" >> $GITHUB_PATH
 
       - name: Write local.properties
         working-directory: ss-v1
