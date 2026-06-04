@@ -44,9 +44,10 @@ android {
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
 // to match the convention used in Web projects.
 secrets {
-  // reads MAPS_API_KEY (and others) from local.properties
   propertiesFileName = "local.properties"
-  defaultPropertiesFileName = ".env.example"
+  defaultPropertiesFileName = "local.properties.example"
+  ignoreList.add("keyToIgnore")
+  ignoreList.add("sdk.*")
 }
 
 // Some unused dependencies are commented out below instead of being removed.
