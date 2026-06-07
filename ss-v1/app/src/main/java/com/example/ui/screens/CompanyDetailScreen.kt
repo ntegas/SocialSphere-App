@@ -216,7 +216,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyOverviewTab(company: C
                     ) {
                         val context = androidx.compose.ui.platform.LocalContext.current
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(address.addressType.name, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                            Text(address.addressType.label(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
                             Text("${address.addressLine}, ${address.city}, ${address.country}", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                         Spacer(modifier = Modifier.width(8.dp))

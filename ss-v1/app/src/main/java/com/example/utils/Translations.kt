@@ -145,3 +145,12 @@ fun ContactStatus.label(): String = when (this) {
     ContactStatus.MAINTAIN -> "Поддерживать"
     ContactStatus.ARCHIVED -> "Архив"
 }
+
+fun AddressType.label(): String = when (this) {
+    AddressType.HOME   -> "Дом"
+    AddressType.WORK   -> "Работа"
+    AddressType.OFFICE -> "Офис"
+    AddressType.BRANCH -> "Филиал"
+    AddressType.LEGAL  -> "Юр. адрес"
+    AddressType.OTHER  -> "Другое"
+}

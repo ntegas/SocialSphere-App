@@ -228,7 +228,7 @@ fun CalendarItemEditScreen(
                     )
                     DropdownMenu(expanded = showTypeDropdown, onDismissRequest = { showTypeDropdown = false }) {
                         CalendarItemType.values().forEach { t ->
-                            DropdownMenuItem(text = { Text(t.name) }, onClick = {
+                            DropdownMenuItem(text = { Text(t.label()) }, onClick = {
                                 type = t
                                 if (t == CalendarItemType.BIRTHDAY) {
                                     isAllDay = true
@@ -246,7 +246,7 @@ fun CalendarItemEditScreen(
                         FilterChip(
                             selected = importance == imp,
                             onClick = { importance = imp },
-                            label = { Text(imp.name, fontSize = 12.sp) }
+                            label = { Text(imp.label(), fontSize = 12.sp) }
                         )
                     }
                 }
@@ -258,7 +258,7 @@ fun CalendarItemEditScreen(
                             FilterChip(
                                 selected = status == stat,
                                 onClick = { status = stat },
-                                label = { Text(stat.name, fontSize = 12.sp) }
+                                label = { Text(stat.label(), fontSize = 12.sp) }
                             )
                         }
                     }

@@ -136,13 +136,11 @@ object ExternalActionHandler {
 
         if (uri != null) {
             val intent = Intent(Intent.ACTION_VIEW).apply { data = Uri.parse(uri) }
-            // For Telegram: try app, fall back to web
+            // For Telegram: try app deep link, fall back to web
             if (messenger.type == com.example.model.MessengerType.TELEGRAM) {
                 try {
-                    if (intent.resolveActivity(context.packageManager) != null) {
-                        context.startActivity(intent)
-                        return
-                    }
+                    context.startActivity(intent)
+                    return
                 } catch (_: Exception) {}
                 // Fallback to web
                 safelyStartIntent(context, Intent(Intent.ACTION_VIEW).apply {
@@ -158,13 +156,11 @@ object ExternalActionHandler {
 
     private fun safelyStartIntent(context: Context, intent: Intent) {
         try {
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-            } else {
-                Toast.makeText(context, "Нет приложения для выполнения действия", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
+            context.startActivity(intent)
+        } catch (e: android.content.ActivityNotFoundException) {
             Toast.makeText(context, "Нет приложения для выполнения действия", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, "Не удалось выполнить действие", Toast.LENGTH_SHORT).show()
         }
     }
 }
