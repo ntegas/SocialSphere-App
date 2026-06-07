@@ -146,7 +146,7 @@ fun ImportExportSettingsScreen(
                 )
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 ExportRow(
-                    icon      = Icons.Default.FolderOpen,
+                    icon      = Icons.Default.FolderZip,
                     text      = "Полный архив → ZIP",
                     subtitle  = "CSV + vCard + JSON в одном файле",
                     loading   = loadingZip,

@@ -46,7 +46,7 @@ fun ContactDetailScreen(
     }
 
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Обзор", "Работа", "Связь", "Подарки", "Заметки", "Детали")
+    val tabs = listOf("Обзор", "Связи", "Важное", "История")
 
     var showAddDialog by remember { mutableStateOf(false) }
     var showVoiceDialog by remember { mutableStateOf(false) }
@@ -150,19 +150,14 @@ fun ContactDetailScreen(
             ) {
                 when (selectedTab) {
                     0 -> overviewTab(contact, onNavigateToCreateCalendarItem)
-                    1 -> workTab(contact)
-                    2 -> communicationTab(contact)
-                    3 -> giftsTab(contact)
-                    4 -> notesTab(
-                        contact  = contact,
-                        onShowAdd   = { showAddDialog = true },
+                    1 -> connectionsTab(contact, onNavigateToContact)
+                    2 -> importantTab(
+                        contact = contact,
+                        onNavigateToCalendarItem = onNavigateToCalendarItem,
+                        onShowAdd = { showAddDialog = true },
                         onShowVoice = { showVoiceDialog = true }
                     )
-                    5 -> detailsTab(
-                        contact                  = contact,
-                        onNavigateToCalendarItem = onNavigateToCalendarItem,
-                        onNavigateToContact      = onNavigateToContact
-                    )
+                    3 -> historyTab(contact)
                 }
             }
         }
@@ -347,160 +342,73 @@ fun ContactDetailScreen(
 
 @Composable
 fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
-    val compRel  = contact.companyRelations.firstOrNull { it.isPrimary } ?: contact.companyRelations.firstOrNull()
-    val company  = compRel?.companyId?.let { AppStateStore.getCompany(it) }?.name ?: ""
+    val compRel = contact.companyRelations.firstOrNull { it.isPrimary } ?: contact.companyRelations.firstOrNull()
+    val company = compRel?.companyId?.let { AppStateStore.getCompany(it) }?.name ?: ""
     val position = compRel?.position ?: ""
-    val address  = AppStateStore.addresses.find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
-    val city     = address?.city ?: ""
-    val name     = "${contact.firstName} ${contact.lastName}".trim()
-
-    // Last contact — most recent note/event
-    val lastNoteDate = AppStateStore.notes
-        .filter { it.contactId == contact.id }
-        .maxByOrNull { it.createdAt }?.createdAt?.take(10)
-
-    // Days since last contact
-    val daysSince = if (!contact.lastContactDate.isNullOrBlank()) {
-        try {
-            val last = java.time.LocalDate.parse(contact.lastContactDate)
-            java.time.ChronoUnit.DAYS.between(last, java.time.LocalDate.now())
-        } catch (e: Exception) { null }
-    } else if (!lastNoteDate.isNullOrBlank()) {
-        try {
-            val last = java.time.LocalDate.parse(lastNoteDate)
-            java.time.ChronoUnit.DAYS.between(last, java.time.LocalDate.now())
-        } catch (e: Exception) { null }
-    } else null
-
-    // Nearest upcoming date
-    val nearestDate = AppStateStore.calendarItems
-        .filter { it.links.any { l -> l.targetId == contact.id } && it.status == CalendarItemStatus.ACTIVE }
-        .filter { it.startDate >= java.time.LocalDate.now().toString() }
-        .minByOrNull { it.startDate }
+    val address = AppStateStore.addresses.find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
+    val city = address?.city ?: ""
+    val name = "${contact.firstName} ${contact.lastName}".trim()
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Avatar
         Box(
             modifier = Modifier.size(80.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text  = contact.firstName.take(1) + contact.lastName.take(1),
+                text = contact.firstName.take(1) + contact.lastName.take(1),
                 color = MaterialTheme.colorScheme.onPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
         }
-
-        Spacer(Modifier.height(10.dp))
-
-        // Name + nickname
+        Spacer(modifier = Modifier.height(12.dp))
         Text(text = name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        if (!contact.nickname.isNullOrBlank())
-            Text("«${contact.nickname}»", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        if (company.isNotEmpty() || position.isNotEmpty()) {
+            Text(text = listOf(company, position).filter { it.isNotEmpty() }.joinToString(" • "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        }
+        if (city.isNotEmpty()) {
+            Text(text = city, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        }
 
-        // Company · position
-        if (company.isNotEmpty() || position.isNotEmpty())
-            Text(
-                listOf(company, position).filter { it.isNotEmpty() }.joinToString(" • "),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary
-            )
-        if (city.isNotEmpty())
-            Text(city, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-
-        Spacer(Modifier.height(10.dp))
-
-        // Status row
+        Spacer(modifier = Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = {}, label = { Text(contact.contactStatus.label(), fontSize = 10.sp) })
             AssistChip(onClick = {}, label = { Text(contact.relationshipType.label(), fontSize = 10.sp) })
+            AssistChip(onClick = {}, label = { Text(contact.connectionLevel.label(), fontSize = 10.sp) })
             AssistChip(onClick = {}, label = { Text(contact.importanceLevel.label(), fontSize = 10.sp) })
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Last contact + next step
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            if (daysSince != null) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.AccessTime, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
-                    val label = when {
-                        daysSince == 0L -> "Общались сегодня"
-                        daysSince == 1L -> "Общались вчера"
-                        else            -> "Последний контакт: $daysSince дн. назад"
-                    }
-                    Text(label, style = MaterialTheme.typography.bodySmall,
-                        color = if (daysSince > 30) MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.secondary)
-                }
-            }
-            if (!contact.nextStep.isNullOrBlank()) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.ArrowForward, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text(contact.nextStep, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
-                }
-            }
-            if (nearestDate != null) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.Event, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
-                    Text("${nearestDate.title}: ${nearestDate.startDate}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
-                }
-            }
-            if (!contact.communicationRhythm.equals(CommunicationRhythm.NOT_TRACKED)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.Repeat, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
-                    Text(contact.communicationRhythm.label(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                }
+            if (contact.socialRole != SocialRole.REGULAR) {
+                AssistChip(onClick = {}, label = { Text(contact.socialRole.label(), fontSize = 10.sp) })
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-
-        // Quick action buttons
+        Spacer(modifier = Modifier.height(16.dp))
         val context = androidx.compose.ui.platform.LocalContext.current
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             QuickActionIcon(Icons.Outlined.Phone, "Позвонить") {
                 val phone = contact.phones.find { it.isPrimary }?.number ?: contact.phones.firstOrNull()?.number
                 com.example.utils.ExternalActionHandler.openDialer(context, phone)
             }
-            // Write — use primary messenger, fallback to SMS
-            QuickActionIcon(Icons.Outlined.ChatBubbleOutline, "Написать") {
-                val m = contact.messengers.find { it.isPrimary } ?: contact.messengers.firstOrNull()
-                if (m != null) com.example.utils.ExternalActionHandler.openMessenger(context, m)
-                else com.example.utils.ExternalActionHandler.openSms(context, contact.phones.firstOrNull()?.number)
+            QuickActionIcon(Icons.Outlined.ChatBubbleOutline, "Сообщение") {
+                val phone = contact.phones.find { it.isPrimary }?.number ?: contact.phones.firstOrNull()?.number
+                com.example.utils.ExternalActionHandler.openSms(context, phone)
             }
             QuickActionIcon(Icons.Outlined.Email, "Email") {
                 val email = contact.emails.find { it.isPrimary }?.email ?: contact.emails.firstOrNull()?.email
                 com.example.utils.ExternalActionHandler.openEmail(context, email)
             }
             if (address != null) QuickActionIcon(Icons.Outlined.Map, "Карта") {
-                if (address.latitude != null && address.longitude != null)
+                if (address.latitude != null && address.longitude != null) {
                     com.example.utils.ExternalActionHandler.openRouteByCoordinates(context, address.latitude, address.longitude)
-                else
+                } else {
                     com.example.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
+                }
             }
+            // FIX: working cheatsheet button
             QuickActionIcon(Icons.Default.Lightbulb, "Шпаргалка") {
                 onNavigateToCheatSheet()
             }
@@ -1300,561 +1208,6 @@ fun SizeChip(label: String, value: String) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
             Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TAB 1 — РАБОТА
-// ═══════════════════════════════════════════════════════════════
-fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact) {
-    item {
-        val compRels = contact.companyRelations
-        if (compRels.isEmpty()) {
-            CardBlock {
-                Text(
-                    "Нет данных о работе",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-            return@item
-        }
-        compRels.forEach { rel ->
-            val company = AppStateStore.getCompany(rel.companyId)
-            CardBlock(title = if (rel.isPrimary) "Основное место работы" else "Дополнительно") {
-                if (company != null) InfoRow("Компания", company.name)
-                if (!rel.position.isNullOrBlank())       InfoRow("Должность",   rel.position)
-                if (!rel.department.isNullOrBlank())     InfoRow("Отдел",       rel.department)
-                if (!rel.role.isNullOrBlank())           InfoRow("Роль",        rel.role)
-                if (!rel.responsibilities.isNullOrBlank()) InfoRow("Задачи",    rel.responsibilities)
-                InfoRow("Статус", rel.employmentStatus.label())
-                if (!rel.workNote.isNullOrBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        rel.workNote,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-            }
-        }
-    }
-
-    // Чем может помочь / Чем я могу помочь
-    item {
-        CardBlock(title = "Взаимная польза") {
-            if (!contact.canHelpWith.isNullOrBlank()) {
-                Text(
-                    "Чем может помочь",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(contact.canHelpWith, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-            }
-            if (!contact.iCanHelpWith.isNullOrBlank()) {
-                Text(
-                    "Чем я могу помочь",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(contact.iCanHelpWith, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-            }
-            if (!contact.talkingPoints.isNullOrBlank()) {
-                Text(
-                    "Темы для разговора",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(contact.talkingPoints, style = MaterialTheme.typography.bodyMedium)
-            }
-            if (contact.canHelpWith.isNullOrBlank() && contact.iCanHelpWith.isNullOrBlank() && contact.talkingPoints.isNullOrBlank()) {
-                Text(
-                    "Заполни при редактировании",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-        }
-    }
-
-    // Work notes
-    item {
-        val workNotes = AppStateStore.notes.filter {
-            it.contactId == contact.id && it.type == NoteType.WORK
-        }
-        if (workNotes.isNotEmpty()) {
-            CardBlock(title = "Рабочие заметки") {
-                workNotes.forEach { note ->
-                    Text("• ${note.text}", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(4.dp))
-                }
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TAB 2 — СВЯЗЬ (каналы коммуникации)
-// ═══════════════════════════════════════════════════════════════
-fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Contact) {
-    // Phones
-    item {
-        CardBlock(title = "Телефоны") {
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            if (contact.phones.isEmpty()) {
-                Text("Нет телефонов", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            } else {
-                contact.phones.forEach { phone ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(phone.number, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(phone.type.label(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            IconButton(onClick = { com.example.utils.ExternalActionHandler.openDialer(ctx, phone.number) }) {
-                                Icon(Icons.Outlined.Phone, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
-                            IconButton(onClick = { com.example.utils.ExternalActionHandler.openSms(ctx, phone.number) }) {
-                                Icon(Icons.Default.Sms, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                }
-            }
-        }
-    }
-
-    // Emails
-    item {
-        CardBlock(title = "Email") {
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            if (contact.emails.isEmpty()) {
-                Text("Нет email", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            } else {
-                contact.emails.forEach { email ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(email.email, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(email.type.label(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                        }
-                        IconButton(onClick = { com.example.utils.ExternalActionHandler.openEmail(ctx, email.email) }) {
-                            Icon(Icons.Outlined.Email, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                }
-            }
-        }
-    }
-
-    // Messengers
-    item {
-        CardBlock(title = "Мессенджеры") {
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            if (contact.messengers.isEmpty()) {
-                Text("Нет мессенджеров", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            } else {
-                contact.messengers.forEach { m ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(m.value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(m.type.label(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                            if (!m.comment.isNullOrBlank())
-                                Text(m.comment, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
-                        }
-                        IconButton(onClick = { com.example.utils.ExternalActionHandler.openMessenger(ctx, m) }) {
-                            Icon(Icons.Default.Chat, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                }
-            }
-        }
-    }
-
-    // Addresses
-    item {
-        val addresses = AppStateStore.addresses.filter {
-            it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT
-        }
-        CardBlock(title = "Адреса") {
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            if (addresses.isEmpty()) {
-                Text("Нет адресов", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            } else {
-                addresses.forEach { addr ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                listOf(addr.addressLine, addr.city, addr.country).filter { it.isNotBlank() }.joinToString(", "),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(addr.addressType.label(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                        }
-                        IconButton(onClick = {
-                            if (addr.latitude != null && addr.longitude != null)
-                                com.example.utils.ExternalActionHandler.openRouteByCoordinates(ctx, addr.latitude, addr.longitude)
-                            else
-                                com.example.utils.ExternalActionHandler.openRoute(ctx, "${addr.addressLine}, ${addr.city}")
-                        }) {
-                            Icon(Icons.Outlined.Map, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                }
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TAB 3 — ПОДАРКИ
-// ═══════════════════════════════════════════════════════════════
-fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(contact: Contact) {
-    // Gift ideas
-    item {
-        val gifts = AppStateStore.gifts.filter { it.contactId == contact.id }
-        val ideas  = gifts.filter { it.status == GiftStatus.IDEA }
-        val given  = gifts.filter { it.status == GiftStatus.GIVEN }
-
-        CardBlock(title = "Идеи подарков") {
-            if (ideas.isEmpty()) {
-                Text("Нет идей", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            } else {
-                ideas.forEach { gift ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(gift.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            if (!gift.note.isNullOrBlank())
-                                Text(gift.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                            if (!gift.link.isNullOrBlank())
-                                Text(gift.link, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        }
-                        if (!gift.date.isNullOrBlank())
-                            Text(gift.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                }
-            }
-        }
-
-        if (given.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            CardBlock(title = "Подарено ранее") {
-                given.forEach { gift ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("• ${gift.title}", style = MaterialTheme.typography.bodyMedium)
-                        if (!gift.date.isNullOrBlank())
-                            Text(gift.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                    }
-                }
-            }
-        }
-    }
-
-    // Preferences
-    item {
-        val size = AppStateStore.sizeInfos.find { it.contactId == contact.id }
-        val pd = contact.personalDetails
-
-        CardBlock(title = "Предпочтения и размеры") {
-            if (size != null) {
-                Text("Размеры", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                @OptIn(ExperimentalLayoutApi::class)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (!size.clothingSize.isNullOrBlank()) SizeChip("Одежда", size.clothingSize)
-                    if (!size.shoeSize.isNullOrBlank())    SizeChip("Обувь",   size.shoeSize)
-                    if (!size.ringSize.isNullOrBlank())    SizeChip("Кольцо",  size.ringSize)
-                    if (!size.other.isNullOrBlank())       SizeChip("Другое",  size.other)
-                }
-                Spacer(Modifier.height(8.dp))
-            }
-            // Food, drinks, likes, dislikes
-            val prefCats = listOf(
-                PersonalDetailCategory.FOOD, PersonalDetailCategory.DRINKS,
-                PersonalDetailCategory.LIKES, PersonalDetailCategory.DISLIKES,
-                PersonalDetailCategory.ALLERGIES, PersonalDetailCategory.RESTRICTIONS
-            )
-            val prefs = pd.filter { it.category in prefCats }
-            if (prefs.isNotEmpty()) {
-                prefs.groupBy { it.category }.forEach { (cat, items) ->
-                    Text(cat.label(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(2.dp))
-                    items.forEach { Text("• ${it.value}", style = MaterialTheme.typography.bodySmall) }
-                    Spacer(Modifier.height(6.dp))
-                }
-            } else {
-                Text("Нет предпочтений", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TAB 4 — ЗАМЕТКИ
-// ═══════════════════════════════════════════════════════════════
-fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
-    contact: Contact,
-    onShowAdd: () -> Unit,
-    onShowVoice: () -> Unit
-) {
-    item {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = onShowAdd,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor   = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Icon(Icons.Default.Add, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Добавить")
-            }
-            Button(
-                onClick = onShowVoice,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor   = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            ) {
-                Icon(Icons.Default.PersonAdd, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("+ Деталь")
-            }
-        }
-    }
-
-    item {
-        val allNotes = AppStateStore.notes
-            .filter { it.contactId == contact.id }
-            .sortedByDescending { it.createdAt }
-
-        if (allNotes.isEmpty()) {
-            Box(Modifier.fillMaxWidth().padding(32.dp), Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Outlined.Notes, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outlineVariant)
-                    Text("Пока нет заметок", color = MaterialTheme.colorScheme.secondary)
-                    Text("Нажми «Добавить» чтобы записать", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                allNotes.forEach { note ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (note.isImportant)
-                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                        ),
-                        elevation = CardDefaults.cardElevation(0.dp)
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer
-                                    ) {
-                                        Text(note.type.label(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                    }
-                                    if (note.isImportant)
-                                        Icon(Icons.Outlined.Star, null, Modifier.size(12.dp), tint = MaterialTheme.colorScheme.error)
-                                }
-                                if (!note.createdAt.isNullOrBlank())
-                                    Text(note.createdAt.take(10), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            Text(note.text, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Personal details (interests, habits etc)
-    item {
-        val pd = contact.personalDetails.filter {
-            it.category in setOf(
-                PersonalDetailCategory.INTERESTS, PersonalDetailCategory.HABITS,
-                PersonalDetailCategory.BRANDS, PersonalDetailCategory.COMMUNICATION_STYLE, PersonalDetailCategory.OTHER
-            )
-        }
-        if (pd.isNotEmpty()) {
-            CardBlock(title = "Личные детали") {
-                pd.groupBy { it.category }.forEach { (cat, items) ->
-                    Text(cat.label(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(2.dp))
-                    items.forEach { d ->
-                        Text("• ${d.value}", style = MaterialTheme.typography.bodyMedium)
-                        if (!d.note.isNullOrBlank()) Text("  ${d.note}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TAB 5 — ДЕТАЛИ
-// ═══════════════════════════════════════════════════════════════
-fun androidx.compose.foundation.lazy.LazyListScope.detailsTab(
-    contact: Contact,
-    onNavigateToCalendarItem: (String) -> Unit,
-    onNavigateToContact: (String) -> Unit = {}
-) {
-    // Status & classification
-    item {
-        CardBlock(title = "Статус и классификация") {
-            InfoRow("Статус",          contact.contactStatus.label())
-            InfoRow("Тип отношений",   contact.relationshipType.label())
-            InfoRow("Уровень связи",   contact.connectionLevel.label())
-            InfoRow("Важность",        contact.importanceLevel.label())
-            InfoRow("Социальная роль", contact.socialRole.label())
-            InfoRow("Ритм общения",    contact.communicationRhythm.label())
-        }
-    }
-
-    // Tags
-    item {
-        CardBlock(title = "Теги") {
-            if (contact.tags.isEmpty()) {
-                Text("Нет тегов", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            } else {
-                @OptIn(ExperimentalLayoutApi::class)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    contact.tags.forEach { tag ->
-                        Surface(
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(tag, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Dates
-    item {
-        val dates = AppStateStore.calendarItems.filter { item ->
-            item.links.any { it.targetId == contact.id } &&
-            item.type in listOf(CalendarItemType.BIRTHDAY, CalendarItemType.ANNIVERSARY, CalendarItemType.IMPORTANT_DATE)
-        }
-        CardBlock(title = "Важные даты") {
-            if (dates.isEmpty()) {
-                Text("Нет дат", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            } else {
-                dates.forEach { date ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { onNavigateToCalendarItem(date.id) }.padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                if (date.type == CalendarItemType.BIRTHDAY) Icons.Default.Cake else Icons.Outlined.Event,
-                                null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary
-                            )
-                            Text(date.title, style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Text(date.startDate, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                }
-            }
-        }
-    }
-
-    // Connected contacts
-    item {
-        val relations = AppStateStore.contactRelations.filter {
-            it.firstContactId == contact.id || it.secondContactId == contact.id
-        }
-        CardBlock(title = "Связанные люди") {
-            if (relations.isEmpty()) {
-                Text("Нет связанных контактов", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            } else {
-                relations.forEach { rel ->
-                    val isFirst   = rel.firstContactId == contact.id
-                    val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
-                    val myRole    = if (isFirst) rel.firstRole else rel.secondRole
-                    val other     = AppStateStore.getContact(otherId)
-                    val otherName = other?.let { "${it.firstName} ${it.lastName}".trim() } ?: "—"
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .clickable { if (other != null) onNavigateToContact(otherId) }
-                            .padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(otherName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                        Text(myRole, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                }
-            }
-        }
-    }
-
-    // History
-    item {
-        val completed = AppStateStore.calendarItems.filter {
-            it.links.any { l -> l.targetId == contact.id } && it.status == CalendarItemStatus.COMPLETED
-        }
-        val givenGifts = AppStateStore.gifts.filter {
-            it.contactId == contact.id && it.status == GiftStatus.GIVEN
-        }
-        if (completed.isNotEmpty() || givenGifts.isNotEmpty()) {
-            CardBlock(title = "История") {
-                completed.forEach { InfoRow(it.startDate, it.title) }
-                givenGifts.forEach { Text("🎁 ${it.title}${if (!it.date.isNullOrBlank()) " · ${it.date}" else ""}", style = MaterialTheme.typography.bodySmall) }
-            }
         }
     }
 }

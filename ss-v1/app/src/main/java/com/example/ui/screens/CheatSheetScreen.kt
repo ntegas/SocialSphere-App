@@ -270,58 +270,6 @@ fun CheatSheetScreen(
                 }
             }
 
-            // ── Чем может помочь ───────────────────────────────
-            if (!contact.canHelpWith.isNullOrBlank()) {
-                item {
-                    SheetBlock("🤝 Чем может помочь") {
-                        Text(
-                            contact.canHelpWith,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            // ── Чем я могу помочь ──────────────────────────────
-            if (!contact.iCanHelpWith.isNullOrBlank()) {
-                item {
-                    SheetBlock("💡 Чем я могу помочь") {
-                        Text(
-                            contact.iCanHelpWith,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            // ── Темы для разговора ─────────────────────────────
-            if (!contact.talkingPoints.isNullOrBlank()) {
-                item {
-                    SheetBlock("💬 Темы для разговора") {
-                        // Split by newline or semicolon for bullet list
-                        val points = contact.talkingPoints
-                            .split("\n", ";")
-                            .map { it.trim() }
-                            .filter { it.isNotBlank() }
-                        if (points.size > 1) {
-                            points.forEach { point ->
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                ) {
-                                    Text("→", color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Bold)
-                                    Text(point, style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-                        } else {
-                            Text(contact.talkingPoints,
-                                style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
-            }
-
             // ── Ограничения / аллергии ─────────────────────────
             if (restrictions.isNotEmpty()) {
                 item {
@@ -371,9 +319,7 @@ fun CheatSheetScreen(
 
             // ── Пустое состояние ───────────────────────────────
             if (!hasContact && impNotes.isEmpty() && lastNote == null &&
-                familyRels.isEmpty() && interests.isEmpty() && dreamNotes.isEmpty() &&
-                contact.canHelpWith.isNullOrBlank() && contact.iCanHelpWith.isNullOrBlank() &&
-                contact.talkingPoints.isNullOrBlank()
+                familyRels.isEmpty() && interests.isEmpty() && dreamNotes.isEmpty()
             ) {
                 item {
                     Box(Modifier.fillMaxWidth().padding(vertical = 32.dp),

@@ -41,9 +41,7 @@ private data class HomeContact(
     val name: String,
     val company: String,
     val position: String,
-    val importance: ImportanceLevel,
-    val daysSince: Long? = null,
-    val overdueLabel: String? = null
+    val importance: ImportanceLevel
 )
 
 private data class HomeEvent(
@@ -55,21 +53,11 @@ private data class HomeEvent(
     val colorIndex: Int = 0
 )
 
-private data class SmartList(
-    val id: String,
-    val title: String,
-    val subtitle: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val color: Color,
-    val count: Int,
-    val contacts: List<HomeContact>
-)
-
 private val eventColors = listOf(
-    Color(0xFFE53935),
-    Color(0xFF1E88E5),
-    Color(0xFF43A047),
-    Color(0xFF8E24AA)
+    Color(0xFFE53935),  // Birthday — red
+    Color(0xFF1E88E5),  // Meeting  — blue
+    Color(0xFF43A047),  // Gift     — green
+    Color(0xFF8E24AA)   // Other    — purple
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -141,86 +129,29 @@ fun HomeScreen(
         }
     }
 
-    // ── Нужно связаться — по ритму + дней без общения ────────
     val needAttention by remember {
         derivedStateOf {
-            val today = java.time.LocalDate.now()
-
-            // Rhythm → max days allowed without contact
-            fun rhythmDays(r: CommunicationRhythm): Long? = when (r) {
-                CommunicationRhythm.WEEKLY         -> 7L
-                CommunicationRhythm.MONTHLY        -> 30L
-                CommunicationRhythm.EVERY_3_MONTHS -> 90L
-                CommunicationRhythm.EVERY_6_MONTHS -> 180L
-                CommunicationRhythm.YEARLY         -> 365L
-                else                               -> null  // NOT_TRACKED / CUSTOM — skip
-            }
-
             AppStateStore.contacts
-                .filter { c ->
-                    // Only contacts with a tracked rhythm
-                    rhythmDays(c.communicationRhythm) != null
+                .filter {
+                    it.importanceLevel != ImportanceLevel.NORMAL ||
+                    it.connectionLevel == ConnectionLevel.CLOSE
                 }
-                .mapNotNull { c ->
-                    val maxDays = rhythmDays(c.communicationRhythm) ?: return@mapNotNull null
-
-                    // Last contact date — from model field or most recent note
-                    val lastDate: java.time.LocalDate? = run {
-                        val fromField = c.lastContactDate?.let {
-                            try { java.time.LocalDate.parse(it.take(10)) } catch (e: Exception) { null }
-                        }
-                        val fromNotes = AppStateStore.notes
-                            .filter { it.contactId == c.id }
-                            .mapNotNull { n ->
-                                try { java.time.LocalDate.parse(n.createdAt.take(10)) }
-                                catch (e: Exception) { null }
-                            }
-                            .maxOrNull()
-                        listOfNotNull(fromField, fromNotes).maxOrNull()
+                .sortedByDescending {
+                    when (it.importanceLevel) {
+                        ImportanceLevel.KEY       -> 3
+                        ImportanceLevel.IMPORTANT -> 2
+                        else -> 1
                     }
-
-                    val daysSince: Long = if (lastDate != null)
-                        java.time.ChronoUnit.DAYS.between(lastDate, today)
-                    else
-                        maxDays + 1  // Never contacted → treat as overdue
-
-                    // Only show if overdue (days without contact > rhythm threshold)
-                    if (daysSince < maxDays) return@mapNotNull null
-
-                    val overdueDays = daysSince - maxDays   // how many days past deadline
-                    val label = when {
-                        lastDate == null -> "Никогда не общались"
-                        daysSince > 365  -> "Более года назад"
-                        else             -> "$daysSince дн. назад"
-                    }
-
+                }
+                .take(5)
+                .map { c ->
                     val compRel = c.companyRelations.firstOrNull { it.isPrimary }
                         ?: c.companyRelations.firstOrNull()
                     val company = compRel?.companyId
                         ?.let { AppStateStore.getCompany(it)?.name } ?: ""
-
-                    HomeContact(
-                        id           = c.id,
-                        name         = "${c.firstName} ${c.lastName}".trim(),
-                        company      = company,
-                        position     = compRel?.position ?: "",
-                        importance   = c.importanceLevel,
-                        daysSince    = daysSince,
-                        overdueLabel = label
-                    ) to overdueDays
+                    HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
+                        company, compRel?.position ?: "", c.importanceLevel)
                 }
-                // Sort: most overdue first, then by importance
-                .sortedWith(compareByDescending<Pair<HomeContact, Long>> { it.second }
-                    .thenByDescending {
-                        when (it.first.importance) {
-                            ImportanceLevel.KEY       -> 3
-                            ImportanceLevel.IMPORTANT -> 2
-                            else -> 1
-                        }
-                    }
-                )
-                .take(7)
-                .map { it.first }
         }
     }
 
@@ -243,127 +174,6 @@ fun HomeScreen(
     val statsContacts  = AppStateStore.contacts.size
     val statsCompanies = AppStateStore.companies.size
     val statsEvents    = AppStateStore.calendarItems.count { it.status == CalendarItemStatus.ACTIVE }
-
-    // ── Умные списки ──────────────────────────────────────────
-
-    val smartLists by remember {
-        derivedStateOf {
-            val today = java.time.LocalDate.now()
-            val lists = mutableListOf<SmartList>()
-
-            // 1. Дни рождения в ближайшие 30 дней
-            val birthdayContacts = AppStateStore.calendarItems
-                .filter { it.type == CalendarItemType.BIRTHDAY && it.status == CalendarItemStatus.ACTIVE }
-                .mapNotNull { event ->
-                    val dateStr = event.startDate
-                    val contactLink = event.links.firstOrNull { it.targetType == CalendarTargetType.CONTACT }
-                        ?: return@mapNotNull null
-                    val contact = AppStateStore.getContact(contactLink.targetId)
-                        ?: return@mapNotNull null
-                    // Normalise birthday to current year
-                    val daysUntil = try {
-                        val bday = java.time.LocalDate.parse(dateStr)
-                        val thisYear = bday.withYear(today.year)
-                        val next = if (thisYear < today) thisYear.plusYears(1) else thisYear
-                        java.time.ChronoUnit.DAYS.between(today, next)
-                    } catch (e: Exception) { return@mapNotNull null }
-                    if (daysUntil > 30) return@mapNotNull null
-                    val compRel = contact.companyRelations.firstOrNull { it.isPrimary }
-                        ?: contact.companyRelations.firstOrNull()
-                    val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                    HomeContact(
-                        contact.id,
-                        "${contact.firstName} ${contact.lastName}".trim(),
-                        comp, compRel?.position ?: "",
-                        contact.importanceLevel,
-                        overdueLabel = "через $daysUntil дн."
-                    )
-                }
-                .sortedBy { it.overdueLabel }
-            if (birthdayContacts.isNotEmpty()) {
-                lists.add(SmartList(
-                    "birthdays", "🎂 Дни рождения скоро",
-                    "Ближайшие 30 дней",
-                    Icons.Default.Cake,
-                    androidx.compose.ui.graphics.Color(0xFFE53935),
-                    birthdayContacts.size, birthdayContacts
-                ))
-            }
-
-            // 2. Есть следующий шаг (nextStep заполнен)
-            val followUpContacts = AppStateStore.contacts
-                .filter { !it.nextStep.isNullOrBlank() }
-                .map { c ->
-                    val compRel = c.companyRelations.firstOrNull { it.isPrimary }
-                        ?: c.companyRelations.firstOrNull()
-                    val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                    HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
-                        comp, compRel?.position ?: "", c.importanceLevel,
-                        overdueLabel = c.nextStep)
-                }
-                .take(5)
-            if (followUpContacts.isNotEmpty()) {
-                lists.add(SmartList(
-                    "followup", "✅ Есть follow-up",
-                    "Запланированные шаги",
-                    Icons.Default.CheckCircle,
-                    androidx.compose.ui.graphics.Color(0xFF43A047),
-                    followUpContacts.size, followUpContacts
-                ))
-            }
-
-            // 3. Важные контакты без следующего шага
-            val noNextStep = AppStateStore.contacts
-                .filter {
-                    it.importanceLevel != ImportanceLevel.NORMAL &&
-                    it.nextStep.isNullOrBlank()
-                }
-                .map { c ->
-                    val compRel = c.companyRelations.firstOrNull { it.isPrimary }
-                        ?: c.companyRelations.firstOrNull()
-                    val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                    HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
-                        comp, compRel?.position ?: "", c.importanceLevel,
-                        overdueLabel = "нет следующего шага")
-                }
-                .take(5)
-            if (noNextStep.isNotEmpty()) {
-                lists.add(SmartList(
-                    "nonextstep", "⚠️ Нет следующего шага",
-                    "Важные контакты без плана",
-                    Icons.Default.WarningAmber,
-                    androidx.compose.ui.graphics.Color(0xFFFB8C00),
-                    noNextStep.size, noNextStep
-                ))
-            }
-
-            // 4. Новые контакты (за последние 7 дней)
-            val weekAgo = today.minusDays(7).toString()
-            val newContacts = AppStateStore.contacts
-                .filter { it.createdAt.take(10) >= weekAgo }
-                .sortedByDescending { it.createdAt }
-                .map { c ->
-                    val compRel = c.companyRelations.firstOrNull { it.isPrimary }
-                        ?: c.companyRelations.firstOrNull()
-                    val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                    HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
-                        comp, compRel?.position ?: "", c.importanceLevel,
-                        overdueLabel = "добавлен ${c.createdAt.take(10)}")
-                }
-                .take(5)
-            if (newContacts.isNotEmpty()) {
-                lists.add(SmartList(
-                    "new", "🆕 Новые контакты",
-                    "За последние 7 дней",
-                    Icons.Default.PersonAdd,
-                    androidx.compose.ui.graphics.Color(0xFF1E88E5),
-                    newContacts.size, newContacts
-                ))
-            }
-
-            lists
-        }
-    }
 
     Scaffold(
         modifier = modifier,
@@ -498,10 +308,10 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    // Нужно связаться
+                    // Active contacts — clickable
                     if (needAttention.isNotEmpty()) {
                         HomeSectionLabel(
-                            "Нужно связаться · ${needAttention.size}",
+                            "Актуальные контакты",
                             Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                         )
                         Column(
@@ -509,7 +319,7 @@ fun HomeScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             needAttention.forEach { c ->
-                                HomeContactRow(c, onNavigateToContact) { onNavigateToContact(c.id) }
+                                HomeContactRow(c) { onNavigateToContact(c.id) }
                             }
                         }
                     }
@@ -530,26 +340,6 @@ fun HomeScreen(
                                 HomeRecentCard(c) { onNavigateToContact(c.id) }
                             }
                         }
-                    }
-
-                    // Smart lists
-                    if (smartLists.isNotEmpty()) {
-                        HomeSectionLabel(
-                            "Умные списки",
-                            Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                        )
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            smartLists.forEach { list ->
-                                SmartListCard(
-                                    smartList    = list,
-                                    onNavigateTo = onNavigateToContact
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
                     }
 
                     Spacer(Modifier.height(80.dp))
@@ -776,24 +566,12 @@ private fun HomeEventCard(event: HomeEvent, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HomeContactRow(
-    contact: HomeContact,
-    onNavigateToContact: (String) -> Unit = {},
-    onClick: () -> Unit
-) {
+private fun HomeContactRow(contact: HomeContact, onClick: () -> Unit) {
     val importanceColor = when (contact.importance) {
         ImportanceLevel.KEY       -> MaterialTheme.colorScheme.error
         ImportanceLevel.IMPORTANT -> MaterialTheme.colorScheme.tertiary
         else                      -> MaterialTheme.colorScheme.primary
     }
-
-    // Overdue color: red if >2x rhythm, orange if >1x
-    val overdueColor = when {
-        contact.daysSince != null && contact.daysSince > 60 -> MaterialTheme.colorScheme.error
-        contact.daysSince != null && contact.daysSince > 14 -> MaterialTheme.colorScheme.tertiary
-        else                                                 -> MaterialTheme.colorScheme.secondary
-    }
-
     Card(
         onClick   = onClick,
         modifier  = Modifier.fillMaxWidth(),
@@ -801,66 +579,29 @@ private fun HomeContactRow(
         colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(12.dp),
+        Row(Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Avatar
-            Box(
-                Modifier.size(44.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    contact.name.take(1),
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 18.sp,
-                    color      = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(44.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center) {
+                Text(contact.name.take(1), fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
-
             Column(Modifier.weight(1f)) {
-                Text(
-                    contact.name,
-                    style      = MaterialTheme.typography.bodyMedium,
+                Text(contact.name, style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis
-                )
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val sub = listOf(contact.company, contact.position)
                     .filter { it.isNotEmpty() }.joinToString(" · ")
                 if (sub.isNotEmpty())
-                    Text(
-                        sub,
-                        style    = MaterialTheme.typography.bodySmall,
-                        color    = MaterialTheme.colorScheme.secondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                // Overdue label — key visual from ТЗ
-                if (!contact.overdueLabel.isNullOrBlank()) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        contact.overdueLabel,
-                        style      = MaterialTheme.typography.labelSmall,
-                        color      = overdueColor,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                    Text(sub, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(importanceColor))
-                Icon(
-                    Icons.Default.ChevronRight,
-                    null,
-                    tint = MaterialTheme.colorScheme.outlineVariant
-                )
-            }
+            Box(Modifier.size(8.dp).clip(CircleShape).background(importanceColor))
+            Icon(Icons.Default.ChevronRight, null,
+                tint = MaterialTheme.colorScheme.outlineVariant)
         }
     }
 }
@@ -898,129 +639,3 @@ private fun HomeRecentCard(contact: HomeContact, onClick: () -> Unit) {
 fun ColorScheme.textInputVariant() =
     if (AppSettings.isDarkTheme.value) outline.copy(alpha = 0.4f)
     else outline.copy(alpha = 0.2f)
-
-@Composable
-private fun SmartListCard(
-    smartList: SmartList,
-    onNavigateTo: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        modifier  = Modifier.fillMaxWidth(),
-        shape     = SocialShape.Card,
-        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Column {
-            // Header row — always visible
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded }
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    Modifier.size(36.dp).clip(CircleShape)
-                        .background(smartList.color.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(smartList.icon, null, Modifier.size(18.dp), tint = smartList.color)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        smartList.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        smartList.subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-                Badge(containerColor = smartList.color.copy(alpha = 0.15f)) {
-                    Text(
-                        smartList.count.toString(),
-                        color = smartList.color,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    null,
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-            }
-
-            // Expanded contacts list
-            if (expanded) {
-                HorizontalDivider(
-                    color     = MaterialTheme.colorScheme.outlineVariant,
-                    thickness = 0.5.dp
-                )
-                Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    smartList.contacts.forEach { contact ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onNavigateTo(contact.id) }
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(
-                                Modifier.size(32.dp).clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    contact.name.take(1),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize   = 12.sp,
-                                    color      = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    contact.name,
-                                    style      = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines   = 1,
-                                    overflow   = TextOverflow.Ellipsis
-                                )
-                                if (contact.company.isNotEmpty())
-                                    Text(
-                                        contact.company,
-                                        style    = MaterialTheme.typography.labelSmall,
-                                        color    = MaterialTheme.colorScheme.secondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                            }
-                            if (!contact.overdueLabel.isNullOrBlank())
-                                Text(
-                                    contact.overdueLabel,
-                                    style    = MaterialTheme.typography.labelSmall,
-                                    color    = smartList.color,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            Icon(
-                                Icons.Default.ChevronRight,
-                                null,
-                                Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.outlineVariant
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}

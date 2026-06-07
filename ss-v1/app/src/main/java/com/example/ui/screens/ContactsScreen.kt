@@ -58,22 +58,11 @@ fun ContactsScreen(
     var filterImportance  by remember { mutableStateOf(emptySet<ImportanceLevel>()) }
     var filterConnLevel   by remember { mutableStateOf(emptySet<ConnectionLevel>()) }
     var filterRhythm      by remember { mutableStateOf(emptySet<CommunicationRhythm>()) }
-    var filterStatus      by remember { mutableStateOf(emptySet<ContactStatus>()) }
-    var filterTag         by remember { mutableStateOf("") }
     var cityFilter        by remember { mutableStateOf("") }
     var showFilterSheet   by remember { mutableStateOf(false) }
 
     val hasActiveFilters = filterRelTypes.isNotEmpty() || filterImportance.isNotEmpty() ||
-        filterConnLevel.isNotEmpty() || filterRhythm.isNotEmpty() ||
-        filterStatus.isNotEmpty() ||
-        cityFilter.isNotBlank() || filterTag.isNotBlank()
-
-    // All unique tags across contacts for suggestion
-    val allTags by remember {
-        derivedStateOf {
-            AppStateStore.contacts.flatMap { it.tags }.distinct().sorted()
-        }
-    }
+        filterConnLevel.isNotEmpty() || filterRhythm.isNotEmpty() || cityFilter.isNotBlank()
 
     // ── Filtered list (derivedStateOf = recompute only when deps change) ──
     val filteredContacts by remember {
@@ -84,9 +73,7 @@ fun ContactsScreen(
                 importanceLevels    = filterImportance,
                 connectionLevels    = filterConnLevel,
                 communicationRhythms= filterRhythm,
-                contactStatuses     = filterStatus,
                 cityFilter          = cityFilter,
-                tagFilter           = filterTag,
                 sortOrder           = sortOrder
             )
         }
@@ -132,28 +119,21 @@ fun ContactsScreen(
     // ── Filter bottom sheet ───────────────────────────────────
     if (showFilterSheet) {
         ContactFilterSheet(
-            filterRelTypes     = filterRelTypes,
-            filterImportance   = filterImportance,
-            filterConnLevel    = filterConnLevel,
-            filterRhythm       = filterRhythm,
-            filterStatus       = filterStatus,
-            cityFilter         = cityFilter,
-            tagFilter          = filterTag,
-            allTags            = allTags,
-            onRelTypesChange   = { filterRelTypes   = it },
-            onImportanceChange = { filterImportance = it },
-            onConnLevelChange  = { filterConnLevel  = it },
-            onRhythmChange     = { filterRhythm     = it },
-            onStatusChange     = { filterStatus     = it },
-            onCityChange       = { cityFilter       = it },
-            onTagChange        = { filterTag        = it },
-            onClear            = {
+            filterRelTypes    = filterRelTypes,
+            filterImportance  = filterImportance,
+            filterConnLevel   = filterConnLevel,
+            filterRhythm      = filterRhythm,
+            cityFilter        = cityFilter,
+            onRelTypesChange  = { filterRelTypes = it },
+            onImportanceChange= { filterImportance = it },
+            onConnLevelChange = { filterConnLevel = it },
+            onRhythmChange    = { filterRhythm = it },
+            onCityChange      = { cityFilter = it },
+            onClear           = {
                 filterRelTypes = emptySet(); filterImportance = emptySet()
-                filterConnLevel = emptySet(); filterRhythm = emptySet()
-                filterStatus = emptySet()
-                cityFilter = ""; filterTag = ""
+                filterConnLevel = emptySet(); filterRhythm = emptySet(); cityFilter = ""
             },
-            onDismiss          = { showFilterSheet = false }
+            onDismiss         = { showFilterSheet = false }
         )
     }
 
@@ -228,9 +208,7 @@ fun ContactsScreen(
                 filterRelTypes.forEach  { add(it.label() to { filterRelTypes   = filterRelTypes   - it }) }
                 filterImportance.forEach{ add(it.label() to { filterImportance = filterImportance - it }) }
                 filterConnLevel.forEach { add(it.label() to { filterConnLevel  = filterConnLevel  - it }) }
-                filterStatus.forEach    { add(it.label() to { filterStatus     = filterStatus     - it }) }
-                if (filterTag.isNotBlank())  add("#$filterTag"    to { filterTag   = "" })
-                if (cityFilter.isNotBlank()) add("📍 $cityFilter" to { cityFilter  = "" })
+                if (cityFilter.isNotBlank()) add("📍 $cityFilter" to { cityFilter = "" })
             }
             if (activeChips.isNotEmpty()) {
                 Row(
@@ -340,17 +318,12 @@ private fun ContactFilterSheet(
     filterImportance: Set<ImportanceLevel>,
     filterConnLevel: Set<ConnectionLevel>,
     filterRhythm: Set<CommunicationRhythm>,
-    filterStatus: Set<ContactStatus> = emptySet(),
     cityFilter: String,
-    tagFilter: String = "",
-    allTags: List<String> = emptyList(),
     onRelTypesChange: (Set<RelationshipType>) -> Unit,
     onImportanceChange: (Set<ImportanceLevel>) -> Unit,
     onConnLevelChange: (Set<ConnectionLevel>) -> Unit,
     onRhythmChange: (Set<CommunicationRhythm>) -> Unit,
-    onStatusChange: (Set<ContactStatus>) -> Unit = {},
     onCityChange: (String) -> Unit,
-    onTagChange: (String) -> Unit = {},
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -365,18 +338,6 @@ private fun ContactFilterSheet(
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                 Text("Фильтры", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 TextButton(onClick = onClear) { Text("Сбросить всё") }
-            }
-
-            // Status
-            FilterSection("Статус контакта") {
-                ContactStatus.values().forEach { status ->
-                    MultiSelectChip(status.label(), status in filterStatus) {
-                        onStatusChange(
-                            if (status in filterStatus) filterStatus - status
-                            else filterStatus + status
-                        )
-                    }
-                }
             }
 
             // Relationship type
@@ -431,38 +392,6 @@ private fun ContactFilterSheet(
                     singleLine = true,
                     shape = SocialShape.Small
                 )
-            }
-
-            // Tags
-            if (allTags.isNotEmpty()) {
-                FilterSection("Тег") {
-                    OutlinedTextField(
-                        value = tagFilter,
-                        onValueChange = onTagChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Например: VIP") },
-                        leadingIcon  = { Icon(Icons.Default.Label, null, Modifier.size(18.dp)) },
-                        trailingIcon = {
-                            if (tagFilter.isNotEmpty()) IconButton(onClick = { onTagChange("") }) {
-                                Icon(Icons.Default.Clear, null, Modifier.size(16.dp))
-                            }
-                        },
-                        singleLine = true,
-                        shape = SocialShape.Small
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        allTags.take(8).forEach { tag ->
-                            FilterChip(
-                                selected = tag.equals(tagFilter, ignoreCase = true),
-                                onClick  = { onTagChange(if (tag.equals(tagFilter, ignoreCase = true)) "" else tag) },
-                                label    = { Text(tag, fontSize = 12.sp) },
-                                shape    = SocialShape.Full
-                            )
-                        }
-                    }
-                }
             }
 
             Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Применить") }

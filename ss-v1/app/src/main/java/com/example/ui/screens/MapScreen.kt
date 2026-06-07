@@ -5,9 +5,11 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -56,16 +58,16 @@ fun MapScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var selectedTab    by remember { mutableIntStateOf(0) }
+    var searchQuery    by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf("Все") }
     var selectedItem   by remember { mutableStateOf<MapLocationItem?>(null) }
     var showMapView    by remember { mutableStateOf(true) }
+    // FIX: start false, only enable after explicit permission grant
     var locationPermGranted by remember { mutableStateOf(false) }
+    // FIX: track map load errors
     var mapLoadError by remember { mutableStateOf<String?>(null) }
 
-    // ТЗ: 4 вкладки — Контакты / Рабочие адреса / Компании / Места
-    val tabs = listOf("Контакты", "Работа", "Компании", "Места")
-
-    var searchQuery by remember { mutableStateOf("") }
+    val filters = listOf("Все", "Люди", "Компании", "Дом", "Работа")
 
     // Check permission on first composition (don't request automatically)
     LaunchedEffect(Unit) {
@@ -137,26 +139,21 @@ fun MapScreen(
         }
     }
 
-    val filteredList by remember(mapObjects, searchQuery, selectedTab) {
+    val filteredList by remember(mapObjects, searchQuery, selectedFilter) {
         derivedStateOf {
             mapObjects.filter { obj ->
                 val q = "${obj.title} ${obj.subtitle} ${obj.city} ${obj.addressLine}"
                 val matchSearch = q.contains(searchQuery, ignoreCase = true)
-                val matchTab = when (selectedTab) {
-                    0 -> // Контакты — все адреса людей (дом + работа)
-                        obj.ownerType == AddressOwnerType.CONTACT
-                    1 -> // Рабочие адреса — только рабочие адреса контактов
-                        obj.ownerType == AddressOwnerType.CONTACT &&
-                        obj.locationType in listOf(AddressType.WORK, AddressType.OFFICE)
-                    2 -> // Компании — адреса компаний
-                        obj.ownerType == AddressOwnerType.COMPANY
-                    3 -> // Места — домашние адреса + прочее
-                        obj.locationType in listOf(
-                            AddressType.HOME, AddressType.OTHER, AddressType.BRANCH
-                        )
+                val matchFilter = when (selectedFilter) {
+                    "Люди"     -> obj.ownerType == AddressOwnerType.CONTACT
+                    "Компании" -> obj.ownerType == AddressOwnerType.COMPANY
+                    "Дом"      -> obj.locationType == AddressType.HOME
+                    "Работа"   -> obj.locationType in listOf(
+                        AddressType.WORK, AddressType.OFFICE, AddressType.BRANCH
+                    )
                     else -> true
                 }
-                matchSearch && matchTab
+                matchSearch && matchFilter
             }
         }
     }
@@ -208,47 +205,44 @@ fun MapScreen(
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
 
-            // ── TabRow по ТЗ ─────────────────────────────────────
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor   = MaterialTheme.colorScheme.background,
-                contentColor     = MaterialTheme.colorScheme.primary
-            ) {
-                tabs.forEachIndexed { idx, title ->
-                    val icon = when (idx) {
-                        0 -> Icons.Default.Person
-                        1 -> Icons.Default.Work
-                        2 -> Icons.Default.Business
-                        3 -> Icons.Default.Place
-                        else -> Icons.Default.LocationOn
-                    }
-                    Tab(
-                        selected  = selectedTab == idx,
-                        onClick   = { selectedTab = idx; selectedItem = null },
-                        text      = { Text(title, style = MaterialTheme.typography.labelMedium) },
-                        icon      = { Icon(icon, null, Modifier.size(16.dp)) }
-                    )
-                }
-            }
-
-            // ── Search ────────────────────────────────────────────
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
+            // Search + filters
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Поиск на карте…") },
-                leadingIcon  = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty())
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, null)
-                        }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(24.dp)
-            )
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Поиск на карте…") },
+                    leadingIcon  = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty())
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, null)
+                            }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(24.dp)
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filters.forEach { f ->
+                        FilterChip(
+                            selected = selectedFilter == f,
+                            onClick  = { selectedFilter = f; selectedItem = null },
+                            label    = { Text(f) },
+                            shape    = RoundedCornerShape(16.dp)
+                        )
+                    }
+                }
+            }
 
             // MAP VIEW
             if (showMapView) {
@@ -269,7 +263,7 @@ fun MapScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.Map,
+                                    Icons.Default.MapOutlined,
                                     null,
                                     Modifier.size(48.dp),
                                     tint = MaterialTheme.colorScheme.outlineVariant

@@ -19,3 +19,34 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ── Socialsphere ProGuard Rules ──────────────────────────────
+
+# Room — не обфусцировать Entity классы
+-keep class com.aistudio.socialsphere.crmlxb.data.local.*Entity { *; }
+-keep class com.aistudio.socialsphere.crmlxb.data.local.*Dao { *; }
+-keepclassmembers class * extends androidx.room.RoomDatabase { *; }
+
+# Moshi — JSON сериализация
+-keep class com.aistudio.socialsphere.crmlxb.model.** { *; }
+-keepclassmembers class com.aistudio.socialsphere.crmlxb.model.** { *; }
+-keep @com.squareup.moshi.JsonClass class * { *; }
+-keepclassmembers class * {
+    @com.squareup.moshi.FromJson *;
+    @com.squareup.moshi.ToJson *;
+}
+
+# Kotlin coroutines
+-keepclassmembernames class kotlinx.** {
+    volatile <fields>;
+}
+
+# Google Maps
+-keep class com.google.android.gms.maps.** { *; }
+-keep interface com.google.android.gms.maps.** { *; }
+
+# Enums — важно для Room
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}

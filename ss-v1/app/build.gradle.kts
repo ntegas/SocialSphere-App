@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.aistudio.socialsphere.crmlxb"
   compileSdk = 35
 
   defaultConfig {
@@ -14,7 +14,7 @@ android {
     minSdk = 24
     targetSdk = 35
     versionCode = 1
-    versionName = "1.0"
+    versionName = "1.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -22,11 +22,13 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     debug {
-      // Uses Android Studio default debug keystore — no custom config needed
+      applicationIdSuffix = ".debug"
+      versionNameSuffix = "-debug"
     }
   }
   compileOptions {
