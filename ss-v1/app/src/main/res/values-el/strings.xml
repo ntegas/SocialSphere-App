@@ -1,0 +1,89 @@
+<resources>
+    <string name="app_name">Socialsphere</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">Αρχική</string>
+    <string name="nav_contacts">Επαφές</string>
+    <string name="nav_companies">Εταιρείες</string>
+    <string name="nav_calendar">Ημερολόγιο</string>
+    <string name="nav_map">Χάρτης</string>
+    <string name="nav_settings">Ρυθμίσεις</string>
+    
+    <!-- Settings Screen -->
+    <string name="settings_title">Ρυθμίσεις</string>
+    <string name="settings_language">Γλώσσα</string>
+    <string name="settings_notifications">Ειδοποιήσεις</string>
+    <string name="settings_calendar">Ημερολόγιο</string>
+    <string name="settings_import_export">Εισαγωγή &amp; Εξαγωγή</string>
+    <string name="settings_appearance">Εμφάνιση</string>
+    <string name="settings_privacy">Απόρρητο</string>
+    <string name="select_language">Επιλογή Γλώσσας</string>
+    
+    <!-- Home Screen -->
+    <string name="search_placeholder">Αναζήτηση…</string>
+    <string name="home_upcoming">Επόμενα</string>
+    <string name="home_active_contacts">Ενεργές Επαφές</string>
+    <string name="home_recent">Πρόσφατα Προστεθήκαντα</string>
+    <string name="home_stats">Μικρά Στατιστικά</string>
+    <string name="stat_total_contacts">Συνολικές Επαφές</string>
+    <string name="stat_total_companies">Συνολικές Εταιρείες</string>
+    <string name="stat_upcoming_events">Γεγονότα Αυτήν την Εβδομάδα</string>
+    <string name="view_all">Όλα</string>
+    
+    <!-- Contacts Screen -->
+    <string name="contacts_search">Αναζήτηση επαφών</string>
+    <string name="view_mode">Προβολή</string>
+    <string name="view_mode_list">Λίστα</string>
+    <string name="view_mode_grid">Κάρτες</string>
+    <string name="add_contact">Προσθήκη Επαφής</string>
+    
+    <!-- Filters -->
+    <string name="filter_relation_type">τύπος σχέσης</string>
+    <string name="filter_conn_level">επίπεδο σύνδεσης</string>
+    <string name="filter_importance">σημαντικότητα</string>
+    <string name="filter_social_role">κοινωνικός ρόλος</string>
+    <string name="filter_company">εταιρεία</string>
+    <string name="filter_city">πόλη</string>
+    <string name="filter_industry">κλάδος</string>
+    
+    <!-- Fast actions -->
+    <string name="action_call">Κλήση</string>
+    <string name="action_message">Μήνυμα</string>
+    
+    <!-- Companies Screen -->
+    <string name="companies_search">Αναζήτηση εταιρειών</string>
+    <string name="add_company">Προσθήκη Εταιρείας</string>
+    <string name="connected_people">Συνδεδεμένα άτομα: %1$d</string>
+    <string name="open_card">Άνοιγμα Κάρτας</string>
+    
+    <!-- Calendar Screen -->
+    <string name="cal_today">Σήμερα</string>
+    <string name="cal_list">Λίστα</string>
+    <string name="cal_day">Ημέρα</string>
+    <string name="cal_week">Εβδομάδα</string>
+    <string name="cal_month">Μήνας</string>
+    
+    <string name="cal_filter_all">Όλα</string>
+    <string name="cal_filter_birthdays">Γενέθλια</string>
+    <string name="cal_filter_meetings">Συναντήσεις</string>
+    <string name="cal_filter_calls">Κλήσεις</string>
+    <string name="cal_filter_gifts">Δώρα</string>
+    <string name="cal_filter_important">Σημαντικά</string>
+    
+    <string name="cal_upcoming_title">Επόμενα Στοιχεία Ημερολογίου</string>
+    <string name="event_birthday">Γενέθλια</string>
+    <string name="event_call">Κλήση</string>
+    <string name="event_meeting">Συνάντηση</string>
+    <string name="event_gift">Δώρο</string>
+    
+    <!-- Map Screen -->
+    <string name="map_search">Αναζήτηση στο χάρτη</string>
+    <string name="map_filter_all">Όλα</string>
+    <string name="map_filter_people">Άνθρωποι</string>
+    <string name="map_filter_companies">Εταιρείες</string>
+    <string name="map_filter_home">Σπίτι</string>
+    <string name="map_filter_work">Εργασία</string>
+    
+    <string name="map_in_this_area">Σε αυτήν την περιοχή</string>
+    <string name="map_route">Διαδρομή</string>
+</resources>
