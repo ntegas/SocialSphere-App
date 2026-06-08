@@ -27,8 +27,7 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     debug {
-      applicationIdSuffix = ".debug"
-      versionNameSuffix = "-debug"
+      // Без суффикса — проще устанавливать на телефон без конфликтов
     }
   }
   compileOptions {
@@ -36,10 +35,6 @@ android {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
   }
-<<<<<<< HEAD
-=======
-  
-//>>>>>>>62f582d8147056648139d19cfb607c43e1b11d10
   buildFeatures {
     compose = true
     buildConfig = true

@@ -590,6 +590,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             color      = androidx.compose.ui.graphics.Color(0xFFE53935),
             isEmpty    = familyRelations.isEmpty()
         ) {
+            // Кликабельные контакты с ролями
             if (familyRelations.isNotEmpty()) {
                 familyRelations.forEach { rel ->
                     val isFirst   = rel.firstContactId == contact.id
@@ -599,23 +600,56 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     val otherName = other?.let { "${it.firstName} ${it.lastName}".trim() }
                         ?: "Контакт удалён"
                     Row(
-                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        Arrangement.SpaceBetween, Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = other != null) { onNavigateToContact(otherId) }
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            role,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.weight(0.4f)
-                        )
-                        Text(
-                            otherName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(0.6f),
-                            textAlign = TextAlign.End
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Аватар
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    (other?.firstName?.firstOrNull()?.toString() ?: "?") +
+                                    (other?.lastName?.firstOrNull()?.toString() ?: ""),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Column {
+                                Text(
+                                    otherName,
+                                    style      = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                if (!role.isNullOrBlank())
+                                    Text(
+                                        role,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                            }
+                        }
+                        if (other != null)
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                null,
+                                Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.outlineVariant
+                            )
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                 }
             } else {
                 FordEmptyHint("Добавь родственников и близких во вкладке «Связи»")
