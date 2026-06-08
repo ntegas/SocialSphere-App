@@ -27,8 +27,7 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     debug {
-      applicationIdSuffix = ".debug"
-      versionNameSuffix = "-debug"
+      // Без суффикса — проще устанавливать на телефон без конфликтов
     }
   }
   compileOptions {

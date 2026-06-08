@@ -98,10 +98,17 @@ fun LocalizedApp(
     @Suppress("DEPRECATION")
     context.resources.updateConfiguration(config, context.resources.displayMetrics)
 
-    // ПРАВИЛО: передаём ОБА провайдера — LocalContext И LocalConfiguration
+    // Сохраняем ActivityResultRegistryOwner чтобы не терялся при смене языка
+    val activityResultRegistry = androidx.activity.compose.LocalActivityResultRegistryOwner.current
+
     CompositionLocalProvider(
         LocalContext provides localizedContext,
-        LocalConfiguration provides config
+        LocalConfiguration provides config,
+        // Явно передаём ActivityResultRegistryOwner — иначе краш в MapScreen и ImportScreens
+        *if (activityResultRegistry != null)
+            arrayOf(androidx.activity.compose.LocalActivityResultRegistryOwner provides activityResultRegistry)
+        else
+            emptyArray()
     ) {
         content()
     }
