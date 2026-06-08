@@ -1,9 +1,12 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
+import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
@@ -13,19 +16,68 @@ enum class AppLanguage(val code: String, val displayName: String) {
     GREEK("el", "Ελληνικά")
 }
 
-object AppSettings {
-    val currentLanguage = mutableStateOf(AppLanguage.RUSSIAN)
-    val isNotificationsEnabled     = mutableStateOf(true)
-    val isDarkTheme                = mutableStateOf(false)
+// ── Persisted state helper — сохраняется при перезапуске ──────
+class PersistedMutableState<T>(
+    private val prefs: android.content.SharedPreferences,
+    private val key: String,
+    private val default: T,
+    private val serialize: (T) -> String,
+    private val deserialize: (String) -> T
+) : MutableState<T> {
+    private val state = mutableStateOf(
+        prefs.getString(key, null)?.let {
+            try { deserialize(it) } catch (e: Exception) { default }
+        } ?: default
+    )
+    override var value: T
+        get() = state.value
+        set(v) {
+            state.value = v
+            prefs.edit().putString(key, serialize(v)).apply()
+        }
+    override fun component1(): T = value
+    override fun component2(): (T) -> Unit = { value = it }
+}
 
-    // Notification timing preferences
-    val defaultReminderTime        = mutableStateOf("за 1 день")
-    val birthdayReminderTimes      = mutableStateOf(setOf("в день события", "за 1 день"))
-    val giftReminderTime           = mutableStateOf("за 3 дня")
-    val meetingReminderTime        = mutableStateOf("за 1 час")
-    val callReminderTime           = mutableStateOf("за 10 минут")
-    val showOverdue                = mutableStateOf(true)
-    val repeatOverdueVisually      = mutableStateOf(false)
+object AppSettings {
+    private var prefs: android.content.SharedPreferences? = null
+
+    fun init(context: Context) {
+        if (prefs != null) return
+        prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+    }
+
+    private fun getPrefs(): android.content.SharedPreferences =
+        prefs ?: throw IllegalStateException("AppSettings.init() not called")
+
+    val currentLanguage: MutableState<AppLanguage> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "language",
+            default     = AppLanguage.RUSSIAN,
+            serialize   = { it.code },
+            deserialize = { code -> AppLanguage.values().find { it.code == code } ?: AppLanguage.RUSSIAN }
+        )
+    }
+
+    val isDarkTheme: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "dark_theme",
+            default     = false,
+            serialize   = { it.toString() },
+            deserialize = { it == "true" }
+        )
+    }
+
+    val isNotificationsEnabled = mutableStateOf(true)
+    val defaultReminderTime    = mutableStateOf("за 1 день")
+    val birthdayReminderTimes  = mutableStateOf(setOf("в день события", "за 1 день"))
+    val giftReminderTime       = mutableStateOf("за 3 дня")
+    val meetingReminderTime    = mutableStateOf("за 1 час")
+    val callReminderTime       = mutableStateOf("за 10 минут")
+    val showOverdue            = mutableStateOf(true)
+    val repeatOverdueVisually  = mutableStateOf(false)
 }
 
 @Composable
@@ -34,23 +86,22 @@ fun LocalizedApp(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val locale = Locale(language.code)
+    val locale  = Locale(language.code)
 
-    // Apply locale globally
     Locale.setDefault(locale)
 
-    // Create a localized context with updated configuration
     val config = Configuration(context.resources.configuration)
     config.setLocale(locale)
     config.setLayoutDirection(locale)
     val localizedContext = context.createConfigurationContext(config)
 
-    // Also update the base context resources so stringResource() picks it up
     @Suppress("DEPRECATION")
     context.resources.updateConfiguration(config, context.resources.displayMetrics)
 
+    // ПРАВИЛО: передаём ОБА провайдера — LocalContext И LocalConfiguration
     CompositionLocalProvider(
-        LocalContext provides localizedContext
+        LocalContext provides localizedContext,
+        LocalConfiguration provides config
     ) {
         content()
     }

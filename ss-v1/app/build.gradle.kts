@@ -36,10 +36,6 @@ android {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
   }
-<<<<<<< HEAD
-=======
-  
-//>>>>>>>62f582d8147056648139d19cfb607c43e1b11d10
   buildFeatures {
     compose = true
     buildConfig = true

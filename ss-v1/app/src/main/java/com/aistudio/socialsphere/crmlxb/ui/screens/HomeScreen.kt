@@ -79,9 +79,13 @@ fun HomeScreen(
     onNavigateToContact: (String) -> Unit = {},
     onNavigateToCompany: (String) -> Unit = {},
     onNavigateToCalendarItem: (String) -> Unit = {},
+    onNavigateToCalendar: () -> Unit = {},
+    onNavigateToContacts: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState  = rememberScrollState()
+    var expandBirthdayList  by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
     // FIX: explicit Locale.getDefault() to avoid crash on locale change
     val today        = LocalDate.now()
     val dateLabel    = remember(today) {
@@ -499,7 +503,13 @@ fun HomeScreen(
                             label     = "ДР в месяце",
                             bgColor   = MaterialTheme.colorScheme.primaryContainer,
                             fgColor   = MaterialTheme.colorScheme.onPrimaryContainer,
-                            onClick   = { /* TODO iter3: scroll to birthdays list */ }
+                            onClick   = {
+                                expandBirthdayList = true
+                                coroutineScope.launch {
+                                    kotlinx.coroutines.delay(100)
+                                    scrollState.animateScrollTo(scrollState.maxValue)
+                                }
+                            }
                         )
                         // 📞 Встречи/звонки на неделе
                         HomeStatCard(
@@ -509,7 +519,7 @@ fun HomeScreen(
                             label     = "Встреч в нед.",
                             bgColor   = MaterialTheme.colorScheme.secondaryContainer,
                             fgColor   = MaterialTheme.colorScheme.onSecondaryContainer,
-                            onClick   = { /* TODO iter3: navigate to calendar week view */ }
+                            onClick   = { onNavigateToCalendar() }
                         )
                         // ⚠️ Просроченных контактов
                         HomeStatCard(
@@ -525,7 +535,7 @@ fun HomeScreen(
                                 MaterialTheme.colorScheme.onErrorContainer
                             else
                                 MaterialTheme.colorScheme.onTertiaryContainer,
-                            onClick   = { /* TODO iter3: scroll to needAttention */ }
+                            onClick   = { onNavigateToContacts() }
                         )
                     }
 
@@ -594,7 +604,9 @@ fun HomeScreen(
                             smartLists.forEach { list ->
                                 SmartListCard(
                                     smartList    = list,
-                                    onNavigateTo = onNavigateToContact
+                                    onNavigateTo = onNavigateToContact,
+                                    forceExpand  = expandBirthdayList &&
+                                        list.title.contains("рождени", ignoreCase = true)
                                 )
                             }
                         }
@@ -966,9 +978,11 @@ fun ColorScheme.textInputVariant() =
 @Composable
 private fun SmartListCard(
     smartList: SmartList,
-    onNavigateTo: (String) -> Unit
+    onNavigateTo: (String) -> Unit,
+    forceExpand: Boolean = false
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(forceExpand) }
+    LaunchedEffect(forceExpand) { if (forceExpand) expanded = true }
 
     Card(
         modifier  = Modifier.fillMaxWidth(),

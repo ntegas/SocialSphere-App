@@ -24,11 +24,13 @@ import com.aistudio.socialsphere.crmlxb.ui.screens.*
 import com.aistudio.socialsphere.crmlxb.ui.theme.MyApplicationTheme
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.data.local.SocialsphereDatabase
+import com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        AppSettings.init(applicationContext)
         val db = SocialsphereDatabase.getDatabase(applicationContext)
         AppStateStore.initialize(db)
 
@@ -99,10 +101,12 @@ fun SocialsphereApp() {
         ) {
             composable("home") {
                 HomeScreen(
-                    onNavigateToSettings    = { navController.navigate("settings") },
-                    onNavigateToContact     = { id -> navController.navigate("contact_detail/$id") },
-                    onNavigateToCompany     = { id -> navController.navigate("company_detail/$id") },
-                    onNavigateToCalendarItem = { id -> navController.navigate("calendar_item_detail/$id") }
+                    onNavigateToSettings     = { navController.navigate("settings") },
+                    onNavigateToContact      = { id -> navController.navigate("contact_detail/$id") },
+                    onNavigateToCompany      = { id -> navController.navigate("company_detail/$id") },
+                    onNavigateToCalendarItem = { id -> navController.navigate("calendar_item_detail/$id") },
+                    onNavigateToCalendar     = { navController.navigate("calendar") },
+                    onNavigateToContacts     = { navController.navigate("contacts") }
                 )
             }
             composable("contacts") {
