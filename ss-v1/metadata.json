@@ -1,0 +1,6 @@
+{
+  "name": "Socialsphere",
+  "description": "CRM-приложение для ведения контактов, компаний, календаря встреч и маркеров на карте.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
