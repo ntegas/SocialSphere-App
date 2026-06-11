@@ -221,7 +221,7 @@ fun CheatSheetScreen(
             // ── Последний контакт ──────────────────────────────
             if (lastNote != null) {
                 item {
-                    SheetBlock("🕐 Последний разговор") {
+                    SheetBlock("🕐 Последняя запись") {
                         Text(lastNote.createdAt.take(10),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.secondary)

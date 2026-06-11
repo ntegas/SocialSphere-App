@@ -46,6 +46,27 @@ fun ContactEmail.toEntity(): ContactEmailEntity = ContactEmailEntity(
     comment = comment
 )
 
+// ── Company-варианты: та же таблица, заполняется companyId ──
+fun ContactPhone.toCompanyEntity(companyId: String): ContactPhoneEntity = ContactPhoneEntity(
+    id = id,
+    contactId = null,
+    companyId = companyId,
+    number = number,
+    type = type.name,
+    isPrimary = isPrimary,
+    comment = comment
+)
+
+fun ContactEmail.toCompanyEntity(companyId: String): ContactEmailEntity = ContactEmailEntity(
+    id = id,
+    contactId = null,
+    companyId = companyId,
+    email = email,
+    type = type.name,
+    isPrimary = isPrimary,
+    comment = comment
+)
+
 fun Messenger.toEntity(): MessengerEntity = MessengerEntity(
     id = id,
     contactId = contactId,

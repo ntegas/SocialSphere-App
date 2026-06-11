@@ -1,12 +1,43 @@
 package com.aistudio.socialsphere.crmlxb.utils
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import com.aistudio.socialsphere.crmlxb.model.Messenger
 
 object ExternalActionHandler {
+
+    /** Ищет Activity в цепочке обёрток контекста. Локализованный контекст
+     *  (createConfigurationContext) не является Activity — startActivity из него
+     *  без флага NEW_TASK бросает AndroidRuntimeException, которую try-catch
+     *  глотал молча. Из-за этого «не работали» кнопки звонка/SMS/почты/карты. */
+    private fun Context.findActivity(): Activity? {
+        var ctx: Context = this
+        while (ctx is ContextWrapper) {
+            if (ctx is Activity) return ctx
+            ctx = ctx.baseContext
+        }
+        return null
+    }
+
+    /** Запускает intent корректно из любого контекста. @return true при успехе. */
+    fun startIntentSafely(context: Context, intent: Intent): Boolean {
+        return try {
+            val activity = context.findActivity()
+            if (activity != null) {
+                activity.startActivity(intent)
+            } else {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     fun openDialer(context: Context, phoneNumber: String?) {
         if (phoneNumber.isNullOrBlank()) {
@@ -138,10 +169,7 @@ object ExternalActionHandler {
             val intent = Intent(Intent.ACTION_VIEW).apply { data = Uri.parse(uri) }
             // For Telegram: try app deep link, fall back to web
             if (messenger.type == com.aistudio.socialsphere.crmlxb.model.MessengerType.TELEGRAM) {
-                try {
-                    context.startActivity(intent)
-                    return
-                } catch (_: Exception) {}
+                if (startIntentSafely(context, intent)) return
                 // Fallback to web
                 safelyStartIntent(context, Intent(Intent.ACTION_VIEW).apply {
                     data = Uri.parse("https://t.me/$value")
@@ -155,12 +183,8 @@ object ExternalActionHandler {
     }
 
     private fun safelyStartIntent(context: Context, intent: Intent) {
-        try {
-            context.startActivity(intent)
-        } catch (e: android.content.ActivityNotFoundException) {
+        if (!startIntentSafely(context, intent)) {
             Toast.makeText(context, "Нет приложения для выполнения действия", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Toast.makeText(context, "Не удалось выполнить действие", Toast.LENGTH_SHORT).show()
         }
     }
 }

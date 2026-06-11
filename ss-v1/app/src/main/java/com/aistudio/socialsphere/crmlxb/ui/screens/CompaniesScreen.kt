@@ -276,10 +276,19 @@ fun CompaniesScreen(
 @Composable
 fun CompanyCardItem(company: Company, onClick: () -> Unit) {
     val ctx = LocalContext.current
-    val addresses = AppStateStore.addresses.filter { it.ownerId == company.id && it.ownerType == AddressOwnerType.COMPANY }
+    // Пересчёт только при смене данных, а не на каждой рекомпозиции при скролле
+    val addresses by remember(company.id) {
+        derivedStateOf {
+            AppStateStore.addresses.filter { it.ownerId == company.id && it.ownerType == AddressOwnerType.COMPANY }
+        }
+    }
+    val relations by remember(company.id) {
+        derivedStateOf {
+            AppStateStore.companyRelations.filter { it.companyId == company.id }
+        }
+    }
     val mainCity = addresses.firstOrNull { it.addressType == AddressType.OFFICE || it.addressType == AddressType.LEGAL }?.city
         ?: addresses.firstOrNull()?.city ?: ""
-    val relations = AppStateStore.companyRelations.filter { it.companyId == company.id }
     val peopleCount = relations.size
     val peopleSample = relations.take(2).mapNotNull {
         AppStateStore.getContact(it.contactId)?.let { c -> "${c.firstName} ${c.lastName}" }

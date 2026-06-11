@@ -161,7 +161,9 @@ fun MapScreen(
         }
     }
 
-    val geoItems  = filteredList.filter { it.latLng != null }
+    val geoItems by remember {
+        derivedStateOf { filteredList.filter { it.latLng != null } }
+    }
     val listItems = filteredList
 
     val defaultLatLng = geoItems.firstOrNull()?.latLng ?: LatLng(37.9838, 23.7275)

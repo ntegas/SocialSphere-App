@@ -277,7 +277,8 @@ fun HomeScreen(
     val meetingsThisWeek by remember {
         derivedStateOf {
             val today      = java.time.LocalDate.now()
-            val endOfWeek  = today.plusDays(7)
+            // Ровно 7 дней включая сегодня: сегодня + 6
+            val endOfWeek  = today.plusDays(6)
             val todayStr   = today.toString()
             val endStr     = endOfWeek.toString()
             AppStateStore.calendarItems.count { item ->
@@ -322,10 +323,15 @@ fun HomeScreen(
                         "${contact.firstName} ${contact.lastName}".trim(),
                         comp, compRel?.position ?: "",
                         contact.importanceLevel,
-                        overdueLabel = "через $daysUntil дн."
+                        daysSince    = daysUntil,
+                        overdueLabel = when (daysUntil) {
+                            0L   -> "сегодня"
+                            1L   -> "завтра"
+                            else -> "через $daysUntil дн."
+                        }
                     )
                 }
-                .sortedBy { it.overdueLabel }
+                .sortedBy { it.daysSince }
             if (birthdayContacts.isNotEmpty()) {
                 lists.add(SmartList(
                     "birthdays", "🎂 Дни рождения скоро",

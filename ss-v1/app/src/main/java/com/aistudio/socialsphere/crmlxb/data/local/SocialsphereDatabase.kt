@@ -59,6 +59,27 @@ abstract class SocialsphereDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE contacts ADD COLUMN meetContext TEXT")
                 database.execSQL("ALTER TABLE contacts ADD COLUMN meetDate TEXT")
+                // Защита: таблицы, отсутствовавшие в ранних версиях схемы.
+                // Для свежих установок не выполняется (Room создаёт всё по текущей схеме).
+                // SQL точно повторяет Entity — иначе Room уронит валидацию.
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `contact_relations` (" +
+                    "`id` TEXT NOT NULL, `firstContactId` TEXT NOT NULL, " +
+                    "`secondContactId` TEXT NOT NULL, `firstRole` TEXT NOT NULL, " +
+                    "`secondRole` TEXT NOT NULL, `note` TEXT, PRIMARY KEY(`id`))"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `size_infos` (" +
+                    "`id` TEXT NOT NULL, `contactId` TEXT NOT NULL, " +
+                    "`clothingSize` TEXT, `shoeSize` TEXT, `ringSize` TEXT, " +
+                    "`other` TEXT, PRIMARY KEY(`id`))"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `personal_details` (" +
+                    "`id` TEXT NOT NULL, `contactId` TEXT NOT NULL, " +
+                    "`category` TEXT NOT NULL, `value` TEXT NOT NULL, " +
+                    "`note` TEXT, PRIMARY KEY(`id`))"
+                )
             }
         }
 

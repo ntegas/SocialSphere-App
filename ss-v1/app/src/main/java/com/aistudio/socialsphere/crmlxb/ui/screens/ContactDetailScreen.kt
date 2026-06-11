@@ -36,7 +36,8 @@ fun ContactDetailScreen(
     onNavigateToEdit: () -> Unit,
     onNavigateToCreateCalendarItem: () -> Unit,
     onNavigateToContact: (String) -> Unit = {},
-    onNavigateToCheatSheet: () -> Unit = {}
+    onNavigateToCheatSheet: () -> Unit = {},
+    onNavigateToCompany: (String) -> Unit = {}
 ) {
     val contact = AppStateStore.getContact(contactId)
     if (contact == null) {
@@ -51,6 +52,8 @@ fun ContactDetailScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var showVoiceDialog by remember { mutableStateOf(false) }
+    var editingNote  by remember { mutableStateOf<Note?>(null) }
+    var deletingNote by remember { mutableStateOf<Note?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Add note state
@@ -115,10 +118,13 @@ fun ContactDetailScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            TabRow(
+            // ScrollableTabRow: 5 вкладок не влезают в фиксированный TabRow —
+            // «Подарки» и «Заметки» обрезались на реальном устройстве
+            ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.primary,
+                edgePadding = 0.dp,
                 indicator = { tabPositions ->
                     if (selectedTab < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
@@ -136,6 +142,8 @@ fun ContactDetailScreen(
                             Text(
                                 text = title,
                                 fontSize = 13.sp,
+                                maxLines = 1,
+                                softWrap = false,
                                 fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
                             )
                         }
@@ -150,18 +158,88 @@ fun ContactDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 when (selectedTab) {
-                    0 -> overviewTab(contact, onNavigateToCreateCalendarItem, onNavigateToCalendarItem, onNavigateToContact)
-                    1 -> workTab(contact)
+                    0 -> overviewTab(contact, onNavigateToCreateCalendarItem, onNavigateToCalendarItem, onNavigateToContact, onNavigateToCompany)
+                    1 -> workTab(contact, onNavigateToCompany)
                     2 -> communicationTab(contact)
                     3 -> giftsTab(contact, onNavigateToCalendarItem)
                     4 -> notesTab(
-                        contact     = contact,
-                        onShowAdd   = { showAddDialog = true },
-                        onShowVoice = { showVoiceDialog = true }
+                        contact      = contact,
+                        onShowAdd    = { showAddDialog = true },
+                        onShowVoice  = { showVoiceDialog = true },
+                        onEditNote   = { editingNote = it },
+                        onDeleteNote = { deletingNote = it }
                     )
                 }
             }
         }
+    }
+
+    // ── Правка заметки ──
+    editingNote?.let { note ->
+        var editText by remember(note.id) { mutableStateOf(note.text) }
+        var editType by remember(note.id) { mutableStateOf(note.type) }
+        var editImportant by remember(note.id) { mutableStateOf(note.isImportant) }
+        AlertDialog(
+            onDismissRequest = { editingNote = null },
+            title = { Text("Править заметку", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = editText,
+                        onValueChange = { editText = it },
+                        label = { Text("Текст заметки") },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                        maxLines = 5
+                    )
+                    DropdownField("Тип заметки", editType.label(), NoteType.values().map { it.label() }) {
+                        editType = NoteType.values().firstOrNull { n -> n.label() == it } ?: editType
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Checkbox(checked = editImportant, onCheckedChange = { editImportant = it })
+                        Text("Важная заметка", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = editText.isNotBlank(),
+                    onClick = {
+                        AppStateStore.updateNote(note.copy(
+                            text = editText.trim(),
+                            type = editType,
+                            isImportant = editImportant
+                        ))
+                        editingNote = null
+                    }
+                ) { Text("Сохранить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingNote = null }) { Text("Отмена") }
+            }
+        )
+    }
+
+    // ── Подтверждение удаления заметки ──
+    deletingNote?.let { note ->
+        AlertDialog(
+            onDismissRequest = { deletingNote = null },
+            title = { Text("Удалить заметку?", fontWeight = FontWeight.Bold) },
+            text = { Text(note.text.take(120) + if (note.text.length > 120) "…" else "") },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    onClick = {
+                        AppStateStore.deleteNote(note.id)
+                        deletingNote = null
+                    }
+                ) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingNote = null }) { Text("Отмена") }
+            }
+        )
     }
 
     if (showAddDialog) {
@@ -358,7 +436,7 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
     // Days since last contact
     val daysSince = if (!contact.lastContactDate.isNullOrBlank()) {
         try {
-            val last = java.time.LocalDate.parse(contact.lastContactDate)
+            val last = java.time.LocalDate.parse(contact.lastContactDate?.take(10))
             java.time.ChronoUnit.DAYS.between(last, java.time.LocalDate.now())
         } catch (e: Exception) { null }
     } else if (!lastNoteDate.isNullOrBlank()) {
@@ -391,7 +469,7 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
         }
         val daysSinceLast = contact.lastContactDate?.let { dateStr ->
             try {
-                java.time.ChronoUnit.DAYS.between(java.time.LocalDate.parse(dateStr), today)
+                java.time.ChronoUnit.DAYS.between(java.time.LocalDate.parse(dateStr.take(10)), today)
             } catch (e: Exception) { null }
         }
         val badgeColor = when {
@@ -467,10 +545,12 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Outlined.AccessTime, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
+                    // «Активность», а не «общались»: дата обновляется любой заметкой
+                    // (в т.ч. «любит кофе»), что не означает реальный разговор
                     val label = when {
-                        daysSince == 0L -> "Общались сегодня"
-                        daysSince == 1L -> "Общались вчера"
-                        else            -> "Последний контакт: $daysSince дн. назад"
+                        daysSince == 0L -> "Последняя активность: сегодня"
+                        daysSince == 1L -> "Последняя активность: вчера"
+                        else            -> "Последняя активность: $daysSince дн. назад"
                     }
                     Text(label, style = MaterialTheme.typography.bodySmall,
                         color = if (daysSince > 30) MaterialTheme.colorScheme.error
@@ -555,7 +635,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     contact: Contact,
     onNavigateToCreateCalendarItem: () -> Unit,
     onNavigateToCalendarItem: (String) -> Unit = {},
-    onNavigateToContact: (String) -> Unit = {}
+    onNavigateToContact: (String) -> Unit = {},
+    onNavigateToCompany: (String) -> Unit = {}
 ) {
     // ── Краткий контекст ────────────────────────────────────
     val impNotes = AppStateStore.notes.filter {
@@ -672,7 +753,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         ) {
             if (compRel != null) {
                 val companyName = AppStateStore.getCompany(compRel.companyId)?.name ?: ""
-                if (companyName.isNotBlank()) InfoRow("Компания", companyName)
+                if (companyName.isNotBlank()) InfoRow("Компания", "$companyName ›",
+                    onClick = { onNavigateToCompany(compRel.companyId) })
                 if (!compRel.position.isNullOrBlank())       InfoRow("Должность",   compRel.position)
                 if (!compRel.department.isNullOrBlank())     InfoRow("Отдел",        compRel.department)
                 if (!compRel.responsibilities.isNullOrBlank()) InfoRow("Задачи",     compRel.responsibilities)
@@ -1534,7 +1616,7 @@ fun SizeChip(label: String, value: String) {
 // ═══════════════════════════════════════════════════════════════
 // TAB 1 — РАБОТА
 // ═══════════════════════════════════════════════════════════════
-fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact) {
+fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onNavigateToCompany: (String) -> Unit = {}) {
     item {
         val compRels = contact.companyRelations
         if (compRels.isEmpty()) {
@@ -1550,7 +1632,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact) {
         compRels.forEach { rel ->
             val company = AppStateStore.getCompany(rel.companyId)
             CardBlock(title = if (rel.isPrimary) "Основное место работы" else "Дополнительно") {
-                if (company != null) InfoRow("Компания", company.name)
+                if (company != null) InfoRow("Компания", "${company.name} ›",
+                    onClick = { onNavigateToCompany(company.id) })
                 if (!rel.position.isNullOrBlank())       InfoRow("Должность",   rel.position)
                 if (!rel.department.isNullOrBlank())     InfoRow("Отдел",       rel.department)
                 if (!rel.role.isNullOrBlank())           InfoRow("Роль",        rel.role)
@@ -1805,9 +1888,10 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                 importantDates.forEach { date ->
                     val daysUntil = try {
                         val d = java.time.LocalDate.parse(date.startDate)
-                        // Переносим на текущий год
+                        // Переносим на текущий год; недавно прошедшие (≤30 дн.)
+                        // оставляем в прошлом — покажется «N дн. назад»
                         val thisYear = d.withYear(today.year)
-                        val next = if (thisYear < today) thisYear.plusYears(1) else thisYear
+                        val next = if (thisYear < today.minusDays(30)) thisYear.plusYears(1) else thisYear
                         java.time.ChronoUnit.DAYS.between(today, next)
                     } catch (e: Exception) { null }
 
@@ -2033,7 +2117,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
 fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
     contact: Contact,
     onShowAdd: () -> Unit,
-    onShowVoice: () -> Unit
+    onShowVoice: () -> Unit,
+    onEditNote: (Note) -> Unit,
+    onDeleteNote: (Note) -> Unit
 ) {
     item {
         Row(
@@ -2211,11 +2297,43 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                                 Modifier.size(12.dp),
                                                 tint = MaterialTheme.colorScheme.error)
                                     }
-                                    Text(
-                                        note.createdAt.take(10),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            note.createdAt.take(10),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                        Box {
+                                            var menuOpen by remember { mutableStateOf(false) }
+                                            IconButton(
+                                                onClick = { menuOpen = true },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(Icons.Default.MoreVert, "Действия с заметкой",
+                                                    Modifier.size(16.dp),
+                                                    tint = MaterialTheme.colorScheme.secondary)
+                                            }
+                                            DropdownMenu(
+                                                expanded = menuOpen,
+                                                onDismissRequest = { menuOpen = false }
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("Править") },
+                                                    leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)) },
+                                                    onClick = { menuOpen = false; onEditNote(note) }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Удалить", color = MaterialTheme.colorScheme.error) },
+                                                    leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(18.dp),
+                                                        tint = MaterialTheme.colorScheme.error) },
+                                                    onClick = { menuOpen = false; onDeleteNote(note) }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                                 Spacer(Modifier.height(6.dp))
                                 Text(note.text, style = MaterialTheme.typography.bodyMedium)

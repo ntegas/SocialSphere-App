@@ -237,7 +237,8 @@ fun SocialsphereApp() {
                     onNavigateToEdit = { navController.navigate("contact_edit/$contactId") },
                     onNavigateToCreateCalendarItem = { navController.navigate("calendar_item_create?contactId=$contactId") },
                     onNavigateToContact = { otherId -> navController.navigate("contact_detail/$otherId") },
-                    onNavigateToCheatSheet = { navController.navigate("cheat_sheet/$contactId") }
+                    onNavigateToCheatSheet = { navController.navigate("cheat_sheet/$contactId") },
+                    onNavigateToCompany = { companyId -> navController.navigate("company_detail/$companyId") }
                 )
             }
             composable("cheat_sheet/{contactId}") { backStackEntry ->

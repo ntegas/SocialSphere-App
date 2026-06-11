@@ -99,44 +99,51 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            val filteredEvents = allEvents.filter { event ->
-                when (selectedFilter) {
-                    "Дни рождения" -> event.type == CalendarItemType.BIRTHDAY
-                    "Звонки" -> event.type == CalendarItemType.CALL
-                    "Встречи" -> event.type == CalendarItemType.MEETING
-                    "Подарки" -> event.type == CalendarItemType.GIFT
-                    "Важное" -> event.importance in listOf(ImportanceLevel.IMPORTANT, ImportanceLevel.KEY)
-                    else -> true
-                }
-            }
-            
-            val todayDate    = java.time.LocalDate.now().toString()
-            val tomorrowDate = java.time.LocalDate.now().plusDays(1).toString()
-            val weekEnd      = java.time.LocalDate.now().plusDays(7).toString()
+            // Пересчёт только при изменении фильтра, режима или данных —
+            // не на каждой рекомпозиции (derivedStateOf отслеживает snapshot-состояния)
+            val groupedEvents by remember {
+                derivedStateOf {
+                    val filteredEvents = allEvents.filter { event ->
+                        when (selectedFilter) {
+                            "Дни рождения" -> event.type == CalendarItemType.BIRTHDAY
+                            "Звонки" -> event.type == CalendarItemType.CALL
+                            "Встречи" -> event.type == CalendarItemType.MEETING
+                            "Подарки" -> event.type == CalendarItemType.GIFT
+                            "Важное" -> event.importance in listOf(ImportanceLevel.IMPORTANT, ImportanceLevel.KEY)
+                            else -> true
+                        }
+                    }
 
-            val groupedEvents = mutableMapOf<String, List<CalendarItem>>()
-            if (selectedMode == "Сегодня") {
-                val todayEvents = filteredEvents.filter { it.startDate == todayDate }
-                if (todayEvents.isNotEmpty()) {
-                    groupedEvents["Сегодня"] = todayEvents
-                } else {
-                    groupedEvents["Ближайшие"] = filteredEvents.sortedBy { it.startDate }.take(5)
+                    val todayDate    = java.time.LocalDate.now().toString()
+                    val tomorrowDate = java.time.LocalDate.now().plusDays(1).toString()
+                    val weekEnd      = java.time.LocalDate.now().plusDays(7).toString()
+
+                    val grouped = mutableMapOf<String, List<CalendarItem>>()
+                    if (selectedMode == "Сегодня") {
+                        val todayEvents = filteredEvents.filter { it.startDate == todayDate }
+                        if (todayEvents.isNotEmpty()) {
+                            grouped["Сегодня"] = todayEvents
+                        } else {
+                            grouped["Ближайшие"] = filteredEvents.sortedBy { it.startDate }.take(5)
+                        }
+                    } else if (selectedMode == "Список") {
+                        val today    = filteredEvents.filter { it.startDate == todayDate }
+                        val tomorrow = filteredEvents.filter { it.startDate == tomorrowDate }
+                        val later    = filteredEvents.filter { it.startDate > tomorrowDate }.sortedBy { it.startDate }
+                        if (today.isNotEmpty())    grouped["Сегодня"] = today
+                        if (tomorrow.isNotEmpty()) grouped["Завтра"]  = tomorrow
+                        if (later.isNotEmpty())    grouped["Позже"]   = later
+                    } else if (selectedMode == "Неделя") {
+                        val weekEvents = filteredEvents.filter { it.startDate in todayDate..weekEnd }.sortedBy { it.startDate }
+                        if (weekEvents.isNotEmpty()) grouped["Ближайшие 7 дней"] = weekEvents
+                        else grouped["Ближайшие 7 дней"] = emptyList()
+                    } else if (selectedMode == "Месяц") {
+                        val monthEnd = java.time.LocalDate.now().plusMonths(1).toString()
+                        val monthEvents = filteredEvents.filter { it.startDate in todayDate..monthEnd }.sortedBy { it.startDate }
+                        grouped["События месяца"] = monthEvents
+                    }
+                    grouped
                 }
-            } else if (selectedMode == "Список") {
-                val today    = filteredEvents.filter { it.startDate == todayDate }
-                val tomorrow = filteredEvents.filter { it.startDate == tomorrowDate }
-                val later    = filteredEvents.filter { it.startDate > tomorrowDate }.sortedBy { it.startDate }
-                if (today.isNotEmpty())    groupedEvents["Сегодня"] = today
-                if (tomorrow.isNotEmpty()) groupedEvents["Завтра"]  = tomorrow
-                if (later.isNotEmpty())    groupedEvents["Позже"]   = later
-            } else if (selectedMode == "Неделя") {
-                val weekEvents = filteredEvents.filter { it.startDate in todayDate..weekEnd }.sortedBy { it.startDate }
-                if (weekEvents.isNotEmpty()) groupedEvents["Ближайшие 7 дней"] = weekEvents
-                else groupedEvents["Ближайшие 7 дней"] = emptyList()
-            } else if (selectedMode == "Месяц") {
-                val monthEnd = java.time.LocalDate.now().plusMonths(1).toString()
-                val monthEvents = filteredEvents.filter { it.startDate in todayDate..monthEnd }.sortedBy { it.startDate }
-                groupedEvents["События месяца"] = monthEvents
             }
 
             if (groupedEvents.isEmpty() || groupedEvents.all { it.value.isEmpty() }) {

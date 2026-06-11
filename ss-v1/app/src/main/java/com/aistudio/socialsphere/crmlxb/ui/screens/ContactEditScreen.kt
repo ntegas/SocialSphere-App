@@ -630,7 +630,9 @@ fun ContactEditScreen(
                     socialRole = SocialRole.values().firstOrNull { r -> r.label() == it } ?: socialRole
                 }
                 Spacer(Modifier.height(10.dp))
-                DropdownField("Ритм общения", communicationRhythm.label(), CommunicationRhythm.values().map { it.label() }) {
+                // CUSTOM исключён: у контакта нет поля своих дней — выбор молча отключал бы отслеживание
+                DropdownField("Ритм общения", communicationRhythm.label(),
+                    CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label() }) {
                     communicationRhythm = CommunicationRhythm.values().firstOrNull { r -> r.label() == it } ?: communicationRhythm
                 }
             }

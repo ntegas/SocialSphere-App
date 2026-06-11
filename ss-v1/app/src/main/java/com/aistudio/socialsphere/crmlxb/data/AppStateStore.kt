@@ -78,8 +78,11 @@ object AppStateStore {
         val addrEntities     = db.addressDao().getAllAddresses()
         val sizeEntities     = db.contactDao().getSizeInfos()
         val pdEntities       = db.contactDao().getPersonalDetails()
-        val phones           = db.contactDao().getContactPhones().map { it.toDomain() }
-        val emails           = db.contactDao().getContactEmails().map { it.toDomain() }
+        val phoneEntities    = db.contactDao().getContactPhones()
+        val emailEntities    = db.contactDao().getContactEmails()
+        // Общие таблицы: строки контактов и строки компаний разделяем по companyId
+        val phones           = phoneEntities.filter { it.companyId == null }.map { it.toDomain() }
+        val emails           = emailEntities.filter { it.companyId == null }.map { it.toDomain() }
         val messengers       = db.contactDao().getMessengers().map { it.toDomain() }
         val links            = db.calendarDao().getCalendarItemLinks().map { it.toDomain() }
         val reminders        = db.calendarDao().getReminderRules().map { it.toDomain() }
@@ -96,8 +99,8 @@ object AppStateStore {
             companies.clear()
             companies.addAll(companyEntities.map { c ->
                 c.toDomain().copy(
-                    phones    = emptyList(),
-                    emails    = emptyList(),
+                    phones    = phoneEntities.filter { it.companyId == c.id }.map { it.toDomain() },
+                    emails    = emailEntities.filter { it.companyId == c.id }.map { it.toDomain() },
                     addresses = addresses.filter { it.ownerType == AddressOwnerType.COMPANY && it.ownerId == c.id }
                 )
             })
@@ -146,6 +149,8 @@ object AppStateStore {
         val db = db() ?: return
         db.companyDao().insertCompany(company.toEntity())
         if (company.addresses.isNotEmpty()) db.addressDao().insertAddresses(company.addresses.map { it.toEntity() })
+        if (company.phones.isNotEmpty())    db.contactDao().insertPhones(company.phones.map { it.toCompanyEntity(company.id) })
+        if (company.emails.isNotEmpty())    db.contactDao().insertEmails(company.emails.map { it.toCompanyEntity(company.id) })
     }
 
     private suspend fun addCalendarItemDb(item: CalendarItem) {
@@ -228,6 +233,8 @@ object AppStateStore {
             scope.launch {
                 val db = db() ?: return@launch
                 db.addressDao().deleteAddressesForOwner(c.id, AddressOwnerType.COMPANY.name)
+                db.companyDao().deletePhonesForCompany(c.id)
+                db.companyDao().deleteEmailsForCompany(c.id)
                 addCompanyDb(c)
             }
         }
@@ -241,6 +248,8 @@ object AppStateStore {
             val db = db() ?: return@launch
             db.companyDao().deleteCompany(companyId)
             db.addressDao().deleteAddressesForOwner(companyId, AddressOwnerType.COMPANY.name)
+            db.companyDao().deletePhonesForCompany(companyId)
+            db.companyDao().deleteEmailsForCompany(companyId)
             db.noteDao().deleteNotesForCompany(companyId)
         }
     }
@@ -314,6 +323,19 @@ object AppStateStore {
             }
         }
         scope.launch { db()?.noteDao()?.insertNotes(listOf(n.toEntity())) }
+    }
+
+    fun updateNote(note: Note) {
+        val idx = notes.indexOfFirst { it.id == note.id }
+        if (idx >= 0) notes[idx] = note
+        note.contactId?.let { cid ->
+            val cidx = contacts.indexOfFirst { it.id == cid }
+            if (cidx >= 0) contacts[cidx] = contacts[cidx].copy(
+                notes = contacts[cidx].notes.map { if (it.id == note.id) note else it }
+            )
+        }
+        // lastContactDate намеренно не трогаем: правка старой записи — не новая активность
+        scope.launch { db()?.noteDao()?.insertNotes(listOf(note.toEntity())) }
     }
 
     fun deleteNote(noteId: String) {

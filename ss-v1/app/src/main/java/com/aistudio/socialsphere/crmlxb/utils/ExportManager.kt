@@ -33,7 +33,11 @@ object ExportManager {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "Поделиться файлом"))
+        // Через безопасный запуск: локализованный контекст — не Activity,
+        // прямой startActivity молча ронял share-sheet экспорта
+        if (!ExternalActionHandler.startIntentSafely(context, Intent.createChooser(intent, "Поделиться файлом"))) {
+            android.widget.Toast.makeText(context, "Не удалось открыть меню «Поделиться»", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     // ─── CSV Contacts ──────────────────────────────────────────
