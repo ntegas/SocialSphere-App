@@ -254,10 +254,14 @@ fun FilterChipsRow(
     options: List<String>,
     selected: String,
     allowMultiple: Boolean = false,
-    selectedMultiple: Set<String> = emptySet()
+    selectedMultiple: Set<String> = emptySet(),
+    // Без колбэков выбор никогда не покидал композабл —
+    // все экраны настроек были декорациями
+    onSelect: (String) -> Unit = {},
+    onSelectMultiple: (Set<String>) -> Unit = {}
 ) {
-    var singleSel   by remember { mutableStateOf(selected) }
-    var multipleSel by remember { mutableStateOf(selectedMultiple) }
+    var singleSel   by remember(selected) { mutableStateOf(selected) }
+    var multipleSel by remember(selectedMultiple) { mutableStateOf(selectedMultiple) }
 
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { opt ->
@@ -265,10 +269,13 @@ fun FilterChipsRow(
             FilterChip(
                 selected = isSelected,
                 onClick  = {
-                    if (allowMultiple)
+                    if (allowMultiple) {
                         multipleSel = if (opt in multipleSel) multipleSel - opt else multipleSel + opt
-                    else
+                        onSelectMultiple(multipleSel)
+                    } else {
                         singleSel = opt
+                        onSelect(opt)
+                    }
                 },
                 label = { Text(opt, fontSize = 12.sp) }
             )

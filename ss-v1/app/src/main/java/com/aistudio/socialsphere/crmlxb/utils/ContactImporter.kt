@@ -151,8 +151,11 @@ object ContactImporter {
                     ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE -> {
                         val type = it.getInt(data2Idx)
                         if (type == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
-                            val date = it.getString(data1Idx)
-                            if (!date.isNullOrBlank()) {
+                            val raw = it.getString(data1Idx)
+                            // Телефонная книга часто отдаёт «--MM-DD» (без года) —
+                            // такой формат ломал парсинг и события исчезали
+                            val date = normalizeBirthday(raw)
+                            if (date != null) {
                                 candidates[contactId] = candidate.copy(birthday = date)
                             }
                         }
@@ -243,11 +246,12 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                 // BDAY: 19900312 or 1990-03-12
                 line.startsWith("BDAY:") -> {
                     val raw = line.removePrefix("BDAY:").trim()
-                    birthday = when {
+                    val pre = when {
                         raw.length == 8 && !raw.contains("-") ->
                             "${raw.take(4)}-${raw.substring(4, 6)}-${raw.takeLast(2)}"
                         else -> raw
                     }
+                    birthday = normalizeBirthday(pre) ?: ""
                 }
             }
         }
@@ -351,4 +355,23 @@ private fun splitCsvLine(line: String): List<String> {
     }
     result.add(current.toString())
     return result
+
+}
+
+/** Нормализация дня рождения из телефонной книги / vCard.
+ *  «--MM-DD» и «--MMDD» (без года) → «1972-MM-DD» (1972 високосный —
+ *  29 февраля валидно); «yyyy-MM-dd…» → первые 10 символов; иначе null. */
+internal fun normalizeBirthday(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    val candidate = when {
+        raw.startsWith("--") && raw.length >= 7 && raw[4] == '-' ->
+            "1972-" + raw.substring(2, 7)                       // --MM-DD
+        raw.startsWith("--") && raw.length >= 6 ->
+            "1972-" + raw.substring(2, 4) + "-" + raw.substring(4, 6) // --MMDD
+        raw.length >= 10 -> raw.take(10)
+        else -> return null
+    }
+    return try {
+        java.time.LocalDate.parse(candidate); candidate
+    } catch (e: Exception) { null }
 }

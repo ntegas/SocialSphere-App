@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
+import com.aistudio.socialsphere.crmlxb.utils.effectiveDate
 import com.aistudio.socialsphere.crmlxb.utils.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -35,7 +36,7 @@ fun CalendarScreen(
     onNavigateToCreateCalendarItem: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedMode by remember { mutableStateOf("Список") }
+    var selectedMode by remember { mutableStateOf(AppSettings.calendarDefaultMode.value) }
     var selectedFilter by remember { mutableStateOf("Все") }
 
     val modes = listOf("Сегодня", "Список", "Неделя", "Месяц")
@@ -103,7 +104,9 @@ fun CalendarScreen(
             // не на каждой рекомпозиции (derivedStateOf отслеживает snapshot-состояния)
             val groupedEvents by remember {
                 derivedStateOf {
+                    val hiddenTypes = AppSettings.calendarHiddenTypes.value
                     val filteredEvents = allEvents.filter { event ->
+                        if (event.type.name in hiddenTypes) return@filter false
                         when (selectedFilter) {
                             "Дни рождения" -> event.type == CalendarItemType.BIRTHDAY
                             "Звонки" -> event.type == CalendarItemType.CALL
@@ -120,26 +123,26 @@ fun CalendarScreen(
 
                     val grouped = mutableMapOf<String, List<CalendarItem>>()
                     if (selectedMode == "Сегодня") {
-                        val todayEvents = filteredEvents.filter { it.startDate == todayDate }
+                        val todayEvents = filteredEvents.filter { it.effectiveDate() == todayDate }
                         if (todayEvents.isNotEmpty()) {
                             grouped["Сегодня"] = todayEvents
                         } else {
-                            grouped["Ближайшие"] = filteredEvents.sortedBy { it.startDate }.take(5)
+                            grouped["Ближайшие"] = filteredEvents.sortedBy { it.effectiveDate() }.take(5)
                         }
                     } else if (selectedMode == "Список") {
-                        val today    = filteredEvents.filter { it.startDate == todayDate }
-                        val tomorrow = filteredEvents.filter { it.startDate == tomorrowDate }
-                        val later    = filteredEvents.filter { it.startDate > tomorrowDate }.sortedBy { it.startDate }
+                        val today    = filteredEvents.filter { it.effectiveDate() == todayDate }
+                        val tomorrow = filteredEvents.filter { it.effectiveDate() == tomorrowDate }
+                        val later    = filteredEvents.filter { it.effectiveDate() > tomorrowDate }.sortedBy { it.effectiveDate() }
                         if (today.isNotEmpty())    grouped["Сегодня"] = today
                         if (tomorrow.isNotEmpty()) grouped["Завтра"]  = tomorrow
                         if (later.isNotEmpty())    grouped["Позже"]   = later
                     } else if (selectedMode == "Неделя") {
-                        val weekEvents = filteredEvents.filter { it.startDate in todayDate..weekEnd }.sortedBy { it.startDate }
+                        val weekEvents = filteredEvents.filter { it.effectiveDate() in todayDate..weekEnd }.sortedBy { it.effectiveDate() }
                         if (weekEvents.isNotEmpty()) grouped["Ближайшие 7 дней"] = weekEvents
                         else grouped["Ближайшие 7 дней"] = emptyList()
                     } else if (selectedMode == "Месяц") {
                         val monthEnd = java.time.LocalDate.now().plusMonths(1).toString()
-                        val monthEvents = filteredEvents.filter { it.startDate in todayDate..monthEnd }.sortedBy { it.startDate }
+                        val monthEvents = filteredEvents.filter { it.effectiveDate() in todayDate..monthEnd }.sortedBy { it.effectiveDate() }
                         grouped["События месяца"] = monthEvents
                     }
                     grouped

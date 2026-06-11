@@ -44,15 +44,19 @@ fun CalendarSettingsScreen(
         ) {
             CardBlock("Отображение календаря") {
                 Text("Режим по умолчанию", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
-                FilterChipsRow(listOf("Сегодня", "Список", "Неделя", "Месяц"), "Список")
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Первый день недели", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
-                FilterChipsRow(listOf("понедельник", "воскресенье"), "понедельник")
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Формат времени", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
-                FilterChipsRow(listOf("24 часа", "12 часов"), "24 часа")
+                FilterChipsRow(
+                    options  = listOf("Сегодня", "Список", "Неделя", "Месяц"),
+                    selected = AppSettings.calendarDefaultMode.value,
+                    onSelect = { AppSettings.calendarDefaultMode.value = it }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "С этим режимом календарь будет открываться при входе",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                // «Первый день недели» и «Формат времени» убраны:
+                // им пока не на что влиять — вернутся вместе с сеткой месяца
             }
 
             CardBlock("Цвета типов событий") {
@@ -78,16 +82,37 @@ fun CalendarSettingsScreen(
             }
 
             CardBlock("Видимость типов событий") {
-                listOf(
-                    "дни рождения", "встречи", "звонки", "подарки", "задачи", "заметки", "события компаний"
-                ).forEach { name ->
+                Text(
+                    "Выключенные типы скрываются в календаре и блоке «Ближайшее»",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                val typeRows = listOf(
+                    "Дни рождения"      to CalendarItemType.BIRTHDAY,
+                    "Годовщины"         to CalendarItemType.ANNIVERSARY,
+                    "Важные даты"       to CalendarItemType.IMPORTANT_DATE,
+                    "Встречи"           to CalendarItemType.MEETING,
+                    "Звонки"            to CalendarItemType.CALL,
+                    "Подарки"           to CalendarItemType.GIFT,
+                    "Задачи"            to CalendarItemType.TASK,
+                    "События компаний"  to CalendarItemType.COMPANY_EVENT
+                )
+                val hidden = AppSettings.calendarHiddenTypes.value
+                typeRows.forEach { (name, type) ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(name, style = MaterialTheme.typography.bodyLarge)
-                        Switch(checked = true, onCheckedChange = {})
+                        Switch(
+                            checked = type.name !in hidden,
+                            onCheckedChange = { visible ->
+                                AppSettings.calendarHiddenTypes.value =
+                                    if (visible) hidden - type.name else hidden + type.name
+                            }
+                        )
                     }
                 }
             }

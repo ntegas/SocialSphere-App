@@ -78,6 +78,28 @@ object AppSettings {
     val callReminderTime       = mutableStateOf("за 10 минут")
     val showOverdue            = mutableStateOf(true)
     val repeatOverdueVisually  = mutableStateOf(false)
+
+    // ── Календарь (персистентно) ──
+    val calendarDefaultMode: MutableState<String> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "calendar_default_mode",
+            default     = "Список",
+            serialize   = { it },
+            deserialize = { it }
+        )
+    }
+
+    /** Имена CalendarItemType, скрытые в календаре и «Ближайшем» (CSV). */
+    val calendarHiddenTypes: MutableState<Set<String>> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "calendar_hidden_types",
+            default     = emptySet(),
+            serialize   = { it.joinToString(",") },
+            deserialize = { raw -> raw.split(",").filter { it.isNotBlank() }.toSet() }
+        )
+    }
 }
 
 @Composable

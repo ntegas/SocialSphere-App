@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.model.*
+import com.aistudio.socialsphere.crmlxb.utils.effectiveDate
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
@@ -116,9 +117,14 @@ fun HomeScreen(
     // Dashboard data
     val upcomingEvents by remember {
         derivedStateOf {
+            val todayStr = java.time.LocalDate.now().toString()
+            val hiddenTypes = AppSettings.calendarHiddenTypes.value
             AppStateStore.calendarItems
-                .filter { it.status == CalendarItemStatus.ACTIVE }
-                .sortedBy { it.startDate }
+                .filter { it.status == CalendarItemStatus.ACTIVE && it.type.name !in hiddenTypes }
+                // ДР проецируются на ближайшее наступление — иначе
+                // импортированные («1990-…») невидимы навсегда
+                .filter { it.effectiveDate() >= todayStr }
+                .sortedBy { it.effectiveDate() }
                 .take(8)
                 .mapNotNull { event ->
                     val icon = when (event.type) {
@@ -145,7 +151,7 @@ fun HomeScreen(
                             else -> null
                         }
                     }.joinToString(", ")
-                    HomeEvent(event.id, event.title, subtitle, event.startDate, icon, colorIdx)
+                    HomeEvent(event.id, event.title, subtitle, event.effectiveDate(), icon, colorIdx)
                 }
         }
     }

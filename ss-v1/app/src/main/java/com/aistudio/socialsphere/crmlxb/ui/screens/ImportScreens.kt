@@ -534,7 +534,11 @@ fun performImport(selected: List<ImportContactCandidate>) {
              }
         }
 
-        if (!candidate.birthday.isNullOrBlank()) {
+        val alreadyHasBirthday = AppStateStore.calendarItems.any {
+            it.type == CalendarItemType.BIRTHDAY &&
+            it.links.any { l -> l.targetType == CalendarTargetType.CONTACT && l.targetId == contactId }
+        }
+        if (!candidate.birthday.isNullOrBlank() && !alreadyHasBirthday) {
             val calId = java.util.UUID.randomUUID().toString()
             AppStateStore.addCalendarItem(
                 CalendarItem(

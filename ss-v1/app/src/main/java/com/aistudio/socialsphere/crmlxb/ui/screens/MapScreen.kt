@@ -8,8 +8,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -61,9 +63,23 @@ fun MapScreen(
     var showMapView    by remember { mutableStateOf(true) }
     var locationPermGranted by remember { mutableStateOf(false) }
     var mapLoadError by remember { mutableStateOf<String?>(null) }
+    var mapTilesLoaded by remember { mutableStateOf(false) }
 
-    // ТЗ: 4 вкладки — Контакты / Рабочие адреса / Компании / Места
-    val tabs = listOf("Контакты", "Работа", "Компании", "Места")
+    // Диагностика «синего экрана»: если тайлы не пришли за 8 сек —
+    // почти наверняка проблема API-ключа (Maps SDK for Android не включён
+    // в Google Cloud Console) или нет интернета
+    LaunchedEffect(showMapView) {
+        if (!showMapView) return@LaunchedEffect
+        kotlinx.coroutines.delay(8000)
+        if (!mapTilesLoaded && mapLoadError == null) {
+            mapLoadError = "Карта не загрузилась. Проверь, включён ли " +
+                "«Maps SDK for Android» для API-ключа в Google Cloud Console, " +
+                "и есть ли интернет-соединение"
+        }
+    }
+
+    // Обновлённое ТЗ: 3 вкладки, «Места» удалена
+    val tabs = listOf("Контакты", "Работа", "Компании")
 
     var searchQuery by remember { mutableStateOf("") }
 
@@ -137,6 +153,10 @@ fun MapScreen(
         }
     }
 
+    // Сессионный кэш геокодинга: адреса без координат получают точку на карте
+    val geoCache = remember { mutableStateMapOf<String, LatLng>() }
+    val coordsOf: (MapLocationItem) -> LatLng? = { it.latLng ?: geoCache[it.addressId] }
+
     val filteredList by remember(mapObjects, searchQuery, selectedTab) {
         derivedStateOf {
             mapObjects.filter { obj ->
@@ -150,10 +170,6 @@ fun MapScreen(
                         obj.locationType in listOf(AddressType.WORK, AddressType.OFFICE)
                     2 -> // Компании — адреса компаний
                         obj.ownerType == AddressOwnerType.COMPANY
-                    3 -> // Места — домашние адреса + прочее
-                        obj.locationType in listOf(
-                            AddressType.HOME, AddressType.OTHER, AddressType.BRANCH
-                        )
                     else -> true
                 }
                 matchSearch && matchTab
@@ -162,7 +178,30 @@ fun MapScreen(
     }
 
     val geoItems by remember {
-        derivedStateOf { filteredList.filter { it.latLng != null } }
+        derivedStateOf { filteredList.filter { coordsOf(it) != null } }
+    }
+
+    // Фоновый геокодинг адресов без координат (Android Geocoder, без API-ключа)
+    LaunchedEffect(filteredList) {
+        val pending = filteredList
+            .filter { it.latLng == null && !geoCache.containsKey(it.addressId) }
+            .take(15)
+        if (pending.isEmpty()) return@LaunchedEffect
+        val resolved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+            pending.mapNotNull { obj ->
+                try {
+                    val query = listOf(obj.addressLine, obj.city, obj.country)
+                        .filter { it.isNotBlank() }.joinToString(", ")
+                    if (query.isBlank()) return@mapNotNull null
+                    @Suppress("DEPRECATION")
+                    val hit = geocoder.getFromLocationName(query, 1)?.firstOrNull()
+                        ?: return@mapNotNull null
+                    obj.addressId to LatLng(hit.latitude, hit.longitude)
+                } catch (e: Exception) { null }
+            }
+        }
+        geoCache.putAll(resolved)
     }
     val listItems = filteredList
 
@@ -174,8 +213,8 @@ fun MapScreen(
         )
     }
 
-    LaunchedEffect(selectedItem) {
-        selectedItem?.latLng?.let { latLng ->
+    LaunchedEffect(selectedItem, geoCache.size) {
+        selectedItem?.let { coordsOf(it) }?.let { latLng ->
             try {
                 cameraState.animate(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
             } catch (e: Exception) {
@@ -349,12 +388,15 @@ fun MapScreen(
                             ),
                             onMapLoaded = {
                                 // Map loaded successfully — clear any error
+                                mapTilesLoaded = true
                                 mapLoadError = null
                             }
                         ) {
                             geoItems.forEach { obj ->
-                                val latLng = obj.latLng ?: return@forEach
+                                val latLng = coordsOf(obj) ?: return@forEach
+                                val isSelected = obj.id == selectedItem?.id
                                 val hue = when {
+                                    isSelected -> BitmapDescriptorFactory.HUE_ORANGE
                                     obj.ownerType == AddressOwnerType.COMPANY ->
                                         BitmapDescriptorFactory.HUE_AZURE
                                     obj.locationType == AddressType.HOME ->
@@ -369,6 +411,7 @@ fun MapScreen(
                                     title   = obj.title,
                                     snippet = "${obj.subtitle} · ${obj.city}",
                                     icon    = BitmapDescriptorFactory.defaultMarker(hue),
+                                    zIndex  = if (isSelected) 1f else 0f,
                                     onClick = { selectedItem = obj; false }
                                 )
                             }
@@ -472,16 +515,22 @@ fun MapScreen(
                                     tint = MaterialTheme.colorScheme.secondary)
                             }
                         }
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                        ) {
                         MapItemDetailCard(
                             item   = selectedItem ?: return@Column,
                             onOpen = {
-                                val item = selectedItem ?: return@MapItemDetailCard: return@MapItemDetailCard
+                                val item = selectedItem ?: return@MapItemDetailCard
                                 if (item.ownerType == AddressOwnerType.CONTACT)
                                     onNavigateToContact(item.ownerId)
                                 else
                                     onNavigateToCompany(item.ownerId)
                             }
                         )
+                        }
                     } else {
                         Row(
                             modifier = Modifier.fillMaxWidth(),

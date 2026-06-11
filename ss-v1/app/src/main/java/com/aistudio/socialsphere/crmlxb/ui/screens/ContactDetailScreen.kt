@@ -419,6 +419,7 @@ fun ContactDetailScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
     val compRel  = contact.companyRelations.firstOrNull { it.isPrimary } ?: contact.companyRelations.firstOrNull()
@@ -525,11 +526,57 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
 
         Spacer(Modifier.height(10.dp))
 
-        // Status row
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = {}, label = { Text(contact.contactStatus.label(), fontSize = 10.sp) })
-            AssistChip(onClick = {}, label = { Text(contact.relationshipType.label(), fontSize = 10.sp) })
-            AssistChip(onClick = {}, label = { Text(contact.importanceLevel.label(), fontSize = 10.sp) })
+        // Статус и классификация — редактируются тапом прямо в карточке
+        val nowIso = {
+            java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        }
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            EditableChip(
+                current = contact.contactStatus.label(),
+                options = ContactStatus.values().map { it.label() }
+            ) { picked ->
+                ContactStatus.values().firstOrNull { it.label() == picked }?.let {
+                    AppStateStore.updateContact(
+                        contact.copy(contactStatus = it, updatedAt = nowIso())
+                    )
+                }
+            }
+            EditableChip(
+                current = contact.relationshipType.label(),
+                options = RelationshipType.values().map { it.label() }
+            ) { picked ->
+                RelationshipType.values().firstOrNull { it.label() == picked }?.let {
+                    AppStateStore.updateContact(
+                        contact.copy(relationshipType = it, updatedAt = nowIso())
+                    )
+                }
+            }
+            EditableChip(
+                current = contact.importanceLevel.label(),
+                options = ImportanceLevel.values().map { it.label() }
+            ) { picked ->
+                ImportanceLevel.values().firstOrNull { it.label() == picked }?.let {
+                    AppStateStore.updateContact(
+                        contact.copy(importanceLevel = it, updatedAt = nowIso())
+                    )
+                }
+            }
+            EditableChip(
+                current = "Ритм: " + contact.communicationRhythm.label(),
+                // CUSTOM исключён — у контакта нет поля своих дней
+                options = CommunicationRhythm.values()
+                    .filter { it != CommunicationRhythm.CUSTOM }
+                    .map { it.label() }
+            ) { picked ->
+                CommunicationRhythm.values().firstOrNull { it.label() == picked }?.let {
+                    AppStateStore.updateContact(
+                        contact.copy(communicationRhythm = it, updatedAt = nowIso())
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -1584,6 +1631,32 @@ fun CardBlock(title: String? = null, content: @Composable ColumnScope.() -> Unit
                 Spacer(modifier = Modifier.height(12.dp))
             }
             content()
+        }
+    }
+}
+
+@Composable
+private fun EditableChip(
+    current: String,
+    options: List<String>,
+    onPick: (String) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        AssistChip(
+            onClick = { open = true },
+            label = { Text(current, fontSize = 10.sp) },
+            trailingIcon = {
+                Icon(Icons.Default.ArrowDropDown, null, Modifier.size(14.dp))
+            }
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { opt ->
+                DropdownMenuItem(
+                    text = { Text(opt) },
+                    onClick = { open = false; onPick(opt) }
+                )
+            }
         }
     }
 }

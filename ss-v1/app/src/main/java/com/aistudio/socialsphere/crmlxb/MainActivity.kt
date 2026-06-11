@@ -82,12 +82,27 @@ fun SocialsphereApp() {
                             label = { Text(stringResource(item.second), maxLines = 1) },
                             selected = currentDestination?.hierarchy?.any { it.route == item.first } == true,
                             onClick = {
-                                navController.navigate(item.first) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
+                                val alreadyHere = currentDestination?.hierarchy
+                                    ?.any { it.route == item.first } == true
+                                if (!alreadyHere) {
+                                    // Возврат на вкладку, уже лежащую в стеке («Главный» всегда
+                                    // на дне), — через popBackStack: restoreState при навигации
+                                    // на стартовую вкладку давал no-op («Главный не нажимается»).
+                                    // saveState = true сохраняет состояние покидаемой вкладки.
+                                    val popped = navController.popBackStack(
+                                        route = item.first,
+                                        inclusive = false,
                                         saveState = true
+                                    )
+                                    if (!popped) {
+                                        navController.navigate(item.first) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
                             }
                         )
