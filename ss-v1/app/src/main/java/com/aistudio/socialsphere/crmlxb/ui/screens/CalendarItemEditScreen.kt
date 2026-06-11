@@ -1,10 +1,8 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -13,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,7 +30,8 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 fun CalendarItemEditScreen(
     calendarItemId: String?,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    prefillContactId: String? = null
 ) {
     val isEditMode = calendarItemId != null
     val originalItem = remember { calendarItemId?.let { AppStateStore.calendarItems.find { item -> item.id == it } } }
@@ -57,6 +55,8 @@ fun CalendarItemEditScreen(
         mutableStateOf<Contact?>(
             originalItem?.links?.firstOrNull { it.targetType == CalendarTargetType.CONTACT }
                 ?.let { AppStateStore.getContact(it.targetId) }
+                // ТЗ: «Создать событие» из карточки — контакт предзаполнен
+                ?: prefillContactId?.let { AppStateStore.getContact(it) }
         )
     }
     var linkedCompany by remember {
@@ -215,7 +215,7 @@ fun CalendarItemEditScreen(
                 // Type Dropdown
                 Box {
                     OutlinedTextField(
-                        value = type.name,
+                        value = type.label(),
                         onValueChange = {},
                         label = { Text("Тип события") },
                         modifier = Modifier.fillMaxWidth().clickable { showTypeDropdown = true },
@@ -264,18 +264,8 @@ fun CalendarItemEditScreen(
                     }
                 }
                 
-                Text("Цвет (метка)", style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.secondary,
-                        MaterialTheme.colorScheme.tertiary,
-                        MaterialTheme.colorScheme.error,
-                        MaterialTheme.colorScheme.surfaceVariant
-                    ).forEach { color ->
-                        Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(color).clickable { })
-                    }
-                }
+                // Блок «Цвет (метка)» удалён: цвет события определяется его типом
+                // автоматически (см. CalendarScreen), ручной выбор не предусмотрен моделью.
             }
 
             // Linked To

@@ -16,10 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.aistudio.socialsphere.crmlxb.ui.screens.*
 import com.aistudio.socialsphere.crmlxb.ui.theme.MyApplicationTheme
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
@@ -140,10 +142,18 @@ fun SocialsphereApp() {
                     onNavigateToEdit = { navController.navigate("calendar_item_edit/$calendarItemId") }
                 )
             }
-            composable("calendar_item_create") {
+            composable(
+                "calendar_item_create?contactId={contactId}",
+                arguments = listOf(navArgument("contactId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                })
+            ) { backStackEntry ->
                 CalendarItemEditScreen(
                     calendarItemId = null,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    prefillContactId = backStackEntry.arguments?.getString("contactId")
                 )
             }
             composable("calendar_item_edit/{calendarItemId}") { backStackEntry ->
@@ -225,7 +235,7 @@ fun SocialsphereApp() {
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToCalendarItem = { calendarItemId -> navController.navigate("calendar_item_detail/$calendarItemId") },
                     onNavigateToEdit = { navController.navigate("contact_edit/$contactId") },
-                    onNavigateToCreateCalendarItem = { navController.navigate("calendar_item_create") },
+                    onNavigateToCreateCalendarItem = { navController.navigate("calendar_item_create?contactId=$contactId") },
                     onNavigateToContact = { otherId -> navController.navigate("contact_detail/$otherId") },
                     onNavigateToCheatSheet = { navController.navigate("cheat_sheet/$contactId") }
                 )

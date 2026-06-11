@@ -287,7 +287,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
             }
         }
     } else {
-        items(relations) { rel ->
+        items(relations, key = { it.id }) { rel ->
             val contact = AppStateStore.getContact(rel.contactId)
             if (contact != null) {
                 Card(
@@ -312,7 +312,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                     Text(text = "${contact.firstName} ${contact.lastName}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(text = rel.employmentStatus.name.take(4), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                    Text(text = rel.employmentStatus.label(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                                 }
                                 
                                 val posRoles = listOfNotNull(rel.position, rel.department, rel.role).filter { it.isNotBlank() }

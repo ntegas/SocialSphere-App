@@ -595,7 +595,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 familyRelations.forEach { rel ->
                     val isFirst   = rel.firstContactId == contact.id
                     val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
-                    val role      = if (isFirst) rel.firstRole else rel.secondRole
+                    // Роль ДРУГОГО человека (например, «Жена» рядом с именем жены)
+                    val role      = if (isFirst) rel.secondRole else rel.firstRole
                     val other     = AppStateStore.getContact(otherId)
                     val otherName = other?.let { "${it.firstName} ${it.lastName}".trim() }
                         ?: "Контакт удалён"
@@ -925,7 +926,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 relations.forEach { rel ->
                     val isFirst   = rel.firstContactId == contact.id
                     val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
-                    val myRole    = if (isFirst) rel.firstRole else rel.secondRole
+                    // Роль ДРУГОГО человека
+                    val theirRole = if (isFirst) rel.secondRole else rel.firstRole
                     val other     = AppStateStore.getContact(otherId)
                     val otherName = other?.let { "${it.firstName} ${it.lastName}".trim() } ?: "Неизвестно"
                     Row(
@@ -955,8 +957,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                             }
                             Column {
                                 Text(otherName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                if (!myRole.isNullOrBlank())
-                                    Text(myRole, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                if (!theirRole.isNullOrBlank())
+                                    Text(theirRole, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                         Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outlineVariant)
@@ -1212,7 +1214,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.connectionsTab(
                                         color = MaterialTheme.colorScheme.primaryContainer
                                     ) {
                                         Text(
-                                            myRole,
+                                            theirRole,
                                             style    = MaterialTheme.typography.labelSmall,
                                             color    = MaterialTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -1224,7 +1226,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.connectionsTab(
                                             color = MaterialTheme.colorScheme.secondaryContainer
                                         ) {
                                             Text(
-                                                theirRole,
+                                                myRole,
                                                 style    = MaterialTheme.typography.labelSmall,
                                                 color    = MaterialTheme.colorScheme.onSecondaryContainer,
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -2338,7 +2340,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.detailsTab(
                 relations.forEach { rel ->
                     val isFirst   = rel.firstContactId == contact.id
                     val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
-                    val myRole    = if (isFirst) rel.firstRole else rel.secondRole
+                    // Роль ДРУГОГО человека
+                    val theirRole = if (isFirst) rel.secondRole else rel.firstRole
                     val other     = AppStateStore.getContact(otherId)
                     val otherName = other?.let { "${it.firstName} ${it.lastName}".trim() } ?: "—"
                     Row(
@@ -2349,7 +2352,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.detailsTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(otherName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                        Text(myRole, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        Text(theirRole, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                 }

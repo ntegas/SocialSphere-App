@@ -101,6 +101,55 @@ fun CheatSheetScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
+        },
+        bottomBar = {
+            // ТЗ (Экран 4): кнопки внизу — 📞 Позвонить + 💬 Написать
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            Surface(color = MaterialTheme.colorScheme.background, shadowElevation = 8.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            ExternalActionHandler.openDialer(
+                                ctx, contact.phones.firstOrNull { it.isPrimary }?.number
+                                    ?: contact.phones.firstOrNull()?.number
+                            )
+                        },
+                        enabled  = contact.phones.isNotEmpty(),
+                        modifier = Modifier.weight(1f),
+                        shape    = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Call, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Позвонить")
+                    }
+                    Button(
+                        onClick = {
+                            val m = contact.messengers.firstOrNull()
+                            if (m != null) ExternalActionHandler.openMessenger(ctx, m)
+                            else ExternalActionHandler.openSms(
+                                ctx, contact.phones.firstOrNull()?.number
+                            )
+                        },
+                        enabled  = contact.messengers.isNotEmpty() || contact.phones.isNotEmpty(),
+                        modifier = Modifier.weight(1f),
+                        shape    = RoundedCornerShape(12.dp),
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor   = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Icon(Icons.Default.Chat, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Написать")
+                    }
+                }
+            }
         }
     ) { paddingValues ->
 
@@ -212,7 +261,8 @@ fun CheatSheetScreen(
                         familyRels.forEach { rel ->
                             val isFirst   = rel.firstContactId == contact.id
                             val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
-                            val role      = if (isFirst) rel.firstRole else rel.secondRole
+                            // Роль ДРУГОГО человека
+                            val role      = if (isFirst) rel.secondRole else rel.firstRole
                             val otherName = AppStateStore.getContact(otherId)
                                 ?.let { "${it.firstName} ${it.lastName}".trim() }
                                 ?: "—"

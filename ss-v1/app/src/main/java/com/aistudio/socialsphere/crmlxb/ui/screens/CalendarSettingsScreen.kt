@@ -1,7 +1,6 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -73,7 +72,7 @@ fun CalendarSettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(name, style = MaterialTheme.typography.bodyLarge)
-                        Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(color).clickable { })
+                        Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(color))
                     }
                 }
             }

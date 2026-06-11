@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.model.*
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.ui.theme.*
 import com.aistudio.socialsphere.crmlxb.utils.*
@@ -85,6 +88,8 @@ fun HomeScreen(
 ) {
     val scrollState  = rememberScrollState()
     var expandBirthdayList  by remember { mutableStateOf(false) }
+    // Y-позиция блока «Нужно связаться» внутри скролл-колонки (для счётчика ⚠️)
+    var needAttentionSectionY by remember { mutableStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
     // FIX: explicit Locale.getDefault() to avoid crash on locale change
     val today        = LocalDate.now()
@@ -535,7 +540,16 @@ fun HomeScreen(
                                 MaterialTheme.colorScheme.onErrorContainer
                             else
                                 MaterialTheme.colorScheme.onTertiaryContainer,
-                            onClick   = { onNavigateToContacts() }
+                            onClick   = {
+                                if (overdueCount > 0) {
+                                    // ТЗ: прокрутка к блоку «Нужно связаться»
+                                    coroutineScope.launch {
+                                        scrollState.animateScrollTo(needAttentionSectionY)
+                                    }
+                                } else {
+                                    onNavigateToContacts()
+                                }
+                            }
                         )
                     }
 
@@ -549,7 +563,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                         ) {
-                            items(upcomingEvents) { e ->
+                            items(upcomingEvents, key = { it.id }) { e ->
                                 HomeEventCard(e) { onNavigateToCalendarItem(e.id) }
                             }
                         }
@@ -561,7 +575,11 @@ fun HomeScreen(
                     if (needAttention.isNotEmpty()) {
                         HomeSectionLabel(
                             "Нужно связаться · ${needAttention.size}",
-                            Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                            Modifier
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                                .onGloballyPositioned { coords ->
+                                    needAttentionSectionY = coords.positionInParent().y.roundToInt()
+                                }
                         )
                         Column(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -585,7 +603,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                         ) {
-                            items(recentlyAdded) { c ->
+                            items(recentlyAdded, key = { it.id }) { c ->
                                 HomeRecentCard(c) { onNavigateToContact(c.id) }
                             }
                         }
@@ -660,7 +678,7 @@ private fun HomeSearchResults(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(vertical = 4.dp))
             }
-            items(contacts) { r ->
+            items(contacts, key = { it.contact.id }) { r ->
                 // FIX: clickable search result
                 val c = r.contact
                 val compRel = c.companyRelations.firstOrNull { it.isPrimary }
@@ -722,7 +740,7 @@ private fun HomeSearchResults(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
             }
-            items(companies) { r ->
+            items(companies, key = { it.company.id }) { r ->
                 // FIX: clickable search result
                 val c = r.company
                 Card(

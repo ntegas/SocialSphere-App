@@ -138,6 +138,8 @@ object AppStateStore {
         if (contact.messengers.isNotEmpty())      db.contactDao().insertMessengers(contact.messengers.map { it.toEntity() })
         if (contact.companyRelations.isNotEmpty())db.contactDao().insertCompanyRelations(contact.companyRelations.map { it.toEntity() })
         if (contact.addresses.isNotEmpty())       db.addressDao().insertAddresses(contact.addresses.map { it.toEntity() })
+        if (contact.personalDetails.isNotEmpty()) db.contactDao().insertPersonalDetails(contact.personalDetails.map { it.toEntity() })
+        contact.sizeInfo?.let { db.contactDao().insertSizeInfo(it.toEntity()) }
     }
 
     private suspend fun addCompanyDb(company: Company) {
@@ -176,6 +178,8 @@ object AppStateStore {
                 db.contactDao().deleteEmailsForContact(c.id)
                 db.contactDao().deleteMessengersForContact(c.id)
                 db.contactDao().deleteCompanyRelationsForContact(c.id)
+                db.contactDao().deletePersonalDetailsForContact(c.id)
+                db.contactDao().deleteSizeInfoForContact(c.id)
                 db.addressDao().deleteAddressesForOwner(c.id, AddressOwnerType.CONTACT.name)
                 addContactDb(c)
             }
@@ -279,6 +283,18 @@ object AppStateStore {
     // ──────────────────────────────────────────────────────────
     //  NOTES CRUD
     // ──────────────────────────────────────────────────────────
+    // ── Связи между контактами (семья и др.) ─────────────────
+    fun addContactRelation(relation: ContactRelation) {
+        if (contactRelations.any { it.id == relation.id }) return
+        contactRelations.add(relation)
+        scope.launch { db()?.contactDao()?.insertContactRelations(listOf(relation.toEntity())) }
+    }
+
+    fun removeContactRelation(relationId: String) {
+        contactRelations.removeAll { it.id == relationId }
+        scope.launch { db()?.contactDao()?.deleteContactRelation(relationId) }
+    }
+
     fun addNote(note: Note) {
         val now = nowIso()
         val n = note.copy(createdAt = now, updatedAt = now)

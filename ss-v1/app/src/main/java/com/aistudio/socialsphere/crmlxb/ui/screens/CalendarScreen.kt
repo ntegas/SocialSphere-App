@@ -150,7 +150,7 @@ fun CalendarScreen(
                             Text(text = header, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(8.dp))
                         }
-                        items(items) { event ->
+                        items(items, key = { it.id }) { event ->
                             CalendarEventItem(
                                 event          = event,
                                 onClick        = { onNavigateToCalendarItem(event.id) },

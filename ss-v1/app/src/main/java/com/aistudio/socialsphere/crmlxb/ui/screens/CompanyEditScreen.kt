@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
+import com.aistudio.socialsphere.crmlxb.utils.label
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -475,10 +476,8 @@ fun CompanyEditScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
         
-        if (showRelationEditDialog != null) {
-            val relation = showRelationEditDialog!!
+        showRelationEditDialog?.let { relation ->
             val contact = AppStateStore.getContact(relation.contactId)
-            
             AlertDialog(
                 onDismissRequest = { showRelationEditDialog = null },
                 title = { Text("Связь: ${contact?.firstName} ${contact?.lastName}") },
@@ -490,7 +489,7 @@ fun CompanyEditScreen(
                         OutlinedTextField(value = relation.position ?: "", onValueChange = {}, label = { Text("Должность") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = relation.department ?: "", onValueChange = {}, label = { Text("Отдел") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = relation.role ?: "", onValueChange = {}, label = { Text("Роль") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = relation.employmentStatus.name, onValueChange = {}, label = { Text("Статус") }, modifier = Modifier.fillMaxWidth(), enabled = false)
+                        OutlinedTextField(value = relation.employmentStatus.label(), onValueChange = {}, label = { Text("Статус") }, modifier = Modifier.fillMaxWidth(), enabled = false)
                         OutlinedTextField(value = relation.responsibilities ?: "", onValueChange = {}, label = { Text("Зона ответственности") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = relation.managedAccounts ?: "", onValueChange = {}, label = { Text("Аккаунты / направления") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = relation.workNote ?: "", onValueChange = {}, label = { Text("Рабочая заметка") }, modifier = Modifier.fillMaxWidth())

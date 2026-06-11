@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
+import com.aistudio.socialsphere.crmlxb.utils.label
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -34,6 +35,19 @@ fun ContactEditScreen(
     val isEditMode = contactId != null
     val originalContact = remember { contactId?.let { AppStateStore.getContact(it) } }
     val nowIso = { LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) }
+
+    // Стабильный id: для нового контакта генерируется один раз,
+    // чтобы связи (семья) могли ссылаться на него ещё до сохранения
+    val editedContactId = remember { originalContact?.id ?: UUID.randomUUID().toString() }
+
+    // ── Семья и отношения ──
+    val originalRelations = remember {
+        AppStateStore.contactRelations
+            .filter { it.firstContactId == editedContactId || it.secondContactId == editedContactId }
+            .toList()
+    }
+    var contactRelationsDraft by remember { mutableStateOf(originalRelations) }
+    var showAddRelation by remember { mutableStateOf(false) }
 
     var firstName by remember { mutableStateOf(originalContact?.firstName ?: "") }
     var lastName  by remember { mutableStateOf(originalContact?.lastName  ?: "") }
@@ -104,7 +118,7 @@ fun ContactEditScreen(
         ) else originalContact?.companyRelations ?: emptyList()
 
         val newContact = Contact(
-            id               = originalContact?.id ?: UUID.randomUUID().toString(),
+            id               = editedContactId,
             firstName        = firstName.trim(),
             lastName         = lastName.trim(),
             nickname         = nickname.trim().ifBlank { null },
@@ -136,10 +150,104 @@ fun ContactEditScreen(
         )
         if (isEditMode) AppStateStore.updateContact(newContact)
         else            AppStateStore.addContact(newContact)
+
+        // Связи (семья): применяем разницу только при сохранении
+        val keptIds = contactRelationsDraft.map { it.id }.toSet()
+        originalRelations.filter { it.id !in keptIds }
+            .forEach { AppStateStore.removeContactRelation(it.id) }
+        val origIds = originalRelations.map { it.id }.toSet()
+        contactRelationsDraft.filter { it.id !in origIds }
+            .forEach { AppStateStore.addContactRelation(it) }
+
         onNavigateBack()
     }
 
     // ── Dialogs ──────────────────────────────────────────────────────
+    if (showAddRelation) {
+        val relationRoles = listOf("Жена", "Муж", "Партнёр", "Мать", "Отец",
+            "Сын", "Дочь", "Брат", "Сестра", "Родственник", "Друг", "Коллега")
+        // Обратная роль по умолчанию (пользователь может изменить)
+        val inverseRole: (String) -> String = {
+            when (it) {
+                "Жена" -> "Муж"; "Муж" -> "Жена"
+                "Партнёр" -> "Партнёр"; "Друг" -> "Друг"; "Коллега" -> "Коллега"
+                else -> "Родственник"
+            }
+        }
+        var newRelContactId by remember { mutableStateOf("") }
+        var newRelOtherRole by remember { mutableStateOf("Родственник") }
+        var newRelMyRole    by remember { mutableStateOf("Родственник") }
+        var myRoleTouched   by remember { mutableStateOf(false) }
+        var showContactPicker by remember { mutableStateOf(false) }
+        val candidates = AppStateStore.contacts.filter { c ->
+            c.id != editedContactId &&
+            contactRelationsDraft.none { it.firstContactId == c.id || it.secondContactId == c.id }
+        }
+        val selectedName = AppStateStore.getContact(newRelContactId)
+            ?.let { "${it.firstName} ${it.lastName}".trim() } ?: ""
+
+        AlertDialog(
+            onDismissRequest = { showAddRelation = false },
+            title = { Text("Добавить человека", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box {
+                        OutlinedTextField(
+                            value = selectedName, onValueChange = {},
+                            label = { Text("Контакт") },
+                            modifier = Modifier.fillMaxWidth().clickable { showContactPicker = true },
+                            enabled = false, shape = SocialShape.Small,
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                        DropdownMenu(expanded = showContactPicker,
+                            onDismissRequest = { showContactPicker = false }) {
+                            if (candidates.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("Нет доступных контактов",
+                                        color = MaterialTheme.colorScheme.secondary) },
+                                    onClick = { showContactPicker = false })
+                            }
+                            candidates.forEach { c ->
+                                DropdownMenuItem(
+                                    text = { Text("${c.firstName} ${c.lastName}".trim()) },
+                                    onClick = { newRelContactId = c.id; showContactPicker = false })
+                            }
+                        }
+                    }
+                    DropdownField("Кем приходится", newRelOtherRole, relationRoles) { v ->
+                        newRelOtherRole = v
+                        if (!myRoleTouched) newRelMyRole = inverseRole(v)
+                    }
+                    DropdownField("Кто я для него/неё", newRelMyRole, relationRoles) { v ->
+                        newRelMyRole = v; myRoleTouched = true
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = newRelContactId.isNotBlank(),
+                    onClick = {
+                        contactRelationsDraft = contactRelationsDraft + ContactRelation(
+                            id              = UUID.randomUUID().toString(),
+                            firstContactId  = editedContactId,
+                            secondContactId = newRelContactId,
+                            firstRole       = newRelMyRole,
+                            secondRole      = newRelOtherRole
+                        )
+                        showAddRelation = false
+                    }
+                ) { Text("Добавить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddRelation = false }) { Text("Отмена") }
+            }
+        )
+    }
     if (showAddPhone) {
         AlertDialog(
             onDismissRequest = { showAddPhone = false; newPhone = "" },
@@ -363,6 +471,46 @@ fun ContactEditScreen(
                 }
             }
 
+            // ── Семья и отношения (ТЗ v2.0, секция 6) ────────────────
+            SectionCard("Семья и отношения") {
+                if (contactRelationsDraft.isEmpty()) {
+                    Text("Нет связанных людей",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary)
+                }
+                contactRelationsDraft.forEach { rel ->
+                    val isFirst   = rel.firstContactId == editedContactId
+                    val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
+                    val otherRole = if (isFirst) rel.secondRole else rel.firstRole
+                    val otherName = AppStateStore.getContact(otherId)
+                        ?.let { "${it.firstName} ${it.lastName}".trim() } ?: "Контакт удалён"
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(otherName, style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold)
+                            Text(otherRole, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary)
+                        }
+                        IconButton(onClick = {
+                            contactRelationsDraft = contactRelationsDraft.filter { it.id != rel.id }
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Удалить связь",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                TextButton(onClick = { showAddRelation = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Добавить человека")
+                }
+            }
+
             // ── Теги ──────────────────────────────────────────────────
             SectionCard("Теги") {
                 if (tags.isNotEmpty()) {
@@ -466,13 +614,25 @@ fun ContactEditScreen(
                     contactStatus = ContactStatus.values().firstOrNull { s -> s.label() == it } ?: ContactStatus.ACTIVE
                 }
                 Spacer(Modifier.height(10.dp))
-                DropdownField("Уровень связи",  connectionLevel.name,    ConnectionLevel.values().map { it.name })    { connectionLevel    = ConnectionLevel.valueOf(it) }
+                DropdownField("Тип отношений", relationshipType.label(), RelationshipType.values().map { it.label() }) {
+                    relationshipType = RelationshipType.values().firstOrNull { r -> r.label() == it } ?: relationshipType
+                }
                 Spacer(Modifier.height(10.dp))
-                DropdownField("Важность",       importanceLevel.name,    ImportanceLevel.values().map { it.name })    { importanceLevel    = ImportanceLevel.valueOf(it) }
+                DropdownField("Уровень связи", connectionLevel.label(), ConnectionLevel.values().map { it.label() }) {
+                    connectionLevel = ConnectionLevel.values().firstOrNull { l -> l.label() == it } ?: connectionLevel
+                }
                 Spacer(Modifier.height(10.dp))
-                DropdownField("Социальная роль",socialRole.name,         SocialRole.values().map { it.name })         { socialRole         = SocialRole.valueOf(it) }
+                DropdownField("Важность", importanceLevel.label(), ImportanceLevel.values().map { it.label() }) {
+                    importanceLevel = ImportanceLevel.values().firstOrNull { l -> l.label() == it } ?: importanceLevel
+                }
                 Spacer(Modifier.height(10.dp))
-                DropdownField("Ритм общения",   communicationRhythm.name,CommunicationRhythm.values().map { it.name }){ communicationRhythm = CommunicationRhythm.valueOf(it) }
+                DropdownField("Социальная роль", socialRole.label(), SocialRole.values().map { it.label() }) {
+                    socialRole = SocialRole.values().firstOrNull { r -> r.label() == it } ?: socialRole
+                }
+                Spacer(Modifier.height(10.dp))
+                DropdownField("Ритм общения", communicationRhythm.label(), CommunicationRhythm.values().map { it.label() }) {
+                    communicationRhythm = CommunicationRhythm.values().firstOrNull { r -> r.label() == it } ?: communicationRhythm
+                }
             }
 
             Spacer(Modifier.height(32.dp))

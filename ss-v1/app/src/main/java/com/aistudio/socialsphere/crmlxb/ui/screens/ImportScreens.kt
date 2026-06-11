@@ -405,7 +405,7 @@ fun ImportPreviewScreen(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(candidates) { candidate ->
+            items(candidates, key = { it.id }) { candidate ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -626,7 +626,7 @@ fun ImportDuplicatesScreen(
             item {
              Text("Выберите действие для каждого найденного дубликата.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
             }
-            items(duplicateCandidates) { candidate ->
+            items(duplicateCandidates, key = { it.id }) { candidate ->
                 val scope = rememberCoroutineScope()
                 Card(
                     modifier = Modifier.fillMaxWidth(),

@@ -67,6 +67,15 @@ interface ContactDao {
     @Query("DELETE FROM contact_company_relations WHERE contactId = :contactId")
     suspend fun deleteCompanyRelationsForContact(contactId: String)
 
+    @Query("DELETE FROM contact_relations WHERE id = :relationId")
+    suspend fun deleteContactRelation(relationId: String)
+
+    @Query("DELETE FROM personal_details WHERE contactId = :contactId")
+    suspend fun deletePersonalDetailsForContact(contactId: String)
+
+    @Query("DELETE FROM size_infos WHERE contactId = :contactId")
+    suspend fun deleteSizeInfoForContact(contactId: String)
+
     @Query("UPDATE contacts SET lastContactDate = :date, updatedAt = :updatedAt WHERE id = :contactId")
     suspend fun updateLastContactDate(contactId: String, date: String, updatedAt: String)
 }
