@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -168,7 +169,7 @@ fun CompanyEditScreen(
                 title = { Text(if (isEditMode) "Редактирование" else "Новая компания", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 actions = {
@@ -494,7 +495,7 @@ fun CompanyEditScreen(
                         OutlinedTextField(value = relation.managedAccounts ?: "", onValueChange = {}, label = { Text("Аккаунты / направления") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = relation.workNote ?: "", onValueChange = {}, label = { Text("Рабочая заметка") }, modifier = Modifier.fillMaxWidth())
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = relation.isPrimary, onCheckedChange = {})
+                            Checkbox(checked = relation.isPrimary, onCheckedChange = {}, enabled = false)
                             Text("Основная компания")
                         }
                     }

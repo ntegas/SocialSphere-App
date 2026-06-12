@@ -1,13 +1,18 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -204,20 +209,95 @@ fun ContactEditScreen(
                                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
-                        DropdownMenu(expanded = showContactPicker,
-                            onDismissRequest = { showContactPicker = false }) {
-                            if (candidates.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("Нет доступных контактов",
-                                        color = MaterialTheme.colorScheme.secondary) },
-                                    onClick = { showContactPicker = false })
+                    }
+                    // Урок 45 ТЗ: список выбора с поиском и сортировкой —
+                    // листаемое меню без поиска неюзабельно при 20+ контактах
+                    if (showContactPicker) {
+                        var pickerQuery by remember { mutableStateOf("") }
+                        val shown = candidates
+                            .sortedBy { "${it.firstName} ${it.lastName}".trim().lowercase() }
+                            .filter { c ->
+                                pickerQuery.isBlank() ||
+                                "${c.firstName} ${c.lastName}".contains(pickerQuery, ignoreCase = true) ||
+                                c.nickname?.contains(pickerQuery, ignoreCase = true) == true
                             }
-                            candidates.forEach { c ->
-                                DropdownMenuItem(
-                                    text = { Text("${c.firstName} ${c.lastName}".trim()) },
-                                    onClick = { newRelContactId = c.id; showContactPicker = false })
+                        AlertDialog(
+                            onDismissRequest = { showContactPicker = false },
+                            title = { Text("Выбор контакта", fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = pickerQuery,
+                                        onValueChange = { pickerQuery = it },
+                                        placeholder = { Text("Поиск по имени…") },
+                                        leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        shape = SocialShape.Small
+                                    )
+                                    if (shown.isEmpty()) {
+                                        Text(
+                                            if (candidates.isEmpty()) "Нет доступных контактов"
+                                            else "Никого не нашлось по запросу «$pickerQuery»",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.padding(vertical = 16.dp)
+                                        )
+                                    } else {
+                                        LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                                            items(shown, key = { it.id }) { c ->
+                                                val cName = "${c.firstName} ${c.lastName}".trim()
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable {
+                                                            newRelContactId = c.id
+                                                            showContactPicker = false
+                                                        }
+                                                        .padding(vertical = 8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(36.dp)
+                                                            .clip(CircleShape)
+                                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            cName.split(" ")
+                                                                .mapNotNull { it.firstOrNull()?.uppercase() }
+                                                                .take(2).joinToString(""),
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                    Column {
+                                                        Text(cName, style = MaterialTheme.typography.bodyMedium,
+                                                            fontWeight = FontWeight.Medium)
+                                                        if (!c.nickname.isNullOrBlank()) {
+                                                            Text("«${c.nickname}»",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = MaterialTheme.colorScheme.secondary)
+                                                        }
+                                                    }
+                                                }
+                                                HorizontalDivider(
+                                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                                    thickness = 0.5.dp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {},
+                            dismissButton = {
+                                TextButton(onClick = { showContactPicker = false }) { Text("Отмена") }
                             }
-                        }
+                        )
                     }
                     DropdownField("Кем приходится", newRelOtherRole, relationRoles) { v ->
                         newRelOtherRole = v
@@ -318,7 +398,7 @@ fun ContactEditScreen(
         topBar = {
             TopAppBar(
                 title = { Text(if (isEditMode) "Редактирование" else "Новый контакт", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "Назад") } },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } },
                 actions = {
                     Button(
                         onClick = ::buildAndSave,
@@ -441,6 +521,7 @@ fun ContactEditScreen(
             // ── Company ───────────────────────────────────────────────
             SectionCard("Компания и работа") {
                 var showCompanyDropdown by remember { mutableStateOf(false) }
+                var showNewCompanyDialog by remember { mutableStateOf(false) }
                 val companies = AppStateStore.companies
                 val selectedCompanyName = companies.find { it.id == selectedCompanyId }?.name ?: ""
 
@@ -457,12 +538,65 @@ fun ContactEditScreen(
                         )
                     )
                     DropdownMenu(expanded = showCompanyDropdown, onDismissRequest = { showCompanyDropdown = false }) {
+                        DropdownMenuItem(
+                            text = { Text("+ Новая компания", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium) },
+                            leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary) },
+                            onClick = { showCompanyDropdown = false; showNewCompanyDialog = true }
+                        )
                         DropdownMenuItem(text = { Text("— Без компании —", color = MaterialTheme.colorScheme.secondary) }, onClick = { selectedCompanyId = ""; showCompanyDropdown = false })
                         HorizontalDivider()
-                        companies.forEach { company ->
+                        // Урок 45: список выбора — отсортирован
+                        companies.sortedBy { it.name.lowercase() }.forEach { company ->
                             DropdownMenuItem(text = { Text(company.name) }, onClick = { selectedCompanyId = company.id; showCompanyDropdown = false })
                         }
                     }
+                }
+                if (showNewCompanyDialog) {
+                    var newCompanyName by remember { mutableStateOf("") }
+                    AlertDialog(
+                        onDismissRequest = { showNewCompanyDialog = false },
+                        title = { Text("Новая компания", fontWeight = FontWeight.Bold) },
+                        text = {
+                            OutlinedTextField(
+                                value = newCompanyName,
+                                onValueChange = { newCompanyName = it },
+                                label = { Text("Название компании*") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = SocialShape.Small
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                enabled = newCompanyName.isNotBlank(),
+                                onClick = {
+                                    val clean = newCompanyName.trim()
+                                    // Дедуп: компания с таким именем уже есть — выбираем её
+                                    val existing = AppStateStore.companies
+                                        .find { it.name.equals(clean, ignoreCase = true) }
+                                    if (existing != null) {
+                                        selectedCompanyId = existing.id
+                                    } else {
+                                        val now = java.time.LocalDateTime.now()
+                                            .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                        val company = Company(
+                                            id = UUID.randomUUID().toString(),
+                                            name = clean,
+                                            industry = Industry.OTHER,
+                                            createdAt = now,
+                                            updatedAt = now
+                                        )
+                                        AppStateStore.addCompany(company)
+                                        selectedCompanyId = company.id
+                                    }
+                                    showNewCompanyDialog = false
+                                }
+                            ) { Text("Создать") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showNewCompanyDialog = false }) { Text("Отмена") }
+                        }
+                    )
                 }
                 if (selectedCompanyId.isNotBlank()) {
                     OutlinedTextField(value = companyPosition, onValueChange = { companyPosition = it }, label = { Text("Должность") }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)

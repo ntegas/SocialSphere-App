@@ -240,9 +240,12 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                     }
                 }
                 // ORG
-                line.startsWith("ORG:")   -> company = line.removePrefix("ORG:").trim()
-                // TITLE
-                line.startsWith("TITLE:") -> title = line.removePrefix("TITLE:").trim()
+                // Урок 45: vCard ORG = «Компания;Отдел;…» — берём только первое поле;
+                // плюс поддержка параметров вида ORG;CHARSET=UTF-8:
+                line.startsWith("ORG:") || line.startsWith("ORG;") ->
+                    company = line.substringAfter(":", "").substringBefore(";").trim()
+                line.startsWith("TITLE:") || line.startsWith("TITLE;") ->
+                    title = line.substringAfter(":", "").trim()
                 // BDAY: 19900312 or 1990-03-12
                 line.startsWith("BDAY:") -> {
                     val raw = line.removePrefix("BDAY:").trim()
@@ -285,16 +288,31 @@ fun parseCsv(content: String): List<ImportContactCandidate> {
     // Parse header
     val headers = splitCsvLine(lines[0]).map { it.trim().lowercase() }
 
-    fun colIdx(vararg names: String): Int =
-        names.firstNotNullOfOrNull { name ->
-            headers.indexOfFirst { it.contains(name) }.takeIf { it >= 0 }
-        } ?: -1
+    // Урок 44: contains-матчинг цеплял «Organization 1 - Title/Type» как компанию —
+    // профессии становились компаниями. Точное совпадение приоритетнее подстроки,
+    // плюс исключения: заголовок с title/type/должн не может быть компанией.
+    fun colIdx(vararg names: String, exclude: List<String> = emptyList()): Int {
+        fun ok(h: String) = exclude.none { h.contains(it) }
+        // 1. точное совпадение
+        names.forEach { name ->
+            val i = headers.indexOfFirst { it == name && ok(it) }
+            if (i >= 0) return i
+        }
+        // 2. подстрока — только если заголовок не исключён
+        names.forEach { name ->
+            val i = headers.indexOfFirst { it.contains(name) && ok(it) }
+            if (i >= 0) return i
+        }
+        return -1
+    }
 
-    val idxFirst   = colIdx("имя", "firstname", "first name", "name", "название")
-    val idxLast    = colIdx("фамилия", "lastname", "last name", "surname")
+    val idxFirst   = colIdx("имя", "firstname", "first name", "given name", "name", "название",
+                            exclude = listOf("org", "company", "файл", "middle"))
+    val idxLast    = colIdx("фамилия", "lastname", "last name", "family name", "surname")
     val idxPhone   = colIdx("телефон", "phone", "mobile", "tel")
     val idxEmail   = colIdx("email", "почта", "e-mail")
-    val idxCompany = colIdx("компания", "company", "организация", "org")
+    val idxCompany = colIdx("компания", "company", "организация", "org",
+                            exclude = listOf("title", "type", "должн", "depart", "symbol", "location"))
     val idxTitle   = colIdx("должность", "title", "position", "job")
     val idxCity    = colIdx("город", "city")
 

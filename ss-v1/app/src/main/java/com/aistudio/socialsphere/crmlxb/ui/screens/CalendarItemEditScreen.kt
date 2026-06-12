@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.clickable
@@ -6,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -118,7 +121,7 @@ fun CalendarItemEditScreen(
                 title = { Text(if (isEditMode) "Редактирование" else "Новое событие", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 actions = {
@@ -430,17 +433,8 @@ fun CalendarItemEditScreen(
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = true, onCheckedChange = {})
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Показывать на главной")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = true, onCheckedChange = {})
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Показывать в карточке контакта/компании")
-                }
+                // Свитчи «Показывать на главной / в карточке» удалены:
+                // в модели CalendarItem нет таких полей — контролы ничего не делали
             }
             
             Spacer(modifier = Modifier.height(32.dp))

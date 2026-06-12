@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -22,6 +23,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -195,7 +197,7 @@ fun HomeScreen(
                     }
 
                     val daysSince: Long = if (lastDate != null)
-                        java.time.ChronoUnit.DAYS.between(lastDate, today)
+                        java.time.temporal.ChronoUnit.DAYS.between(lastDate, today)
                     else
                         maxDays + 1  // Never contacted → treat as overdue
 
@@ -317,8 +319,8 @@ fun HomeScreen(
                     val daysUntil = try {
                         val bday = java.time.LocalDate.parse(dateStr)
                         val thisYear = bday.withYear(today.year)
-                        val next = if (thisYear < today) thisYear.plusYears(1) else thisYear
-                        java.time.ChronoUnit.DAYS.between(today, next)
+                        val next = if (thisYear.isBefore(today)) thisYear.plusYears(1) else thisYear
+                        java.time.temporal.ChronoUnit.DAYS.between(today, next)
                     } catch (e: Exception) { return@mapNotNull null }
                     if (daysUntil > 30) return@mapNotNull null
                     val compRel = contact.companyRelations.firstOrNull { it.isPrimary }
@@ -462,7 +464,7 @@ fun HomeScreen(
                 navigationIcon = {
                     if (searchActive) {
                         IconButton(onClick = { searchActive = false; searchQuery = "" }) {
-                            Icon(Icons.Default.ArrowBack, "Закрыть")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Закрыть")
                         }
                     }
                 },

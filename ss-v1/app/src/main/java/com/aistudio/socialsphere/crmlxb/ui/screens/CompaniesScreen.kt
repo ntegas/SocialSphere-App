@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.background
@@ -9,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -168,7 +171,7 @@ fun CompaniesScreen(
                 navigationIcon = {
                     if (searchActive) {
                         IconButton(onClick = { searchActive = false; searchQuery = "" }) {
-                            Icon(Icons.Default.ArrowBack, "Закрыть поиск")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Закрыть поиск")
                         }
                     }
                 },

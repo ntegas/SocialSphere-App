@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.border
@@ -9,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -54,6 +57,11 @@ fun ContactDetailScreen(
     var showVoiceDialog by remember { mutableStateOf(false) }
     var editingNote  by remember { mutableStateOf<Note?>(null) }
     var deletingNote by remember { mutableStateOf<Note?>(null) }
+    var showAddGift     by remember { mutableStateOf(false) }
+    var editingGift     by remember { mutableStateOf<GiftIdea?>(null) }
+    var deletingGift    by remember { mutableStateOf<GiftIdea?>(null) }
+    var showSizesDialog by remember { mutableStateOf(false) }
+    var showAddPref     by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Add note state
@@ -93,7 +101,7 @@ fun ContactDetailScreen(
                 ) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 actions = {
@@ -161,7 +169,19 @@ fun ContactDetailScreen(
                     0 -> overviewTab(contact, onNavigateToCreateCalendarItem, onNavigateToCalendarItem, onNavigateToContact, onNavigateToCompany)
                     1 -> workTab(contact, onNavigateToCompany)
                     2 -> communicationTab(contact)
-                    3 -> giftsTab(contact, onNavigateToCalendarItem)
+                    3 -> giftsTab(
+                        contact, onNavigateToCalendarItem,
+                        onAddGift    = { showAddGift = true },
+                        onEditGift   = { editingGift = it },
+                        onDeleteGift = { deletingGift = it },
+                        onEditSizes  = { showSizesDialog = true },
+                        onAddPref    = { showAddPref = true },
+                        onDeletePref = { pref ->
+                            AppStateStore.updateContact(contact.copy(
+                                personalDetails = contact.personalDetails.filter { it.id != pref.id }
+                            ))
+                        }
+                    )
                     4 -> notesTab(
                         contact      = contact,
                         onShowAdd    = { showAddDialog = true },
@@ -172,6 +192,146 @@ fun ContactDetailScreen(
                 }
             }
         }
+    }
+
+    // ── Добавление / правка идеи подарка ──
+    if (showAddGift || editingGift != null) {
+        val g = editingGift
+        var gTitle by remember(g?.id ?: "new") { mutableStateOf(g?.title ?: "") }
+        var gNote  by remember(g?.id ?: "new") { mutableStateOf(g?.note ?: "") }
+        var gLink  by remember(g?.id ?: "new") { mutableStateOf(g?.link ?: "") }
+        AlertDialog(
+            onDismissRequest = { showAddGift = false; editingGift = null },
+            title = { Text(if (g == null) "Идея подарка" else "Править идею", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(value = gTitle, onValueChange = { gTitle = it },
+                        label = { Text("Название*") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = gNote, onValueChange = { gNote = it },
+                        label = { Text("Заметка") }, modifier = Modifier.fillMaxWidth(), maxLines = 3)
+                    OutlinedTextField(value = gLink, onValueChange = { gLink = it },
+                        label = { Text("Ссылка") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                }
+            },
+            confirmButton = {
+                Button(enabled = gTitle.isNotBlank(), onClick = {
+                    if (g == null) {
+                        AppStateStore.addGift(GiftIdea(
+                            id = java.util.UUID.randomUUID().toString(),
+                            contactId = contact.id,
+                            title = gTitle.trim(),
+                            note  = gNote.trim().ifBlank { null },
+                            link  = gLink.trim().ifBlank { null },
+                            status = GiftStatus.IDEA
+                        ))
+                    } else {
+                        AppStateStore.updateGift(g.copy(
+                            title = gTitle.trim(),
+                            note  = gNote.trim().ifBlank { null },
+                            link  = gLink.trim().ifBlank { null }
+                        ))
+                    }
+                    showAddGift = false; editingGift = null
+                }) { Text("Сохранить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddGift = false; editingGift = null }) { Text("Отмена") }
+            }
+        )
+    }
+
+    // ── Подтверждение удаления идеи ──
+    deletingGift?.let { gift ->
+        AlertDialog(
+            onDismissRequest = { deletingGift = null },
+            title = { Text("Удалить идею?", fontWeight = FontWeight.Bold) },
+            text = { Text(gift.title) },
+            confirmButton = {
+                Button(colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    onClick = { AppStateStore.deleteGift(gift.id); deletingGift = null }
+                ) { Text("Удалить") }
+            },
+            dismissButton = { TextButton(onClick = { deletingGift = null }) { Text("Отмена") } }
+        )
+    }
+
+    // ── Размеры ──
+    if (showSizesDialog) {
+        val existing = AppStateStore.sizeInfos.find { it.contactId == contact.id }
+        var sClothing by remember { mutableStateOf(existing?.clothingSize ?: "") }
+        var sShoe     by remember { mutableStateOf(existing?.shoeSize ?: "") }
+        var sRing     by remember { mutableStateOf(existing?.ringSize ?: "") }
+        var sOther    by remember { mutableStateOf(existing?.other ?: "") }
+        AlertDialog(
+            onDismissRequest = { showSizesDialog = false },
+            title = { Text("Размеры", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(value = sClothing, onValueChange = { sClothing = it },
+                        label = { Text("Одежда (напр. M, 48)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = sShoe, onValueChange = { sShoe = it },
+                        label = { Text("Обувь (напр. 42)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = sRing, onValueChange = { sRing = it },
+                        label = { Text("Кольцо (напр. 17)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = sOther, onValueChange = { sOther = it },
+                        label = { Text("Другое") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    AppStateStore.setSizeInfo(contact.id, SizeInfo(
+                        id = existing?.id ?: java.util.UUID.randomUUID().toString(),
+                        contactId    = contact.id,
+                        clothingSize = sClothing.trim().ifBlank { null },
+                        shoeSize     = sShoe.trim().ifBlank { null },
+                        ringSize     = sRing.trim().ifBlank { null },
+                        other        = sOther.trim().ifBlank { null }
+                    ))
+                    showSizesDialog = false
+                }) { Text("Сохранить") }
+            },
+            dismissButton = { TextButton(onClick = { showSizesDialog = false }) { Text("Отмена") } }
+        )
+    }
+
+    // ── Добавление предпочтения ──
+    if (showAddPref) {
+        val prefCategories = listOf(
+            PersonalDetailCategory.FOOD, PersonalDetailCategory.DRINKS,
+            PersonalDetailCategory.LIKES, PersonalDetailCategory.DISLIKES,
+            PersonalDetailCategory.BRANDS, PersonalDetailCategory.ALLERGIES,
+            PersonalDetailCategory.RESTRICTIONS
+        )
+        var prefCat   by remember { mutableStateOf(PersonalDetailCategory.FOOD) }
+        var prefValue by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAddPref = false },
+            title = { Text("Предпочтение", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DropdownField("Категория", prefCat.label(), prefCategories.map { it.label() }) { picked ->
+                        prefCat = prefCategories.firstOrNull { it.label() == picked } ?: prefCat
+                    }
+                    OutlinedTextField(value = prefValue, onValueChange = { prefValue = it },
+                        label = { Text("Значение (напр. «тёмный шоколад»)") },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true)
+                }
+            },
+            confirmButton = {
+                Button(enabled = prefValue.isNotBlank(), onClick = {
+                    AppStateStore.updateContact(contact.copy(
+                        personalDetails = contact.personalDetails + PersonalDetail(
+                            id        = java.util.UUID.randomUUID().toString(),
+                            contactId = contact.id,
+                            category  = prefCat,
+                            value     = prefValue.trim()
+                        )
+                    ))
+                    showAddPref = false
+                }) { Text("Добавить") }
+            },
+            dismissButton = { TextButton(onClick = { showAddPref = false }) { Text("Отмена") } }
+        )
     }
 
     // ── Правка заметки ──
@@ -438,12 +598,12 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
     val daysSince = if (!contact.lastContactDate.isNullOrBlank()) {
         try {
             val last = java.time.LocalDate.parse(contact.lastContactDate?.take(10))
-            java.time.ChronoUnit.DAYS.between(last, java.time.LocalDate.now())
+            java.time.temporal.ChronoUnit.DAYS.between(last, java.time.LocalDate.now())
         } catch (e: Exception) { null }
     } else if (!lastNoteDate.isNullOrBlank()) {
         try {
             val last = java.time.LocalDate.parse(lastNoteDate)
-            java.time.ChronoUnit.DAYS.between(last, java.time.LocalDate.now())
+            java.time.temporal.ChronoUnit.DAYS.between(last, java.time.LocalDate.now())
         } catch (e: Exception) { null }
     } else null
 
@@ -470,7 +630,7 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
         }
         val daysSinceLast = contact.lastContactDate?.let { dateStr ->
             try {
-                java.time.ChronoUnit.DAYS.between(java.time.LocalDate.parse(dateStr.take(10)), today)
+                java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.parse(dateStr.take(10)), today)
             } catch (e: Exception) { null }
         }
         val badgeColor = when {
@@ -1636,6 +1796,26 @@ fun CardBlock(title: String? = null, content: @Composable ColumnScope.() -> Unit
 }
 
 @Composable
+private fun GiftMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, modifier = Modifier.size(24.dp)) {
+            Icon(Icons.Default.MoreVert, "Действия", Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.secondary)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("Править") },
+                leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)) },
+                onClick = { open = false; onEdit() })
+            DropdownMenuItem(text = { Text("Удалить", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.error) },
+                onClick = { open = false; onDelete() })
+        }
+    }
+}
+
+@Composable
 private fun EditableChip(
     current: String,
     options: List<String>,
@@ -1943,7 +2123,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
 // ═══════════════════════════════════════════════════════════════
 fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
     contact: Contact,
-    onNavigateToCalendarItem: (String) -> Unit
+    onNavigateToCalendarItem: (String) -> Unit,
+    onAddGift: () -> Unit = {},
+    onEditGift: (GiftIdea) -> Unit = {},
+    onDeleteGift: (GiftIdea) -> Unit = {},
+    onEditSizes: () -> Unit = {},
+    onAddPref: () -> Unit = {},
+    onDeletePref: (PersonalDetail) -> Unit = {}
 ) {
     // ── Важные даты вверху ───────────────────────────────────
     item {
@@ -1964,8 +2150,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                         // Переносим на текущий год; недавно прошедшие (≤30 дн.)
                         // оставляем в прошлом — покажется «N дн. назад»
                         val thisYear = d.withYear(today.year)
-                        val next = if (thisYear < today.minusDays(30)) thisYear.plusYears(1) else thisYear
-                        java.time.ChronoUnit.DAYS.between(today, next)
+                        val next = if (thisYear.isBefore(today.minusDays(30))) thisYear.plusYears(1) else thisYear
+                        java.time.temporal.ChronoUnit.DAYS.between(today, next)
                     } catch (e: Exception) { null }
 
                     Row(
@@ -1993,17 +2179,20 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                             )
                         }
                         if (daysUntil != null) {
+                            // Явная не-nullable копия: K2 не делал smart-cast,
+                            // и -daysUntil давал ambiguity unaryMinus
+                            val du: Long = daysUntil
                             Text(
                                 when {
-                                    daysUntil == 0L -> "Сегодня! 🎉"
-                                    daysUntil > 0   -> "через $daysUntil дн."
-                                    else            -> "${-daysUntil} дн. назад"
+                                    du == 0L -> "Сегодня! 🎉"
+                                    du > 0L  -> "через $du дн."
+                                    else     -> "${-du} дн. назад"
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = when {
-                                    daysUntil in 0..7 -> MaterialTheme.colorScheme.error
-                                    daysUntil in 8..30 -> MaterialTheme.colorScheme.tertiary
-                                    else -> MaterialTheme.colorScheme.secondary
+                                    du in 0L..7L  -> MaterialTheme.colorScheme.error
+                                    du in 8L..30L -> MaterialTheme.colorScheme.tertiary
+                                    else          -> MaterialTheme.colorScheme.secondary
                                 },
                                 fontWeight = FontWeight.Medium
                             )
@@ -2024,6 +2213,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
         val given  = gifts.filter { it.status == GiftStatus.GIVEN }
 
         // Идеи
+        TextButton(onClick = onAddGift, modifier = Modifier.padding(bottom = 4.dp)) {
+            Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("Идея подарка")
+        }
         CardBlock(title = "Идеи подарков") {
             if (ideas.isEmpty()) {
                 Text(
@@ -2071,6 +2265,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                         ) {
                             Text("Купить 🛍️", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                         }
+                        GiftMenu(onEdit = { onEditGift(gift) }, onDelete = { onDeleteGift(gift) })
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                 }
@@ -2099,6 +2294,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                         ) {
                             Text("Подарить ✅", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                         }
+                        GiftMenu(onEdit = { onEditGift(gift) }, onDelete = { onDeleteGift(gift) })
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                 }
@@ -2137,8 +2333,22 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
         )
         val prefs = contact.personalDetails.filter { it.category in prefCats }
 
-        if (size != null || prefs.isNotEmpty()) {
+        // Блок виден всегда: раньше при пустых данных добавить размеры
+        // и предпочтения из вкладки было негде в принципе
+        run {
             CardBlock(title = "Предпочтения и размеры") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onEditSizes, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Default.Edit, null, Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Размеры", fontSize = 12.sp)
+                    }
+                    TextButton(onClick = onAddPref, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Default.Add, null, Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Предпочтение", fontSize = 12.sp)
+                    }
+                }
                 if (size != null) {
                     Text(
                         "Размеры",
@@ -2168,12 +2378,25 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(2.dp))
-                        items.forEach { Text("• ${it.value}", style = MaterialTheme.typography.bodySmall) }
+                        items.forEach { pref ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("• ${pref.value}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                IconButton(onClick = { onDeletePref(pref) }, modifier = Modifier.size(20.dp)) {
+                                    Icon(Icons.Default.Close, "Удалить",
+                                        Modifier.size(12.dp),
+                                        tint = MaterialTheme.colorScheme.secondary)
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(6.dp))
                     }
                 } else if (size == null) {
                     Text(
-                        "Нет предпочтений",
+                        "Добавь размеры и предпочтения — пригодятся при выборе подарка",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary
                     )

@@ -292,6 +292,31 @@ object AppStateStore {
     // ──────────────────────────────────────────────────────────
     //  NOTES CRUD
     // ──────────────────────────────────────────────────────────
+    /** Полное удаление всех данных пользователя: все таблицы Room +
+     *  in-memory списки. После перезапуска засеются демо-данные (чистый старт). */
+    fun wipeAllData(onDone: () -> Unit = {}) {
+        scope.launch {
+            try { db()?.clearAllTables() } catch (e: Exception) { /* БД могла не открыться */ }
+            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                contacts.clear(); companies.clear(); calendarItems.clear()
+                notes.clear(); gifts.clear(); companyRelations.clear()
+                contactRelations.clear(); addresses.clear()
+                sizeInfos.clear(); personalDetails.clear()
+                onDone()
+            }
+        }
+    }
+
+    /** Сохранение размеров: глобальный список (его читает вкладка Подарки),
+     *  копия в контакте и Room — всё синхронно. */
+    fun setSizeInfo(contactId: String, sizeInfo: SizeInfo) {
+        val idx = sizeInfos.indexOfFirst { it.contactId == contactId }
+        if (idx >= 0) sizeInfos[idx] = sizeInfo else sizeInfos.add(sizeInfo)
+        val cidx = contacts.indexOfFirst { it.id == contactId }
+        if (cidx >= 0) contacts[cidx] = contacts[cidx].copy(sizeInfo = sizeInfo)
+        scope.launch { db()?.contactDao()?.insertSizeInfo(sizeInfo.toEntity()) }
+    }
+
     // ── Связи между контактами (семья и др.) ─────────────────
     fun addContactRelation(relation: ContactRelation) {
         if (contactRelations.any { it.id == relation.id }) return

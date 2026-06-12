@@ -114,3 +114,37 @@ class PersistedState<T>(
 □ В коде используется stringResource(R.string.key)?
 □ НЕТ хардкода текста на русском в .kt файлах?
 ```
+
+---
+
+## 🆕 Раздел 8 — Ошибки компиляции K2 (уроки 31–43, июнь 2026)
+
+> Источник: первая реальная компиляция проекта в Android Studio.
+> Код, который «выглядит правильно», не существует — существует код, который компилируется.
+> Автопроверка: `python3 qa_check.py` из корня репо — обязательна перед каждым ZIP/коммитом.
+
+| # | Ошибка | Урок |
+|---|---|---|
+| 31 | `java.time.ChronoUnit` — Unresolved | Класс живёт в `java.time.temporal.ChronoUnit`. Полные пути НЕ писать по памяти — только проверенные |
+| 32 | `Icons.Default.ArrowBack` — Unresolved ×4 | Каждая иконка требует импорта. Файлы с точечными импортами иконок — мина. Стандарт проекта: `import ...icons.filled.*` |
+| 33 | `FlowRow` — «API is experimental» как ОШИБКА | K2 считает experimental без opt-in ошибкой, и она каскадирует на вызовы. Каждый файл с FlowRow: `@file:OptIn(...ExperimentalLayoutApi::class)` ПЕРЕД `package` |
+| 34 | `PaddingValues(vertical=…, bottom=…)` | Оси (vertical/horizontal) и стороны (top/bottom/start/end) — разные перегрузки, смешивать нельзя |
+| 35 | `LocalDate < LocalDate` — operator required | K2 спотыкается. Только `isBefore()/isAfter()` для дат |
+| 36 | `-daysUntil` — ambiguity unaryMinus | K2 не делает smart-cast nullable в составных when. Перед использованием: `val du: Long = daysUntil` |
+| 37 | `ContactImporter.parseVCard` — Unresolved | parseVCard/parseCsv — top-level функции, НЕ члены object. Перед вызовом `Объект.функция` — проверить, что функция внутри object |
+| 38 | `positionInParent` — Unresolved | Это extension-функция: полная квалификация не работает, нужен `import androidx.compose.ui.layout.positionInParent` |
+| 39 | `return@X: return@X` | Мусор от автоправок. Скриптовые правки — только с assert и проверкой баланса скобок |
+| 40 | `CalendarItemType.REMINDER` не существует | Значения enum НЕ угадывать — читать `Enums.kt` перед использованием |
+| 41 | Хелпер вшит внутрь чужой функции | `rfind('}')` находит НЕ ту скобку. Вставка top-level кода — только по уникальному текстовому якорю |
+| 42 | ClassNotFoundException BootReceiver на устройстве | Старый APK + drift: манифест объявляет класс, которого нет в dex. Перед установкой новой сборки — УДАЛИТЬ старое приложение |
+| 43 | Studio собирал папку socialsphere-X при готовом Y | Собирать всегда ПОСЛЕДНИЙ ZIP в чистую папку, не патчить старую |
+
+| 44 | Профессии стали компаниями при импорте | CSV: contains-матчинг заголовков цеплял «Organization 1 - Type/Title» под «org». Матчинг колонок: сначала точное совпадение, потом подстрока С исключениями (title/type/должн не могут быть компанией). Юнит-тест на реальных заголовках Google CSV обязателен |
+| 45 | vCard ORG = «Компания;Отдел;…» | Поля vCard разделены `;`, у строк бывают параметры (`ORG;CHARSET=…:`). Брать `substringAfter(":").substringBefore(";")`. Страж при создании сущностей: companyName ≠ jobTitle |
+| 46 | Счётчик скобок врёт на `1)` в комментариях | В комментариях и строках кода не писать голые скобки — «1.», «2.» вместо «1)», «2)» |
+
+| 47 | `Icons.Default.ArrowBack` deprecated на BOM 2024.09.03 | Старый запрет «AutoMirrored нельзя» УСТАРЕЛ с обновлением BOM. Зеркальные иконки (ArrowBack/Forward, Send, List, ExitToApp, Reply...) ДОЛЖНЫ быть `Icons.AutoMirrored.Filled.X` + импорт `...icons.automirrored.filled.X`. Прочие иконки AutoMirrored по-прежнему нельзя. qa_check обновлён под это |
+| 48 | Статус лога: `finished` ≠ `failed` | `finished` + deprecated = ПРЕДУПРЕЖДЕНИЯ, сборка прошла, APK собран. `failed` + `e:` = ошибки. Не путать warning с error — паниковать только на `failed` |
+
+### Главный мета-урок
+Среда без Android SDK ловит не всё. Поэтому: **(1)** `qa_check.py` перед каждой выдачей, **(2)** первая ошибка из лога компилятора важнее десяти статических догадок, **(3)** цикл «сборка → первая `e:`-строка → фикс» до зелёного.

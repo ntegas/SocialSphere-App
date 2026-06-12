@@ -100,12 +100,11 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Пересчёт только при изменении фильтра, режима или данных —
-            // не на каждой рекомпозиции (derivedStateOf отслеживает snapshot-состояния)
-            val groupedEvents by remember {
+            // События после фильтра типа и скрытых типов — общие для списка и сетки
+            val visibleEvents by remember {
                 derivedStateOf {
                     val hiddenTypes = AppSettings.calendarHiddenTypes.value
-                    val filteredEvents = allEvents.filter { event ->
+                    allEvents.filter { event ->
                         if (event.type.name in hiddenTypes) return@filter false
                         when (selectedFilter) {
                             "Дни рождения" -> event.type == CalendarItemType.BIRTHDAY
@@ -116,6 +115,14 @@ fun CalendarScreen(
                             else -> true
                         }
                     }
+                }
+            }
+
+            // Пересчёт только при изменении фильтра, режима или данных —
+            // не на каждой рекомпозиции (derivedStateOf отслеживает snapshot-состояния)
+            val groupedEvents by remember {
+                derivedStateOf {
+                    val filteredEvents = visibleEvents
 
                     val todayDate    = java.time.LocalDate.now().toString()
                     val tomorrowDate = java.time.LocalDate.now().plusDays(1).toString()
@@ -149,7 +156,14 @@ fun CalendarScreen(
                 }
             }
 
-            if (groupedEvents.isEmpty() || groupedEvents.all { it.value.isEmpty() }) {
+            if (selectedMode == "Месяц") {
+                MonthGridView(
+                    events         = visibleEvents,
+                    firstDayMonday = AppSettings.calendarFirstDayMonday.value,
+                    onEventClick   = { onNavigateToCalendarItem(it) },
+                    modifier       = Modifier.fillMaxSize().weight(1f)
+                )
+            } else if (groupedEvents.isEmpty() || groupedEvents.all { it.value.isEmpty() }) {
                 Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
                     Text("События не найдены", color = MaterialTheme.colorScheme.secondary)
                 }
@@ -170,6 +184,173 @@ fun CalendarScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Сетка месяца: дни с цветными точками событий (ДР проецируются через
+ * effectiveDate на ближайшее наступление), листание месяцев, тап по дню —
+ * события дня внизу, тап по событию — карточка с напоминаниями.
+ */
+@Composable
+fun MonthGridView(
+    events: List<CalendarItem>,
+    firstDayMonday: Boolean,
+    onEventClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var month       by remember { mutableStateOf(java.time.YearMonth.now()) }
+    var selectedDay by remember { mutableStateOf(java.time.LocalDate.now()) }
+    val today = java.time.LocalDate.now()
+
+    // Для произвольного месяца сетки ДР проецируем на ГОД отображаемого месяца,
+    // а не только на ближайшее наступление
+    val eventsByDay = remember(events, month) {
+        val map = mutableMapOf<String, MutableList<CalendarItem>>()
+        events.forEach { ev ->
+            val isYearly = ev.type == CalendarItemType.BIRTHDAY ||
+                ev.recurrenceRule?.contains("YEARLY", ignoreCase = true) == true
+            val key = if (isYearly) {
+                try {
+                    java.time.LocalDate.parse(ev.startDate.take(10))
+                        .withYear(month.year).toString()
+                } catch (e: Exception) { ev.startDate.take(10) }
+            } else ev.startDate.take(10)
+            map.getOrPut(key) { mutableListOf() }.add(ev)
+        }
+        map
+    }
+
+    val monthNames = listOf(
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    )
+
+    Column(modifier = modifier) {
+        // ── Шапка: ← Месяц Год → ──
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { month = month.minusMonths(1) }) {
+                Icon(Icons.Default.ChevronLeft, "Предыдущий месяц")
+            }
+            Text(
+                "${monthNames[month.monthValue - 1]} ${month.year}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            IconButton(onClick = { month = month.plusMonths(1) }) {
+                Icon(Icons.Default.ChevronRight, "Следующий месяц")
+            }
+        }
+
+        // ── Дни недели ──
+        val dow = if (firstDayMonday)
+            listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
+        else
+            listOf("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")
+        Row(Modifier.fillMaxWidth()) {
+            dow.forEach { d ->
+                Text(
+                    d,
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+
+        // ── Сетка ──
+        val firstDowIso = month.atDay(1).dayOfWeek.value      // 1=Пн … 7=Вс
+        val offset      = if (firstDayMonday) firstDowIso - 1 else firstDowIso % 7
+        val daysInMonth = month.lengthOfMonth()
+        val rows        = (offset + daysInMonth + 6) / 7
+
+        for (r in 0 until rows) {
+            Row(Modifier.fillMaxWidth()) {
+                for (c in 0 until 7) {
+                    val dayNum = r * 7 + c - offset + 1
+                    Box(
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (dayNum in 1..daysInMonth) {
+                            val date    = month.atDay(dayNum)
+                            val isToday = date == today
+                            val isSel   = date == selectedDay
+                            val dayEvts = eventsByDay[date.toString()].orEmpty()
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        when {
+                                            isSel   -> MaterialTheme.colorScheme.primary
+                                            isToday -> MaterialTheme.colorScheme.primaryContainer
+                                            else    -> Color.Transparent
+                                        }
+                                    )
+                                    .clickable { selectedDay = date }
+                                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    "$dayNum",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = if (isToday || isSel) FontWeight.Bold else FontWeight.Normal,
+                                    color = when {
+                                        isSel   -> MaterialTheme.colorScheme.onPrimary
+                                        isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else    -> MaterialTheme.colorScheme.onBackground
+                                    }
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    dayEvts.take(3).forEach { ev ->
+                                        Box(
+                                            Modifier.size(5.dp).clip(CircleShape).background(
+                                                when (ev.type) {
+                                                    CalendarItemType.BIRTHDAY -> MaterialTheme.colorScheme.error
+                                                    CalendarItemType.MEETING,
+                                                    CalendarItemType.CALL     -> MaterialTheme.colorScheme.tertiary
+                                                    CalendarItemType.GIFT     -> MaterialTheme.colorScheme.secondary
+                                                    else                      -> MaterialTheme.colorScheme.primary
+                                                }
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+        Spacer(Modifier.height(8.dp))
+
+        // ── События выбранного дня ──
+        val selEvents = eventsByDay[selectedDay.toString()].orEmpty()
+        Text(
+            "${selectedDay.dayOfMonth} ${monthNames[selectedDay.monthValue - 1].lowercase()}" +
+                if (selEvents.isEmpty()) " — событий нет" else "",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(8.dp))
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(selEvents, key = { it.id }) { event ->
+                CalendarEventItem(event = event, onClick = { onEventClick(event.id) })
             }
         }
     }

@@ -90,6 +90,17 @@ object AppSettings {
         )
     }
 
+    /** Понедельник — первый день недели в сетке месяца. */
+    val calendarFirstDayMonday: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "calendar_first_day_monday",
+            default     = true,
+            serialize   = { it.toString() },
+            deserialize = { it == "true" }
+        )
+    }
+
     /** Имена CalendarItemType, скрытые в календаре и «Ближайшем» (CSV). */
     val calendarHiddenTypes: MutableState<Set<String>> by lazy {
         PersistedMutableState(

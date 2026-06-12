@@ -6,6 +6,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,7 +29,7 @@ fun CalendarSettingsScreen(
                 title = { Text("Календарь", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -55,8 +57,14 @@ fun CalendarSettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
-                // «Первый день недели» и «Формат времени» убраны:
-                // им пока не на что влиять — вернутся вместе с сеткой месяца
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Первый день недели", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
+                FilterChipsRow(
+                    options  = listOf("понедельник", "воскресенье"),
+                    selected = if (AppSettings.calendarFirstDayMonday.value) "понедельник" else "воскресенье",
+                    onSelect = { AppSettings.calendarFirstDayMonday.value = it == "понедельник" }
+                )
+                // «Формат времени» вернётся, когда события получат время суток
             }
 
             CardBlock("Цвета типов событий") {

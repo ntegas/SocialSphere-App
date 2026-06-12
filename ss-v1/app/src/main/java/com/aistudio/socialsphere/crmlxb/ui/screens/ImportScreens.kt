@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,6 +28,8 @@ import androidx.core.content.ContextCompat
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.ContactImporter
+import com.aistudio.socialsphere.crmlxb.utils.parseVCard
+import com.aistudio.socialsphere.crmlxb.utils.parseCsv
 import com.aistudio.socialsphere.crmlxb.utils.DuplicateStatus
 import com.aistudio.socialsphere.crmlxb.utils.ImportContactCandidate
 import kotlinx.coroutines.Dispatchers
@@ -79,7 +82,7 @@ fun ImportContactsScreen(
                         .openInputStream(uri)
                         ?.bufferedReader()
                         ?.readText() ?: ""
-                    ContactImporter.parseVCard(content)
+                    parseVCard(content)
                 }
                 if (candidates.isEmpty()) {
                     fileError = "Контакты не найдены в файле vCard"
@@ -110,7 +113,7 @@ fun ImportContactsScreen(
                         .openInputStream(uri)
                         ?.bufferedReader()
                         ?.readText() ?: ""
-                    ContactImporter.parseCsv(content)
+                    parseCsv(content)
                 }
                 if (candidates.isEmpty()) {
                     fileError = "Контакты не найдены. Проверь заголовки CSV (Имя, Фамилия, Телефон, Email)"
@@ -133,7 +136,7 @@ fun ImportContactsScreen(
                 title = { Text("Импорт контактов", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -347,7 +350,7 @@ fun ImportPreviewScreen(
                 title = { Text("Предварительный просмотр", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 actions = {
@@ -491,13 +494,17 @@ fun performImport(selected: List<ImportContactCandidate>) {
             }
         }
 
-        if (!candidate.companyName.isNullOrBlank()) {
+        // Страж: компания не создаётся, если название пустое после trim
+        // или совпадает с должностью (классический симптом кривого маппинга)
+        val cleanCompanyName = candidate.companyName?.trim()
+        if (!cleanCompanyName.isNullOrBlank() &&
+            !cleanCompanyName.equals(candidate.jobTitle?.trim(), ignoreCase = true)) {
             // Find or create company
-            var company = AppStateStore.companies.find { it.name.equals(candidate.companyName, ignoreCase = true) }
+            var company = AppStateStore.companies.find { it.name.equals(cleanCompanyName, ignoreCase = true) }
             if (company == null) {
                 company = Company(
                     id = java.util.UUID.randomUUID().toString(),
-                    name = candidate.companyName,
+                    name = cleanCompanyName,
                     industry = Industry.OTHER,
                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
                     updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -609,7 +616,7 @@ fun ImportDuplicatesScreen(
                 title = { Text("Возможные дубликаты", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -702,17 +709,19 @@ fun mergeCandidate(candidate: ImportContactCandidate) {
     }
     
     // Merge company relation
-    if (!candidate.companyName.isNullOrBlank()) {
+    val cleanCompanyName2 = candidate.companyName?.trim()
+    if (!cleanCompanyName2.isNullOrBlank() &&
+        !cleanCompanyName2.equals(candidate.jobTitle?.trim(), ignoreCase = true)) {
         val hasCompanyRelation = existingContact.companyRelations.any { relation -> 
             val comp = AppStateStore.companies.find { it.id == relation.companyId }
-            comp?.name.equals(candidate.companyName, ignoreCase = true)
+            comp?.name.equals(cleanCompanyName2, ignoreCase = true)
         }
         if (!hasCompanyRelation) {
-            var company = AppStateStore.companies.find { it.name.equals(candidate.companyName, ignoreCase = true) }
+            var company = AppStateStore.companies.find { it.name.equals(cleanCompanyName2, ignoreCase = true) }
             if (company == null) {
                 company = Company(
                     id = java.util.UUID.randomUUID().toString(),
-                    name = candidate.companyName,
+                    name = cleanCompanyName2,
                     industry = Industry.OTHER,
                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
                     updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)

@@ -4,8 +4,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.ui.platform.LocalContext
+import com.aistudio.socialsphere.crmlxb.data.AppStateStore
+import com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,13 +22,16 @@ import androidx.compose.ui.unit.sp
 fun PrivacySettingsScreen(
     onNavigateBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    var showWipeConfirm by remember { mutableStateOf(false) }
+    var wipeDone        by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Приватность", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -39,32 +46,75 @@ fun PrivacySettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            CardBlock("Безопасность входа") {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Блокировка приложения PIN-кодом", style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = false, onCheckedChange = {})
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Вход по биометрии", style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = false, onCheckedChange = {})
-                }
-            }
-
-            CardBlock("Отображение данных") {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Скрытие чувствительных полей", style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = true, onCheckedChange = {})
-                }
-                Text("Скрывать номера телефонов и доходы на главном экране", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-            }
-
             CardBlock("Разрешения Android") {
-                ActionRow(icon = Icons.Default.Security, text = "Управление разрешениями")
+                ActionRow(
+                    icon = Icons.Default.Security,
+                    text = "Управление разрешениями",
+                    subtitle = "Контакты, уведомления — в системных настройках",
+                    onClick = {
+                        val intent = android.content.Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.fromParts("package", context.packageName, null)
+                        )
+                        ExternalActionHandler.startIntentSafely(context, intent)
+                    }
+                )
             }
 
             CardBlock("Локальное хранение") {
-                Text("Все ваши данные хранятся локально на устройстве и не передаются на серверы. Резервные копии шифруются.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                Text(
+                    "Все данные хранятся только на этом устройстве и никуда не " +
+                        "передаются. Файлы экспорта не шифруются — храни их в " +
+                        "надёжном месте.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+
+            CardBlock("Опасная зона") {
+                ActionRow(
+                    icon = Icons.Default.DeleteForever,
+                    text = "Удалить все данные",
+                    subtitle = "Контакты, компании, события, заметки — безвозвратно",
+                    onClick = { showWipeConfirm = true }
+                )
+                if (wipeDone) {
+                    Text(
+                        "Данные удалены. Перезапусти приложение.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
         }
+    }
+
+    if (showWipeConfirm) {
+        AlertDialog(
+            onDismissRequest = { showWipeConfirm = false },
+            title = { Text("Удалить все данные?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Будут безвозвратно удалены все контакты, компании, " +
+                        "события, заметки и подарки. Перед удалением можно " +
+                        "сделать экспорт в Настройках → Импорт и экспорт."
+                )
+            },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    onClick = {
+                        showWipeConfirm = false
+                        AppStateStore.wipeAllData { wipeDone = true }
+                    }
+                ) { Text("Удалить всё") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWipeConfirm = false }) { Text("Отмена") }
+            }
+        )
     }
 }
