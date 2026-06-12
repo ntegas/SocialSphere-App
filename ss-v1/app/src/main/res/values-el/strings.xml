@@ -86,4 +86,35 @@
     
     <string name="map_in_this_area">Σε αυτήν την περιοχή</string>
     <string name="map_route">Διαδρομή</string>
+    <string name="common_today">σήμερα</string>
+    <string name="common_tomorrow">αύριο</string>
+    <string name="common_close">Κλείσιμο</string>
+    <string name="common_clear">Καθαρισμός</string>
+    <string name="common_search">Αναζήτηση</string>
+    <string name="common_contacts">Επαφές</string>
+    <string name="common_companies">Εταιρείες</string>
+    <string name="common_settings">Ρυθμίσεις</string>
+    <string name="home_search_placeholder">Αναζήτηση ατόμων, εταιρειών…</string>
+    <string name="home_nothing_found">Δεν βρέθηκε τίποτα για «%1$s»</string>
+    <string name="home_counter_birthdays">Γενέθλια μήνα</string>
+    <string name="home_counter_meetings">Συναντήσεις εβδ.</string>
+    <string name="home_counter_overdue">Εκπρόθεσμα</string>
+    <string name="home_upcoming">Προσεχώς</string>
+    <string name="home_need_attention">Χρειάζεται επικοινωνία</string>
+    <string name="home_recently_added">Πρόσφατα</string>
+    <string name="home_smart_lists">Έξυπνες λίστες</string>
+    <string name="home_never_contacted">Καμία επικοινωνία</string>
+    <string name="home_over_year_ago">Πριν από 1+ χρόνο</string>
+    <string name="home_days_ago">πριν %1$d ημ.</string>
+    <string name="home_in_days">σε %1$d ημ.</string>
+    <string name="home_sl_birthdays">🎂 Γενέθλια σύντομα</string>
+    <string name="home_sl_birthdays_sub">Επόμενες 30 ημέρες</string>
+    <string name="home_sl_followup">✅ Με follow-up</string>
+    <string name="home_sl_followup_sub">Σχεδιασμένα βήματα</string>
+    <string name="home_sl_nonextstep">⚠️ Χωρίς επόμενο βήμα</string>
+    <string name="home_sl_nonextstep_sub">Σημαντικές επαφές χωρίς πλάνο</string>
+    <string name="home_sl_new">🆕 Νέες επαφές</string>
+    <string name="home_sl_new_sub">Τελευταίες 7 ημέρες</string>
+    <string name="home_no_next_step_label">χωρίς επόμενο βήμα</string>
+    <string name="home_added_on">προστέθηκε %1$s</string>
 </resources>

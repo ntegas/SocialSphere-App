@@ -177,6 +177,10 @@ object AppStateStore {
         val idx = contacts.indexOfFirst { it.id == c.id }
         if (idx >= 0) {
             contacts[idx] = c
+            // Карта читает ГЛОБАЛЬНЫЙ addresses — синхронизируем, иначе
+            // новые/изменённые адреса невидимы на карте до перезапуска
+            addresses.removeAll { it.ownerId == c.id && it.ownerType == AddressOwnerType.CONTACT }
+            addresses.addAll(c.addresses)
             scope.launch {
                 val db = db() ?: return@launch
                 db.contactDao().deletePhonesForContact(c.id)
@@ -230,6 +234,9 @@ object AppStateStore {
         val idx = companies.indexOfFirst { it.id == c.id }
         if (idx >= 0) {
             companies[idx] = c
+            // Симметрично контактам: глобальный addresses для карты
+            addresses.removeAll { it.ownerId == c.id && it.ownerType == AddressOwnerType.COMPANY }
+            addresses.addAll(c.addresses)
             scope.launch {
                 val db = db() ?: return@launch
                 db.addressDao().deleteAddressesForOwner(c.id, AddressOwnerType.COMPANY.name)

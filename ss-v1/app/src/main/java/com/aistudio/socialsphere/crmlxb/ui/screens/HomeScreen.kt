@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.effectiveDate
@@ -117,6 +118,26 @@ fun HomeScreen(
     }
 
     // Dashboard data
+    // stringResource нельзя вызывать внутри derivedStateOf —
+    // захватываем локализованные строки здесь; они же — ключи remember,
+    // чтобы смена языка пересчитала блоки
+    val strNever        = stringResource(R.string.home_never_contacted)
+    val strOverYear     = stringResource(R.string.home_over_year_ago)
+    val strDaysAgo      = stringResource(R.string.home_days_ago)
+    val strInDays       = stringResource(R.string.home_in_days)
+    val strToday        = stringResource(R.string.common_today)
+    val strTomorrow     = stringResource(R.string.common_tomorrow)
+    val strNoNextStep   = stringResource(R.string.home_no_next_step_label)
+    val strAddedOn      = stringResource(R.string.home_added_on)
+    val strSlBirthdays    = stringResource(R.string.home_sl_birthdays)
+    val strSlBirthdaysSub = stringResource(R.string.home_sl_birthdays_sub)
+    val strSlFollowup     = stringResource(R.string.home_sl_followup)
+    val strSlFollowupSub  = stringResource(R.string.home_sl_followup_sub)
+    val strSlNoStep       = stringResource(R.string.home_sl_nonextstep)
+    val strSlNoStepSub    = stringResource(R.string.home_sl_nonextstep_sub)
+    val strSlNew          = stringResource(R.string.home_sl_new)
+    val strSlNewSub       = stringResource(R.string.home_sl_new_sub)
+
     val upcomingEvents by remember {
         derivedStateOf {
             val todayStr = java.time.LocalDate.now().toString()
@@ -159,7 +180,7 @@ fun HomeScreen(
     }
 
     // ── Нужно связаться — по ритму + дней без общения ────────
-    val needAttention by remember {
+    val needAttention by remember(strNever, strOverYear, strDaysAgo) {
         derivedStateOf {
             val today = java.time.LocalDate.now()
 
@@ -206,9 +227,9 @@ fun HomeScreen(
 
                     val overdueDays = daysSince - maxDays   // how many days past deadline
                     val label = when {
-                        lastDate == null -> "Никогда не общались"
-                        daysSince > 365  -> "Более года назад"
-                        else             -> "$daysSince дн. назад"
+                        lastDate == null -> strNever
+                        daysSince > 365  -> strOverYear
+                        else             -> String.format(strDaysAgo, daysSince)
                     }
 
                     val compRel = c.companyRelations.firstOrNull { it.isPrimary }
@@ -301,7 +322,9 @@ fun HomeScreen(
 
     // ── Умные списки ──────────────────────────────────────────
 
-    val smartLists by remember {
+    val smartLists by remember(strToday, strTomorrow, strInDays, strNoNextStep, strAddedOn,
+        strSlBirthdays, strSlBirthdaysSub, strSlFollowup, strSlFollowupSub,
+        strSlNoStep, strSlNoStepSub, strSlNew, strSlNewSub) {
         derivedStateOf {
             val today = java.time.LocalDate.now()
             val lists = mutableListOf<SmartList>()
@@ -333,17 +356,17 @@ fun HomeScreen(
                         contact.importanceLevel,
                         daysSince    = daysUntil,
                         overdueLabel = when (daysUntil) {
-                            0L   -> "сегодня"
-                            1L   -> "завтра"
-                            else -> "через $daysUntil дн."
+                            0L   -> strToday
+                            1L   -> strTomorrow
+                            else -> String.format(strInDays, daysUntil)
                         }
                     )
                 }
                 .sortedBy { it.daysSince }
             if (birthdayContacts.isNotEmpty()) {
                 lists.add(SmartList(
-                    "birthdays", "🎂 Дни рождения скоро",
-                    "Ближайшие 30 дней",
+                    "birthdays", strSlBirthdays,
+                    strSlBirthdaysSub,
                     Icons.Default.Cake,
                     androidx.compose.ui.graphics.Color(0xFFE53935),
                     birthdayContacts.size, birthdayContacts
@@ -364,8 +387,8 @@ fun HomeScreen(
                 .take(5)
             if (followUpContacts.isNotEmpty()) {
                 lists.add(SmartList(
-                    "followup", "✅ Есть follow-up",
-                    "Запланированные шаги",
+                    "followup", strSlFollowup,
+                    strSlFollowupSub,
                     Icons.Default.CheckCircle,
                     androidx.compose.ui.graphics.Color(0xFF43A047),
                     followUpContacts.size, followUpContacts
@@ -384,13 +407,13 @@ fun HomeScreen(
                     val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
                     HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
                         comp, compRel?.position ?: "", c.importanceLevel,
-                        overdueLabel = "нет следующего шага")
+                        overdueLabel = strNoNextStep)
                 }
                 .take(5)
             if (noNextStep.isNotEmpty()) {
                 lists.add(SmartList(
-                    "nonextstep", "⚠️ Нет следующего шага",
-                    "Важные контакты без плана",
+                    "nonextstep", strSlNoStep,
+                    strSlNoStepSub,
                     Icons.Default.WarningAmber,
                     androidx.compose.ui.graphics.Color(0xFFFB8C00),
                     noNextStep.size, noNextStep
@@ -408,13 +431,13 @@ fun HomeScreen(
                     val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
                     HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
                         comp, compRel?.position ?: "", c.importanceLevel,
-                        overdueLabel = "добавлен ${c.createdAt.take(10)}")
+                        overdueLabel = String.format(strAddedOn, c.createdAt.take(10)))
                 }
                 .take(5)
             if (newContacts.isNotEmpty()) {
                 lists.add(SmartList(
-                    "new", "🆕 Новые контакты",
-                    "За последние 7 дней",
+                    "new", strSlNew,
+                    strSlNewSub,
                     Icons.Default.PersonAdd,
                     androidx.compose.ui.graphics.Color(0xFF1E88E5),
                     newContacts.size, newContacts
@@ -447,7 +470,7 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .focusRequester(focusRequester)
                                 .testTag("home_search_input"),
-                            placeholder = { Text("Поиск людей, компаний…") },
+                            placeholder = { Text(stringResource(R.string.home_search_placeholder)) },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor   = Color.Transparent,
@@ -464,7 +487,7 @@ fun HomeScreen(
                 navigationIcon = {
                     if (searchActive) {
                         IconButton(onClick = { searchActive = false; searchQuery = "" }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Закрыть")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_close))
                         }
                     }
                 },
@@ -474,14 +497,14 @@ fun HomeScreen(
                             onClick  = { searchActive = true },
                             modifier = Modifier.testTag("home_settings_button")
                         ) {
-                            Icon(Icons.Default.Search, "Поиск")
+                            Icon(Icons.Default.Search, stringResource(R.string.common_search))
                         }
                         IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Default.Settings, "Настройки")
+                            Icon(Icons.Default.Settings, stringResource(R.string.common_settings))
                         }
                     } else if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, "Очистить")
+                            Icon(Icons.Default.Clear, stringResource(R.string.common_clear))
                         }
                     }
                 },
@@ -519,7 +542,7 @@ fun HomeScreen(
                             modifier  = Modifier.weight(1f),
                             icon      = Icons.Outlined.Cake,
                             value     = birthdaysThisMonth.toString(),
-                            label     = "ДР в месяце",
+                            label     = stringResource(R.string.home_counter_birthdays),
                             bgColor   = MaterialTheme.colorScheme.primaryContainer,
                             fgColor   = MaterialTheme.colorScheme.onPrimaryContainer,
                             onClick   = {
@@ -535,7 +558,7 @@ fun HomeScreen(
                             modifier  = Modifier.weight(1f),
                             icon      = Icons.Outlined.CalendarToday,
                             value     = meetingsThisWeek.toString(),
-                            label     = "Встреч в нед.",
+                            label     = stringResource(R.string.home_counter_meetings),
                             bgColor   = MaterialTheme.colorScheme.secondaryContainer,
                             fgColor   = MaterialTheme.colorScheme.onSecondaryContainer,
                             onClick   = { onNavigateToCalendar() }
@@ -545,7 +568,7 @@ fun HomeScreen(
                             modifier  = Modifier.weight(1f),
                             icon      = Icons.Outlined.NotificationsActive,
                             value     = overdueCount.toString(),
-                            label     = "Просрочено",
+                            label     = stringResource(R.string.home_counter_overdue),
                             bgColor   = if (overdueCount > 0)
                                 MaterialTheme.colorScheme.errorContainer
                             else
@@ -570,7 +593,7 @@ fun HomeScreen(
                     // Upcoming events — clickable
                     if (upcomingEvents.isNotEmpty()) {
                         HomeSectionLabel(
-                            "Ближайшее",
+                            stringResource(R.string.home_upcoming),
                             Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                         )
                         LazyRow(
@@ -588,7 +611,7 @@ fun HomeScreen(
                     // Нужно связаться
                     if (needAttention.isNotEmpty()) {
                         HomeSectionLabel(
-                            "Нужно связаться · ${needAttention.size}",
+                            stringResource(R.string.home_need_attention) + " · ${needAttention.size}",
                             Modifier
                                 .padding(horizontal = 16.dp, vertical = 4.dp)
                                 .onGloballyPositioned { coords ->
@@ -610,7 +633,7 @@ fun HomeScreen(
                     // Recently added — clickable
                     if (recentlyAdded.isNotEmpty()) {
                         HomeSectionLabel(
-                            "Недавно добавленные",
+                            stringResource(R.string.home_recently_added),
                             Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                         )
                         LazyRow(
@@ -626,7 +649,7 @@ fun HomeScreen(
                     // Smart lists
                     if (smartLists.isNotEmpty()) {
                         HomeSectionLabel(
-                            "Умные списки",
+                            stringResource(R.string.home_smart_lists),
                             Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                         )
                         Column(
@@ -638,7 +661,7 @@ fun HomeScreen(
                                     smartList    = list,
                                     onNavigateTo = onNavigateToContact,
                                     forceExpand  = expandBirthdayList &&
-                                        list.title.contains("рождени", ignoreCase = true)
+                                        list.id == "birthdays"
                                 )
                             }
                         }
@@ -669,7 +692,7 @@ private fun HomeSearchResults(
             ) {
                 Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp),
                     tint = MaterialTheme.colorScheme.outlineVariant)
-                Text("Ничего не найдено по «$query»",
+                Text(stringResource(R.string.home_nothing_found, query),
                     color = MaterialTheme.colorScheme.secondary)
             }
         }
@@ -686,7 +709,7 @@ private fun HomeSearchResults(
     ) {
         if (contacts.isNotEmpty()) {
             item {
-                Text("Контакты",
+                Text(stringResource(R.string.common_contacts),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -748,7 +771,7 @@ private fun HomeSearchResults(
 
         if (companies.isNotEmpty()) {
             item {
-                Text("Компании",
+                Text(stringResource(R.string.common_companies),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,

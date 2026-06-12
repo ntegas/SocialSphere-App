@@ -61,6 +61,7 @@ fun ContactEditScreen(
     var phones     by remember { mutableStateOf(originalContact?.phones     ?: emptyList<ContactPhone>()) }
     var emails     by remember { mutableStateOf(originalContact?.emails     ?: emptyList<ContactEmail>()) }
     var messengers by remember { mutableStateOf(originalContact?.messengers ?: emptyList<Messenger>()) }
+    var draftAddresses by remember { mutableStateOf(originalContact?.addresses ?: emptyList<Address>()) }
 
     // Company / work
     var selectedCompanyId by remember { mutableStateOf(originalContact?.companyRelations?.firstOrNull { it.isPrimary }?.companyId ?: originalContact?.companyRelations?.firstOrNull()?.companyId ?: "") }
@@ -131,7 +132,7 @@ fun ContactEditScreen(
             emails           = emails,
             messengers       = messengers,
             companyRelations = compRelList,
-            addresses        = originalContact?.addresses ?: emptyList(),
+            addresses        = draftAddresses,
             notes            = originalContact?.notes ?: emptyList(),
             gifts            = originalContact?.gifts ?: emptyList(),
             sizeInfo         = originalContact?.sizeInfo,
@@ -519,6 +520,94 @@ fun ContactEditScreen(
             }
 
             // ── Company ───────────────────────────────────────────────
+            SectionCard("Адреса") {
+                var showAddAddress by remember { mutableStateOf(false) }
+                if (draftAddresses.isEmpty()) {
+                    Text(
+                        "Адрес появится на карте после сохранения",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                draftAddresses.forEach { addr ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                addr.addressLine,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                listOf(addr.addressType.label(), addr.city, addr.country)
+                                    .filter { it.isNotBlank() }.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                        IconButton(onClick = { draftAddresses = draftAddresses - addr }) {
+                            Icon(Icons.Default.Close, "Удалить адрес",
+                                Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                }
+                TextButton(onClick = { showAddAddress = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Адрес")
+                }
+                if (showAddAddress) {
+                    var aLine by remember { mutableStateOf("") }
+                    var aCity by remember { mutableStateOf("") }
+                    var aCountry by remember { mutableStateOf("") }
+                    var aType by remember { mutableStateOf(AddressType.HOME) }
+                    AlertDialog(
+                        onDismissRequest = { showAddAddress = false },
+                        title = { Text("Новый адрес", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(value = aLine, onValueChange = { aLine = it },
+                                    label = { Text("Улица, дом*") },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(value = aCity, onValueChange = { aCity = it },
+                                        label = { Text("Город") },
+                                        modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small)
+                                    OutlinedTextField(value = aCountry, onValueChange = { aCountry = it },
+                                        label = { Text("Страна") },
+                                        modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small)
+                                }
+                                DropdownField("Тип адреса", aType.label(),
+                                    AddressType.values().map { it.label() }) { picked ->
+                                    aType = AddressType.values().firstOrNull { it.label() == picked } ?: aType
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(enabled = aLine.isNotBlank(), onClick = {
+                                draftAddresses = draftAddresses + Address(
+                                    id          = UUID.randomUUID().toString(),
+                                    ownerType   = AddressOwnerType.CONTACT,
+                                    ownerId     = editedContactId,
+                                    addressType = aType,
+                                    addressLine = aLine.trim(),
+                                    city        = aCity.trim(),
+                                    country     = aCountry.trim()
+                                )
+                                showAddAddress = false
+                            }) { Text("Добавить") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showAddAddress = false }) { Text("Отмена") }
+                        }
+                    )
+                }
+            }
+
             SectionCard("Компания и работа") {
                 var showCompanyDropdown by remember { mutableStateOf(false) }
                 var showNewCompanyDialog by remember { mutableStateOf(false) }
@@ -815,14 +904,3 @@ fun DropdownField(label: String, selectedValue: String, options: List<String>, o
     }
 }
 
-@Composable
-fun AddressBlock(title: String, address: Address?) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-        OutlinedTextField(value = address?.addressLine ?: "", onValueChange = {}, label = { Text("Адрес") }, modifier = Modifier.fillMaxWidth(), shape = SocialShape.Small)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(value = address?.city ?: "",    onValueChange = {}, label = { Text("Город") },  modifier = Modifier.weight(1f), shape = SocialShape.Small)
-            OutlinedTextField(value = address?.country ?: "", onValueChange = {}, label = { Text("Страна") }, modifier = Modifier.weight(1f), shape = SocialShape.Small)
-        }
-    }
-}
