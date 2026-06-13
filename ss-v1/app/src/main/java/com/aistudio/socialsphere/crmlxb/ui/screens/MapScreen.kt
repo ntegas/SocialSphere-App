@@ -74,14 +74,24 @@ fun MapScreen(
         if (!showMapView) return@LaunchedEffect
         kotlinx.coroutines.delay(8000)
         if (!mapTilesLoaded && mapLoadError == null) {
+<<<<<<< HEAD
             mapLoadError = stringResource(R.string.map_load_failed_1) +
                 stringResource(R.string.map_load_failed_2) +
                 stringResource(R.string.map_load_failed_3)
+=======
+            mapLoadError = "Карта не загрузилась. Проверь, включён ли " +
+                "«Maps SDK for Android» для API-ключа в Google Cloud Console, " +
+                "и есть ли интернет-соединение"
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
         }
     }
 
     // Обновлённое ТЗ: 3 вкладки, «Места» удалена
+<<<<<<< HEAD
     val tabs = listOf(stringResource(R.string.map_tab_contacts), stringResource(R.string.map_tab_work), stringResource(R.string.map_tab_companies))
+=======
+    val tabs = listOf("Контакты", "Работа", "Компании")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
 
     var searchQuery by remember { mutableStateOf("") }
 

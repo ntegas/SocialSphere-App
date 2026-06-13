@@ -99,7 +99,11 @@ fun CheatSheetScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
+<<<<<<< HEAD
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
+=======
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -226,7 +230,11 @@ fun CheatSheetScreen(
             // ── Последний контакт ──────────────────────────────
             if (lastNote != null) {
                 item {
+<<<<<<< HEAD
                     SheetBlock(stringResource(R.string.cs_last_note)) {
+=======
+                    SheetBlock("🕐 Последняя запись") {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         Text(lastNote.createdAt.take(10),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.secondary)

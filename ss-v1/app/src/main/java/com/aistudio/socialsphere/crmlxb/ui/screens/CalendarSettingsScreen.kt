@@ -31,7 +31,11 @@ fun CalendarSettingsScreen(
                 title = { Text(stringResource(R.string.settings_calendar), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
+<<<<<<< HEAD
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+=======
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -46,6 +50,7 @@ fun CalendarSettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+<<<<<<< HEAD
             CardBlock(stringResource(R.string.calset_display)) {
                 Text(stringResource(R.string.calset_default_mode), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
                 FilterChipsRow(
@@ -61,10 +66,23 @@ fun CalendarSettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     stringResource(R.string.calset_mode_hint),
+=======
+            CardBlock("Отображение календаря") {
+                Text("Режим по умолчанию", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
+                FilterChipsRow(
+                    options  = listOf("Сегодня", "Список", "Неделя", "Месяц"),
+                    selected = AppSettings.calendarDefaultMode.value,
+                    onSelect = { AppSettings.calendarDefaultMode.value = it }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "С этим режимом календарь будет открываться при входе",
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
                 Spacer(modifier = Modifier.height(16.dp))
+<<<<<<< HEAD
                 Text(stringResource(R.string.calset_first_day), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
                 val monLabel = stringResource(R.string.calset_monday)
                 val sunLabel = stringResource(R.string.calset_sunday)
@@ -72,6 +90,13 @@ fun CalendarSettingsScreen(
                     options  = listOf(monLabel, sunLabel),
                     selected = if (AppSettings.calendarFirstDayMonday.value) monLabel else sunLabel,
                     onSelect = { AppSettings.calendarFirstDayMonday.value = it == monLabel }
+=======
+                Text("Первый день недели", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
+                FilterChipsRow(
+                    options  = listOf("понедельник", "воскресенье"),
+                    selected = if (AppSettings.calendarFirstDayMonday.value) "понедельник" else "воскресенье",
+                    onSelect = { AppSettings.calendarFirstDayMonday.value = it == "понедельник" }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 )
                 // «Формат времени» вернётся, когда события получат время суток
             }
@@ -98,14 +123,21 @@ fun CalendarSettingsScreen(
                 }
             }
 
+<<<<<<< HEAD
             CardBlock(stringResource(R.string.calset_visibility)) {
                 Text(
                     stringResource(R.string.calset_visibility_hint),
+=======
+            CardBlock("Видимость типов событий") {
+                Text(
+                    "Выключенные типы скрываются в календаре и блоке «Ближайшее»",
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 val typeRows = listOf(
+<<<<<<< HEAD
                     stringResource(R.string.evt_birthdays)       to CalendarItemType.BIRTHDAY,
                     stringResource(R.string.evt_anniversary)     to CalendarItemType.ANNIVERSARY,
                     stringResource(R.string.evt_important_date)  to CalendarItemType.IMPORTANT_DATE,
@@ -114,6 +146,16 @@ fun CalendarSettingsScreen(
                     stringResource(R.string.evt_gifts)           to CalendarItemType.GIFT,
                     stringResource(R.string.evt_tasks)           to CalendarItemType.TASK,
                     stringResource(R.string.evt_company_events)  to CalendarItemType.COMPANY_EVENT
+=======
+                    "Дни рождения"      to CalendarItemType.BIRTHDAY,
+                    "Годовщины"         to CalendarItemType.ANNIVERSARY,
+                    "Важные даты"       to CalendarItemType.IMPORTANT_DATE,
+                    "Встречи"           to CalendarItemType.MEETING,
+                    "Звонки"            to CalendarItemType.CALL,
+                    "Подарки"           to CalendarItemType.GIFT,
+                    "Задачи"            to CalendarItemType.TASK,
+                    "События компаний"  to CalendarItemType.COMPANY_EVENT
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 )
                 val hidden = AppSettings.calendarHiddenTypes.value
                 typeRows.forEach { (name, type) ->

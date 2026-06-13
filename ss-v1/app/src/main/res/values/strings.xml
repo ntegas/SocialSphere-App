@@ -320,6 +320,7 @@
     <string name="map_selected_object">Выбранный объект</string>
     <string name="map_no_coords">Без координат: %1$d</string>
     <string name="map_route">Маршрут</string>
+<<<<<<< HEAD
     <string name="map_no_gps_route">Нет GPS — маршрут по адресу</string>
     <string name="map_open">Открыть</string>
     <string name="map_list">Список</string>
@@ -794,4 +795,37 @@
     <string name="lbl_address_type_branch">Филиал</string>
     <string name="lbl_address_type_legal">Юр. адрес</string>
     <string name="lbl_address_type_other">Другое</string>
+=======
+    <string name="common_today">сегодня</string>
+    <string name="common_tomorrow">завтра</string>
+    <string name="common_close">Закрыть</string>
+    <string name="common_clear">Очистить</string>
+    <string name="common_search">Поиск</string>
+    <string name="common_contacts">Контакты</string>
+    <string name="common_companies">Компании</string>
+    <string name="common_settings">Настройки</string>
+    <string name="home_search_placeholder">Поиск людей, компаний…</string>
+    <string name="home_nothing_found">Ничего не найдено по «%1$s»</string>
+    <string name="home_counter_birthdays">ДР в месяце</string>
+    <string name="home_counter_meetings">Встреч в нед.</string>
+    <string name="home_counter_overdue">Просрочено</string>
+    <string name="home_upcoming">Ближайшее</string>
+    <string name="home_need_attention">Нужно связаться</string>
+    <string name="home_recently_added">Недавно добавленные</string>
+    <string name="home_smart_lists">Умные списки</string>
+    <string name="home_never_contacted">Никогда не общались</string>
+    <string name="home_over_year_ago">Более года назад</string>
+    <string name="home_days_ago">%1$d дн. назад</string>
+    <string name="home_in_days">через %1$d дн.</string>
+    <string name="home_sl_birthdays">🎂 Дни рождения скоро</string>
+    <string name="home_sl_birthdays_sub">Ближайшие 30 дней</string>
+    <string name="home_sl_followup">✅ Есть follow-up</string>
+    <string name="home_sl_followup_sub">Запланированные шаги</string>
+    <string name="home_sl_nonextstep">⚠️ Нет следующего шага</string>
+    <string name="home_sl_nonextstep_sub">Важные контакты без плана</string>
+    <string name="home_sl_new">🆕 Новые контакты</string>
+    <string name="home_sl_new_sub">За последние 7 дней</string>
+    <string name="home_no_next_step_label">нет следующего шага</string>
+    <string name="home_added_on">добавлен %1$s</string>
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
 </resources>

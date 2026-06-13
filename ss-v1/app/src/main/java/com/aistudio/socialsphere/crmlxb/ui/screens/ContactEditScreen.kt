@@ -214,6 +214,98 @@ fun ContactEditScreen(
                                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
+<<<<<<< HEAD
+=======
+                    }
+                    // Урок 45 ТЗ: список выбора с поиском и сортировкой —
+                    // листаемое меню без поиска неюзабельно при 20+ контактах
+                    if (showContactPicker) {
+                        var pickerQuery by remember { mutableStateOf("") }
+                        val shown = candidates
+                            .sortedBy { "${it.firstName} ${it.lastName}".trim().lowercase() }
+                            .filter { c ->
+                                pickerQuery.isBlank() ||
+                                "${c.firstName} ${c.lastName}".contains(pickerQuery, ignoreCase = true) ||
+                                c.nickname?.contains(pickerQuery, ignoreCase = true) == true
+                            }
+                        AlertDialog(
+                            onDismissRequest = { showContactPicker = false },
+                            title = { Text("Выбор контакта", fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = pickerQuery,
+                                        onValueChange = { pickerQuery = it },
+                                        placeholder = { Text("Поиск по имени…") },
+                                        leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        shape = SocialShape.Small
+                                    )
+                                    if (shown.isEmpty()) {
+                                        Text(
+                                            if (candidates.isEmpty()) "Нет доступных контактов"
+                                            else "Никого не нашлось по запросу «$pickerQuery»",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.padding(vertical = 16.dp)
+                                        )
+                                    } else {
+                                        LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                                            items(shown, key = { it.id }) { c ->
+                                                val cName = "${c.firstName} ${c.lastName}".trim()
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable {
+                                                            newRelContactId = c.id
+                                                            showContactPicker = false
+                                                        }
+                                                        .padding(vertical = 8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(36.dp)
+                                                            .clip(CircleShape)
+                                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            cName.split(" ")
+                                                                .mapNotNull { it.firstOrNull()?.uppercase() }
+                                                                .take(2).joinToString(""),
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                    Column {
+                                                        Text(cName, style = MaterialTheme.typography.bodyMedium,
+                                                            fontWeight = FontWeight.Medium)
+                                                        if (!c.nickname.isNullOrBlank()) {
+                                                            Text("«${c.nickname}»",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = MaterialTheme.colorScheme.secondary)
+                                                        }
+                                                    }
+                                                }
+                                                HorizontalDivider(
+                                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                                    thickness = 0.5.dp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {},
+                            dismissButton = {
+                                TextButton(onClick = { showContactPicker = false }) { Text("Отмена") }
+                            }
+                        )
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                     // Урок 45 ТЗ: список выбора с поиском и сортировкой —
                     // листаемое меню без поиска неюзабельно при 20+ контактах
@@ -402,8 +494,13 @@ fun ContactEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+<<<<<<< HEAD
                 title = { Text(if (isEditMode) stringResource(R.string.ce_edit) else stringResource(R.string.ce_new_contact), fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) } },
+=======
+                title = { Text(if (isEditMode) "Редактирование" else "Новый контакт", fontWeight = FontWeight.Bold) },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 actions = {
                     Button(
                         onClick = ::buildAndSave,
@@ -524,11 +621,19 @@ fun ContactEditScreen(
             }
 
             // ── Company ───────────────────────────────────────────────
+<<<<<<< HEAD
             SectionCard(stringResource(R.string.ce_addresses)) {
                 var showAddAddress by remember { mutableStateOf(false) }
                 if (draftAddresses.isEmpty()) {
                     Text(
                         stringResource(R.string.ce_address_after_save),
+=======
+            SectionCard("Адреса") {
+                var showAddAddress by remember { mutableStateOf(false) }
+                if (draftAddresses.isEmpty()) {
+                    Text(
+                        "Адрес появится на карте после сохранения",
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -545,14 +650,22 @@ fun ContactEditScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
+<<<<<<< HEAD
                                 listOf(addr.addressType.label(ctxLabel), addr.city, addr.country)
+=======
+                                listOf(addr.addressType.label(), addr.city, addr.country)
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                     .filter { it.isNotBlank() }.joinToString(" · "),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.secondary
                             )
                         }
                         IconButton(onClick = { draftAddresses = draftAddresses - addr }) {
+<<<<<<< HEAD
                             Icon(Icons.Default.Close, stringResource(R.string.ce_remove_address),
+=======
+                            Icon(Icons.Default.Close, "Удалить адрес",
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                 Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.secondary)
                         }
@@ -562,7 +675,11 @@ fun ContactEditScreen(
                 TextButton(onClick = { showAddAddress = true }) {
                     Icon(Icons.Default.Add, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
+<<<<<<< HEAD
                     Text(stringResource(R.string.ce_address))
+=======
+                    Text("Адрес")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 }
                 if (showAddAddress) {
                     var aLine by remember { mutableStateOf("") }
@@ -571,6 +688,7 @@ fun ContactEditScreen(
                     var aType by remember { mutableStateOf(AddressType.HOME) }
                     AlertDialog(
                         onDismissRequest = { showAddAddress = false },
+<<<<<<< HEAD
                         title = { Text(stringResource(R.string.ce_new_address), fontWeight = FontWeight.Bold) },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -588,6 +706,25 @@ fun ContactEditScreen(
                                 DropdownField(stringResource(R.string.ce_address_type), aType.label(ctxLabel),
                                     AddressType.values().map { it.label(ctxLabel) }) { picked ->
                                     aType = AddressType.values().firstOrNull { it.label(ctxLabel) == picked } ?: aType
+=======
+                        title = { Text("Новый адрес", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(value = aLine, onValueChange = { aLine = it },
+                                    label = { Text("Улица, дом*") },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(value = aCity, onValueChange = { aCity = it },
+                                        label = { Text("Город") },
+                                        modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small)
+                                    OutlinedTextField(value = aCountry, onValueChange = { aCountry = it },
+                                        label = { Text("Страна") },
+                                        modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small)
+                                }
+                                DropdownField("Тип адреса", aType.label(),
+                                    AddressType.values().map { it.label() }) { picked ->
+                                    aType = AddressType.values().firstOrNull { it.label() == picked } ?: aType
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                 }
                             }
                         },
@@ -603,16 +740,27 @@ fun ContactEditScreen(
                                     country     = aCountry.trim()
                                 )
                                 showAddAddress = false
+<<<<<<< HEAD
                             }) { Text(stringResource(R.string.common_add)) }
                         },
                         dismissButton = {
                             TextButton(onClick = { showAddAddress = false }) { Text(stringResource(R.string.common_cancel)) }
+=======
+                            }) { Text("Добавить") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showAddAddress = false }) { Text("Отмена") }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         }
                     )
                 }
             }
 
+<<<<<<< HEAD
             SectionCard(stringResource(R.string.ce_company_work)) {
+=======
+            SectionCard("Компания и работа") {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 var showCompanyDropdown by remember { mutableStateOf(false) }
                 var showNewCompanyDialog by remember { mutableStateOf(false) }
                 val companies = AppStateStore.companies
@@ -632,11 +780,19 @@ fun ContactEditScreen(
                     )
                     DropdownMenu(expanded = showCompanyDropdown, onDismissRequest = { showCompanyDropdown = false }) {
                         DropdownMenuItem(
+<<<<<<< HEAD
                             text = { Text(stringResource(R.string.ce_new_company), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium) },
                             leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary) },
                             onClick = { showCompanyDropdown = false; showNewCompanyDialog = true }
                         )
                         DropdownMenuItem(text = { Text(stringResource(R.string.ce_no_company), color = MaterialTheme.colorScheme.secondary) }, onClick = { selectedCompanyId = ""; showCompanyDropdown = false })
+=======
+                            text = { Text("+ Новая компания", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium) },
+                            leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary) },
+                            onClick = { showCompanyDropdown = false; showNewCompanyDialog = true }
+                        )
+                        DropdownMenuItem(text = { Text("— Без компании —", color = MaterialTheme.colorScheme.secondary) }, onClick = { selectedCompanyId = ""; showCompanyDropdown = false })
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         HorizontalDivider()
                         // Урок 45: список выбора — отсортирован
                         companies.sortedBy { it.name.lowercase() }.forEach { company ->
@@ -648,12 +804,20 @@ fun ContactEditScreen(
                     var newCompanyName by remember { mutableStateOf("") }
                     AlertDialog(
                         onDismissRequest = { showNewCompanyDialog = false },
+<<<<<<< HEAD
                         title = { Text(stringResource(R.string.ce_new_company_title), fontWeight = FontWeight.Bold) },
+=======
+                        title = { Text("Новая компания", fontWeight = FontWeight.Bold) },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         text = {
                             OutlinedTextField(
                                 value = newCompanyName,
                                 onValueChange = { newCompanyName = it },
+<<<<<<< HEAD
                                 label = { Text(stringResource(R.string.ce_company_name_req)) },
+=======
+                                label = { Text("Название компании*") },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = SocialShape.Small
@@ -684,10 +848,17 @@ fun ContactEditScreen(
                                     }
                                     showNewCompanyDialog = false
                                 }
+<<<<<<< HEAD
                             ) { Text(stringResource(R.string.ce_create)) }
                         },
                         dismissButton = {
                             TextButton(onClick = { showNewCompanyDialog = false }) { Text(stringResource(R.string.common_cancel)) }
+=======
+                            ) { Text("Создать") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showNewCompanyDialog = false }) { Text("Отмена") }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         }
                     )
                 }
@@ -858,9 +1029,15 @@ fun ContactEditScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 // CUSTOM исключён: у контакта нет поля своих дней — выбор молча отключал бы отслеживание
+<<<<<<< HEAD
                 DropdownField(stringResource(R.string.ce_rhythm), communicationRhythm.label(ctxLabel),
                     CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) }) {
                     communicationRhythm = CommunicationRhythm.values().firstOrNull { r -> r.label(ctxLabel) == it } ?: communicationRhythm
+=======
+                DropdownField("Ритм общения", communicationRhythm.label(),
+                    CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label() }) {
+                    communicationRhythm = CommunicationRhythm.values().firstOrNull { r -> r.label() == it } ?: communicationRhythm
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 }
             }
 

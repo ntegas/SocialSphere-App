@@ -28,8 +28,13 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
+<<<<<<< HEAD
                 title = { Text(stringResource(R.string.settings_appearance), fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) } },
+=======
+                title = { Text("Внешний вид", fontWeight = FontWeight.Bold) },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }

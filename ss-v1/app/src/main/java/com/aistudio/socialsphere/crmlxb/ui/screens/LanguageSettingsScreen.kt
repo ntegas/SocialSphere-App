@@ -29,7 +29,11 @@ fun LanguageSettingsScreen(
                 title = { Text(stringResource(R.string.settings_language), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
+<<<<<<< HEAD
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+=======
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)

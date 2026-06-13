@@ -173,7 +173,11 @@ fun CompanyEditScreen(
                 title = { Text(if (isEditMode) stringResource(R.string.cce_edit) else stringResource(R.string.cce_new), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
+<<<<<<< HEAD
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+=======
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                 },
                 actions = {
@@ -500,7 +504,11 @@ fun CompanyEditScreen(
                         OutlinedTextField(value = relation.workNote ?: "", onValueChange = {}, label = { Text(stringResource(R.string.cce_work_note)) }, modifier = Modifier.fillMaxWidth())
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = relation.isPrimary, onCheckedChange = {}, enabled = false)
+<<<<<<< HEAD
                             Text(stringResource(R.string.cce_main_company))
+=======
+                            Text("Основная компания")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         }
                     }
                 },

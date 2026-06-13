@@ -38,7 +38,11 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                 title = { Text(stringResource(R.string.notif_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
+<<<<<<< HEAD
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
+=======
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

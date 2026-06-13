@@ -190,7 +190,11 @@ fun ContactsScreen(
                 navigationIcon = {
                     if (searchActive) {
                         IconButton(onClick = { searchActive = false; searchQuery = "" }) {
+<<<<<<< HEAD
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.contacts_close_search))
+=======
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Закрыть поиск")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         }
                     }
                 },

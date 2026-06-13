@@ -30,7 +30,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+<<<<<<< HEAD
 import androidx.compose.ui.platform.LocalContext
+=======
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.effectiveDate

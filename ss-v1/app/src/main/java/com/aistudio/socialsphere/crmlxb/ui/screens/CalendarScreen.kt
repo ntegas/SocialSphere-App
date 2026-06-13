@@ -57,9 +57,14 @@ fun CalendarScreen(
     onNavigateToCreateCalendarItem: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+<<<<<<< HEAD
     val ctxLabel = LocalContext.current
     var selectedMode by remember { mutableStateOf(AppSettings.calendarDefaultMode.value) }
     var selectedFilter by remember { mutableStateOf(CalendarEventFilter.ALL) }
+=======
+    var selectedMode by remember { mutableStateOf(AppSettings.calendarDefaultMode.value) }
+    var selectedFilter by remember { mutableStateOf("Все") }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
 
     val modes = CalendarViewMode.entries
     val filters = CalendarEventFilter.entries
@@ -129,17 +134,27 @@ fun CalendarScreen(
                     allEvents.filter { event ->
                         if (event.type.name in hiddenTypes) return@filter false
                         when (selectedFilter) {
+<<<<<<< HEAD
                             CalendarEventFilter.BIRTHDAYS -> event.type == CalendarItemType.BIRTHDAY
                             CalendarEventFilter.CALLS -> event.type == CalendarItemType.CALL
                             CalendarEventFilter.MEETINGS -> event.type == CalendarItemType.MEETING
                             CalendarEventFilter.GIFTS -> event.type == CalendarItemType.GIFT
                             CalendarEventFilter.IMPORTANT -> event.importance in listOf(ImportanceLevel.IMPORTANT, ImportanceLevel.KEY)
                             CalendarEventFilter.ALL -> true
+=======
+                            "Дни рождения" -> event.type == CalendarItemType.BIRTHDAY
+                            "Звонки" -> event.type == CalendarItemType.CALL
+                            "Встречи" -> event.type == CalendarItemType.MEETING
+                            "Подарки" -> event.type == CalendarItemType.GIFT
+                            "Важное" -> event.importance in listOf(ImportanceLevel.IMPORTANT, ImportanceLevel.KEY)
+                            else -> true
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         }
                     }
                 }
             }
 
+<<<<<<< HEAD
             // stringResource нельзя вызывать внутри derivedStateOf —
             // захватываем заголовки групп здесь; они же — ключи remember,
             // чтобы смена языка пересчитала группировку
@@ -153,6 +168,11 @@ fun CalendarScreen(
             // Пересчёт только при изменении фильтра, режима, данных или языка —
             // не на каждой рекомпозиции (derivedStateOf отслеживает snapshot-состояния)
             val groupedEvents by remember(strToday, strTomorrow, strLater, strNearest, strNext7Days, strMonthEvents) {
+=======
+            // Пересчёт только при изменении фильтра, режима или данных —
+            // не на каждой рекомпозиции (derivedStateOf отслеживает snapshot-состояния)
+            val groupedEvents by remember {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 derivedStateOf {
                     val filteredEvents = visibleEvents
 
@@ -161,6 +181,7 @@ fun CalendarScreen(
                     val weekEnd      = java.time.LocalDate.now().plusDays(7).toString()
 
                     val grouped = mutableMapOf<String, List<CalendarItem>>()
+<<<<<<< HEAD
                     if (selectedMode == CalendarViewMode.TODAY) {
                         val todayEvents = filteredEvents.filter { it.effectiveDate() == todayDate }
                         if (todayEvents.isNotEmpty()) {
@@ -183,12 +204,40 @@ fun CalendarScreen(
                         val monthEnd = java.time.LocalDate.now().plusMonths(1).toString()
                         val monthEvents = filteredEvents.filter { it.effectiveDate() in todayDate..monthEnd }.sortedBy { it.effectiveDate() }
                         grouped[strMonthEvents] = monthEvents
+=======
+                    if (selectedMode == "Сегодня") {
+                        val todayEvents = filteredEvents.filter { it.effectiveDate() == todayDate }
+                        if (todayEvents.isNotEmpty()) {
+                            grouped["Сегодня"] = todayEvents
+                        } else {
+                            grouped["Ближайшие"] = filteredEvents.sortedBy { it.effectiveDate() }.take(5)
+                        }
+                    } else if (selectedMode == "Список") {
+                        val today    = filteredEvents.filter { it.effectiveDate() == todayDate }
+                        val tomorrow = filteredEvents.filter { it.effectiveDate() == tomorrowDate }
+                        val later    = filteredEvents.filter { it.effectiveDate() > tomorrowDate }.sortedBy { it.effectiveDate() }
+                        if (today.isNotEmpty())    grouped["Сегодня"] = today
+                        if (tomorrow.isNotEmpty()) grouped["Завтра"]  = tomorrow
+                        if (later.isNotEmpty())    grouped["Позже"]   = later
+                    } else if (selectedMode == "Неделя") {
+                        val weekEvents = filteredEvents.filter { it.effectiveDate() in todayDate..weekEnd }.sortedBy { it.effectiveDate() }
+                        if (weekEvents.isNotEmpty()) grouped["Ближайшие 7 дней"] = weekEvents
+                        else grouped["Ближайшие 7 дней"] = emptyList()
+                    } else if (selectedMode == "Месяц") {
+                        val monthEnd = java.time.LocalDate.now().plusMonths(1).toString()
+                        val monthEvents = filteredEvents.filter { it.effectiveDate() in todayDate..monthEnd }.sortedBy { it.effectiveDate() }
+                        grouped["События месяца"] = monthEvents
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                     grouped
                 }
             }
 
+<<<<<<< HEAD
             if (selectedMode == CalendarViewMode.MONTH) {
+=======
+            if (selectedMode == "Месяц") {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 MonthGridView(
                     events         = visibleEvents,
                     firstDayMonday = AppSettings.calendarFirstDayMonday.value,
@@ -256,12 +305,17 @@ fun MonthGridView(
     }
 
     val monthNames = listOf(
+<<<<<<< HEAD
         stringResource(R.string.month_1), stringResource(R.string.month_2),
         stringResource(R.string.month_3), stringResource(R.string.month_4),
         stringResource(R.string.month_5), stringResource(R.string.month_6),
         stringResource(R.string.month_7), stringResource(R.string.month_8),
         stringResource(R.string.month_9), stringResource(R.string.month_10),
         stringResource(R.string.month_11), stringResource(R.string.month_12)
+=======
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
     )
 
     Column(modifier = modifier) {
@@ -272,7 +326,11 @@ fun MonthGridView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { month = month.minusMonths(1) }) {
+<<<<<<< HEAD
                 Icon(Icons.Default.ChevronLeft, stringResource(R.string.cal_prev_month))
+=======
+                Icon(Icons.Default.ChevronLeft, "Предыдущий месяц")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             }
             Text(
                 "${monthNames[month.monthValue - 1]} ${month.year}",
@@ -280,15 +338,25 @@ fun MonthGridView(
                 fontWeight = FontWeight.Bold
             )
             IconButton(onClick = { month = month.plusMonths(1) }) {
+<<<<<<< HEAD
                 Icon(Icons.Default.ChevronRight, stringResource(R.string.cal_next_month))
+=======
+                Icon(Icons.Default.ChevronRight, "Следующий месяц")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             }
         }
 
         // ── Дни недели ──
         val dow = if (firstDayMonday)
+<<<<<<< HEAD
             listOf(stringResource(R.string.wd_mon), stringResource(R.string.wd_tue), stringResource(R.string.wd_wed), stringResource(R.string.wd_thu), stringResource(R.string.wd_fri), stringResource(R.string.wd_sat), stringResource(R.string.wd_sun))
         else
             listOf(stringResource(R.string.wd_sun), stringResource(R.string.wd_mon), stringResource(R.string.wd_tue), stringResource(R.string.wd_wed), stringResource(R.string.wd_thu), stringResource(R.string.wd_fri), stringResource(R.string.wd_sat))
+=======
+            listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
+        else
+            listOf("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
         Row(Modifier.fillMaxWidth()) {
             dow.forEach { d ->
                 Text(
@@ -375,7 +443,11 @@ fun MonthGridView(
         val selEvents = eventsByDay[selectedDay.toString()].orEmpty()
         Text(
             "${selectedDay.dayOfMonth} ${monthNames[selectedDay.monthValue - 1].lowercase()}" +
+<<<<<<< HEAD
                 if (selEvents.isEmpty()) " " + stringResource(R.string.cal_no_events_day) else "",
+=======
+                if (selEvents.isEmpty()) " — событий нет" else "",
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary

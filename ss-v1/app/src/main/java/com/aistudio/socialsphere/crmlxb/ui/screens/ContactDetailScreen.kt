@@ -106,7 +106,11 @@ fun ContactDetailScreen(
                 ) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
+<<<<<<< HEAD
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+=======
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                 },
                 actions = {
@@ -207,6 +211,7 @@ fun ContactDetailScreen(
         var gLink  by remember(g?.id ?: "new") { mutableStateOf(g?.link ?: "") }
         AlertDialog(
             onDismissRequest = { showAddGift = false; editingGift = null },
+<<<<<<< HEAD
             title = { Text(if (g == null) stringResource(R.string.cd_gift_idea) else stringResource(R.string.cd_gift_edit), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -216,6 +221,17 @@ fun ContactDetailScreen(
                         label = { Text(stringResource(R.string.cd_note)) }, modifier = Modifier.fillMaxWidth(), maxLines = 3)
                     OutlinedTextField(value = gLink, onValueChange = { gLink = it },
                         label = { Text(stringResource(R.string.cd_link)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+=======
+            title = { Text(if (g == null) "Идея подарка" else "Править идею", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(value = gTitle, onValueChange = { gTitle = it },
+                        label = { Text("Название*") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = gNote, onValueChange = { gNote = it },
+                        label = { Text("Заметка") }, modifier = Modifier.fillMaxWidth(), maxLines = 3)
+                    OutlinedTextField(value = gLink, onValueChange = { gLink = it },
+                        label = { Text("Ссылка") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 }
             },
             confirmButton = {
@@ -237,10 +253,17 @@ fun ContactDetailScreen(
                         ))
                     }
                     showAddGift = false; editingGift = null
+<<<<<<< HEAD
                 }) { Text(stringResource(R.string.common_save)) }
             },
             dismissButton = {
                 TextButton(onClick = { showAddGift = false; editingGift = null }) { Text(stringResource(R.string.common_cancel)) }
+=======
+                }) { Text("Сохранить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddGift = false; editingGift = null }) { Text("Отмена") }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             }
         )
     }
@@ -249,14 +272,24 @@ fun ContactDetailScreen(
     deletingGift?.let { gift ->
         AlertDialog(
             onDismissRequest = { deletingGift = null },
+<<<<<<< HEAD
             title = { Text(stringResource(R.string.cd_gift_delete_q), fontWeight = FontWeight.Bold) },
+=======
+            title = { Text("Удалить идею?", fontWeight = FontWeight.Bold) },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             text = { Text(gift.title) },
             confirmButton = {
                 Button(colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     onClick = { AppStateStore.deleteGift(gift.id); deletingGift = null }
+<<<<<<< HEAD
                 ) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = { TextButton(onClick = { deletingGift = null }) { Text(stringResource(R.string.common_cancel)) } }
+=======
+                ) { Text("Удалить") }
+            },
+            dismissButton = { TextButton(onClick = { deletingGift = null }) { Text("Отмена") } }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
         )
     }
 
@@ -269,6 +302,7 @@ fun ContactDetailScreen(
         var sOther    by remember { mutableStateOf(existing?.other ?: "") }
         AlertDialog(
             onDismissRequest = { showSizesDialog = false },
+<<<<<<< HEAD
             title = { Text(stringResource(R.string.cd_sizes), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -280,6 +314,19 @@ fun ContactDetailScreen(
                         label = { Text(stringResource(R.string.cd_ring_hint)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedTextField(value = sOther, onValueChange = { sOther = it },
                         label = { Text(stringResource(R.string.common_other)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+=======
+            title = { Text("Размеры", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(value = sClothing, onValueChange = { sClothing = it },
+                        label = { Text("Одежда (напр. M, 48)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = sShoe, onValueChange = { sShoe = it },
+                        label = { Text("Обувь (напр. 42)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = sRing, onValueChange = { sRing = it },
+                        label = { Text("Кольцо (напр. 17)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = sOther, onValueChange = { sOther = it },
+                        label = { Text("Другое") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 }
             },
             confirmButton = {
@@ -293,9 +340,15 @@ fun ContactDetailScreen(
                         other        = sOther.trim().ifBlank { null }
                     ))
                     showSizesDialog = false
+<<<<<<< HEAD
                 }) { Text(stringResource(R.string.common_save)) }
             },
             dismissButton = { TextButton(onClick = { showSizesDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+=======
+                }) { Text("Сохранить") }
+            },
+            dismissButton = { TextButton(onClick = { showSizesDialog = false }) { Text("Отмена") } }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
         )
     }
 
@@ -311,6 +364,7 @@ fun ContactDetailScreen(
         var prefValue by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showAddPref = false },
+<<<<<<< HEAD
             title = { Text(stringResource(R.string.cd_preference), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -319,6 +373,16 @@ fun ContactDetailScreen(
                     }
                     OutlinedTextField(value = prefValue, onValueChange = { prefValue = it },
                         label = { Text(stringResource(R.string.cd_value_hint)) },
+=======
+            title = { Text("Предпочтение", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DropdownField("Категория", prefCat.label(), prefCategories.map { it.label() }) { picked ->
+                        prefCat = prefCategories.firstOrNull { it.label() == picked } ?: prefCat
+                    }
+                    OutlinedTextField(value = prefValue, onValueChange = { prefValue = it },
+                        label = { Text("Значение (напр. «тёмный шоколад»)") },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         modifier = Modifier.fillMaxWidth(), singleLine = true)
                 }
             },
@@ -333,9 +397,15 @@ fun ContactDetailScreen(
                         )
                     ))
                     showAddPref = false
+<<<<<<< HEAD
                 }) { Text(stringResource(R.string.common_add)) }
             },
             dismissButton = { TextButton(onClick = { showAddPref = false }) { Text(stringResource(R.string.common_cancel)) } }
+=======
+                }) { Text("Добавить") }
+            },
+            dismissButton = { TextButton(onClick = { showAddPref = false }) { Text("Отмена") } }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
         )
     }
 
@@ -346,12 +416,17 @@ fun ContactDetailScreen(
         var editImportant by remember(note.id) { mutableStateOf(note.isImportant) }
         AlertDialog(
             onDismissRequest = { editingNote = null },
+<<<<<<< HEAD
             title = { Text(stringResource(R.string.cd_note_edit), fontWeight = FontWeight.Bold) },
+=======
+            title = { Text("Править заметку", fontWeight = FontWeight.Bold) },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = editText,
                         onValueChange = { editText = it },
+<<<<<<< HEAD
                         label = { Text(stringResource(R.string.cd_note_text)) },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
                         maxLines = 5
@@ -362,6 +437,18 @@ fun ContactDetailScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Checkbox(checked = editImportant, onCheckedChange = { editImportant = it })
                         Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
+=======
+                        label = { Text("Текст заметки") },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                        maxLines = 5
+                    )
+                    DropdownField("Тип заметки", editType.label(), NoteType.values().map { it.label() }) {
+                        editType = NoteType.values().firstOrNull { n -> n.label() == it } ?: editType
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Checkbox(checked = editImportant, onCheckedChange = { editImportant = it })
+                        Text("Важная заметка", style = MaterialTheme.typography.bodyMedium)
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                 }
             },
@@ -376,10 +463,17 @@ fun ContactDetailScreen(
                         ))
                         editingNote = null
                     }
+<<<<<<< HEAD
                 ) { Text(stringResource(R.string.common_save)) }
             },
             dismissButton = {
                 TextButton(onClick = { editingNote = null }) { Text(stringResource(R.string.common_cancel)) }
+=======
+                ) { Text("Сохранить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingNote = null }) { Text("Отмена") }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             }
         )
     }
@@ -388,7 +482,11 @@ fun ContactDetailScreen(
     deletingNote?.let { note ->
         AlertDialog(
             onDismissRequest = { deletingNote = null },
+<<<<<<< HEAD
             title = { Text(stringResource(R.string.cd_note_delete_q), fontWeight = FontWeight.Bold) },
+=======
+            title = { Text("Удалить заметку?", fontWeight = FontWeight.Bold) },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             text = { Text(note.text.take(120) + if (note.text.length > 120) "…" else "") },
             confirmButton = {
                 Button(
@@ -399,10 +497,17 @@ fun ContactDetailScreen(
                         AppStateStore.deleteNote(note.id)
                         deletingNote = null
                     }
+<<<<<<< HEAD
                 ) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = {
                 TextButton(onClick = { deletingNote = null }) { Text(stringResource(R.string.common_cancel)) }
+=======
+                ) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingNote = null }) { Text("Отмена") }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             }
         )
     }
@@ -700,36 +805,58 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             EditableChip(
+<<<<<<< HEAD
                 current = contact.contactStatus.label(ctxLabel),
                 options = ContactStatus.values().map { it.label(ctxLabel) }
             ) { picked ->
                 ContactStatus.values().firstOrNull { it.label(ctxLabel) == picked }?.let {
+=======
+                current = contact.contactStatus.label(),
+                options = ContactStatus.values().map { it.label() }
+            ) { picked ->
+                ContactStatus.values().firstOrNull { it.label() == picked }?.let {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     AppStateStore.updateContact(
                         contact.copy(contactStatus = it, updatedAt = nowIso())
                     )
                 }
             }
             EditableChip(
+<<<<<<< HEAD
                 current = contact.relationshipType.label(ctxLabel),
                 options = RelationshipType.values().map { it.label(ctxLabel) }
             ) { picked ->
                 RelationshipType.values().firstOrNull { it.label(ctxLabel) == picked }?.let {
+=======
+                current = contact.relationshipType.label(),
+                options = RelationshipType.values().map { it.label() }
+            ) { picked ->
+                RelationshipType.values().firstOrNull { it.label() == picked }?.let {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     AppStateStore.updateContact(
                         contact.copy(relationshipType = it, updatedAt = nowIso())
                     )
                 }
             }
             EditableChip(
+<<<<<<< HEAD
                 current = contact.importanceLevel.label(ctxLabel),
                 options = ImportanceLevel.values().map { it.label(ctxLabel) }
             ) { picked ->
                 ImportanceLevel.values().firstOrNull { it.label(ctxLabel) == picked }?.let {
+=======
+                current = contact.importanceLevel.label(),
+                options = ImportanceLevel.values().map { it.label() }
+            ) { picked ->
+                ImportanceLevel.values().firstOrNull { it.label() == picked }?.let {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     AppStateStore.updateContact(
                         contact.copy(importanceLevel = it, updatedAt = nowIso())
                     )
                 }
             }
             EditableChip(
+<<<<<<< HEAD
                 current = stringResource(R.string.cd_rhythm_prefix) + contact.communicationRhythm.label(ctxLabel),
                 // CUSTOM исключён — у контакта нет поля своих дней
                 options = CommunicationRhythm.values()
@@ -737,6 +864,15 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
                     .map { it.label(ctxLabel) }
             ) { picked ->
                 CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == picked }?.let {
+=======
+                current = "Ритм: " + contact.communicationRhythm.label(),
+                // CUSTOM исключён — у контакта нет поля своих дней
+                options = CommunicationRhythm.values()
+                    .filter { it != CommunicationRhythm.CUSTOM }
+                    .map { it.label() }
+            ) { picked ->
+                CommunicationRhythm.values().firstOrNull { it.label() == picked }?.let {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     AppStateStore.updateContact(
                         contact.copy(communicationRhythm = it, updatedAt = nowIso())
                     )
@@ -760,9 +896,15 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}) {
                     // «Активность», а не «общались»: дата обновляется любой заметкой
                     // (в т.ч. «любит кофе»), что не означает реальный разговор
                     val label = when {
+<<<<<<< HEAD
                         daysSince == 0L -> stringResource(R.string.cd_last_today)
                         daysSince == 1L -> stringResource(R.string.cd_last_yesterday)
                         else            -> stringResource(R.string.cd_last_days_ago, daysSince)
+=======
+                        daysSince == 0L -> "Последняя активность: сегодня"
+                        daysSince == 1L -> "Последняя активность: вчера"
+                        else            -> "Последняя активность: $daysSince дн. назад"
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                     Text(label, style = MaterialTheme.typography.bodySmall,
                         color = if (daysSince > 30) MaterialTheme.colorScheme.error
@@ -965,12 +1107,21 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         ) {
             if (compRel != null) {
                 val companyName = AppStateStore.getCompany(compRel.companyId)?.name ?: ""
+<<<<<<< HEAD
                 if (companyName.isNotBlank()) InfoRow(stringResource(R.string.cd_company), "$companyName ›",
                     onClick = { onNavigateToCompany(compRel.companyId) })
                 if (!compRel.position.isNullOrBlank())       InfoRow(stringResource(R.string.cd_position),   compRel.position)
                 if (!compRel.department.isNullOrBlank())     InfoRow(stringResource(R.string.cd_department),        compRel.department)
                 if (!compRel.responsibilities.isNullOrBlank()) InfoRow(stringResource(R.string.cd_tasks),     compRel.responsibilities)
                 if (!compRel.workNote.isNullOrBlank())       InfoRow(stringResource(R.string.cd_note),      compRel.workNote)
+=======
+                if (companyName.isNotBlank()) InfoRow("Компания", "$companyName ›",
+                    onClick = { onNavigateToCompany(compRel.companyId) })
+                if (!compRel.position.isNullOrBlank())       InfoRow("Должность",   compRel.position)
+                if (!compRel.department.isNullOrBlank())     InfoRow("Отдел",        compRel.department)
+                if (!compRel.responsibilities.isNullOrBlank()) InfoRow("Задачи",     compRel.responsibilities)
+                if (!compRel.workNote.isNullOrBlank())       InfoRow("Заметка",      compRel.workNote)
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 // Work notes
                 val workNotes = AppStateStore.notes.filter {
                     it.contactId == contact.id && it.type == NoteType.WORK
@@ -1805,6 +1956,7 @@ private fun GiftMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.size(24.dp)) {
+<<<<<<< HEAD
             Icon(Icons.Default.MoreVert, stringResource(R.string.cd_actions), Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.secondary)
         }
@@ -1813,6 +1965,16 @@ private fun GiftMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
                 leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)) },
                 onClick = { open = false; onEdit() })
             DropdownMenuItem(text = { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) },
+=======
+            Icon(Icons.Default.MoreVert, "Действия", Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.secondary)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("Править") },
+                leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)) },
+                onClick = { open = false; onEdit() })
+            DropdownMenuItem(text = { Text("Удалить", color = MaterialTheme.colorScheme.error) },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.error) },
                 onClick = { open = false; onDelete() })
@@ -1889,6 +2051,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
         }
         compRels.forEach { rel ->
             val company = AppStateStore.getCompany(rel.companyId)
+<<<<<<< HEAD
             CardBlock(title = if (rel.isPrimary) stringResource(R.string.cd_main_workplace) else stringResource(R.string.cd_more)) {
                 if (company != null) InfoRow(stringResource(R.string.cd_company), "${company.name} ›",
                     onClick = { onNavigateToCompany(company.id) })
@@ -1897,6 +2060,16 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                 if (!rel.role.isNullOrBlank())           InfoRow(stringResource(R.string.cd_role),        rel.role)
                 if (!rel.responsibilities.isNullOrBlank()) InfoRow(stringResource(R.string.cd_tasks),    rel.responsibilities)
                 InfoRow(stringResource(R.string.common_status), rel.employmentStatus.label(ctxLabel))
+=======
+            CardBlock(title = if (rel.isPrimary) "Основное место работы" else "Дополнительно") {
+                if (company != null) InfoRow("Компания", "${company.name} ›",
+                    onClick = { onNavigateToCompany(company.id) })
+                if (!rel.position.isNullOrBlank())       InfoRow("Должность",   rel.position)
+                if (!rel.department.isNullOrBlank())     InfoRow("Отдел",       rel.department)
+                if (!rel.role.isNullOrBlank())           InfoRow("Роль",        rel.role)
+                if (!rel.responsibilities.isNullOrBlank()) InfoRow("Задачи",    rel.responsibilities)
+                InfoRow("Статус", rel.employmentStatus.label())
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 if (!rel.workNote.isNullOrBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -2189,9 +2362,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                             val du: Long = daysUntil
                             Text(
                                 when {
+<<<<<<< HEAD
                                     du == 0L -> stringResource(R.string.cd_today_party)
                                     du > 0L  -> String.format(stringResource(R.string.home_in_days), du)
                                     else     -> String.format(stringResource(R.string.home_days_ago), -du)
+=======
+                                    du == 0L -> "Сегодня! 🎉"
+                                    du > 0L  -> "через $du дн."
+                                    else     -> "${-du} дн. назад"
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = when {
@@ -2221,9 +2400,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
         TextButton(onClick = onAddGift, modifier = Modifier.padding(bottom = 4.dp)) {
             Icon(Icons.Default.Add, null, Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
+<<<<<<< HEAD
             Text(stringResource(R.string.cd_gift_idea))
         }
         CardBlock(title = stringResource(R.string.cd_gift_ideas)) {
+=======
+            Text("Идея подарка")
+        }
+        CardBlock(title = "Идеи подарков") {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
             if (ideas.isEmpty()) {
                 Text(
                     stringResource(R.string.cd_gift_ideas_none),
@@ -2341,17 +2526,29 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
         // Блок виден всегда: раньше при пустых данных добавить размеры
         // и предпочтения из вкладки было негде в принципе
         run {
+<<<<<<< HEAD
             CardBlock(title = stringResource(R.string.cd_prefs_sizes)) {
+=======
+            CardBlock(title = "Предпочтения и размеры") {
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onEditSizes, contentPadding = PaddingValues(horizontal = 8.dp)) {
                         Icon(Icons.Default.Edit, null, Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
+<<<<<<< HEAD
                         Text(stringResource(R.string.cd_sizes), fontSize = 12.sp)
+=======
+                        Text("Размеры", fontSize = 12.sp)
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                     TextButton(onClick = onAddPref, contentPadding = PaddingValues(horizontal = 8.dp)) {
                         Icon(Icons.Default.Add, null, Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
+<<<<<<< HEAD
                         Text(stringResource(R.string.cd_preference), fontSize = 12.sp)
+=======
+                        Text("Предпочтение", fontSize = 12.sp)
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                     }
                 }
                 if (size != null) {
@@ -2391,7 +2588,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                             ) {
                                 Text("• ${pref.value}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                                 IconButton(onClick = { onDeletePref(pref) }, modifier = Modifier.size(20.dp)) {
+<<<<<<< HEAD
                                     Icon(Icons.Default.Close, stringResource(R.string.common_delete),
+=======
+                                    Icon(Icons.Default.Close, "Удалить",
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                         Modifier.size(12.dp),
                                         tint = MaterialTheme.colorScheme.secondary)
                                 }
@@ -2401,7 +2602,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                     }
                 } else if (size == null) {
                     Text(
+<<<<<<< HEAD
                         stringResource(R.string.cd_hint_sizes),
+=======
+                        "Добавь размеры и предпочтения — пригодятся при выборе подарка",
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -2616,7 +2821,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                                 onClick = { menuOpen = true },
                                                 modifier = Modifier.size(24.dp)
                                             ) {
+<<<<<<< HEAD
                                                 Icon(Icons.Default.MoreVert, stringResource(R.string.cd_note_actions),
+=======
+                                                Icon(Icons.Default.MoreVert, "Действия с заметкой",
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                                     Modifier.size(16.dp),
                                                     tint = MaterialTheme.colorScheme.secondary)
                                             }
@@ -2625,12 +2834,20 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                                 onDismissRequest = { menuOpen = false }
                                             ) {
                                                 DropdownMenuItem(
+<<<<<<< HEAD
                                                     text = { Text(stringResource(R.string.cd_edit_short)) },
+=======
+                                                    text = { Text("Править") },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                                     leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)) },
                                                     onClick = { menuOpen = false; onEditNote(note) }
                                                 )
                                                 DropdownMenuItem(
+<<<<<<< HEAD
                                                     text = { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) },
+=======
+                                                    text = { Text("Удалить", color = MaterialTheme.colorScheme.error) },
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
                                                     leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(18.dp),
                                                         tint = MaterialTheme.colorScheme.error) },
                                                     onClick = { menuOpen = false; onDeleteNote(note) }

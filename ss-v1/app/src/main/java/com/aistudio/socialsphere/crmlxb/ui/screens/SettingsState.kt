@@ -81,6 +81,7 @@ object AppSettings {
     val repeatOverdueVisually  = mutableStateOf(false)
 
     // ── Календарь (персистентно) ──
+<<<<<<< HEAD
     val calendarDefaultMode: MutableState<CalendarViewMode> by lazy {
         PersistedMutableState(
             prefs       = getPrefs(),
@@ -98,6 +99,15 @@ object AppSettings {
                     else -> try { CalendarViewMode.valueOf(raw) } catch (e: Exception) { CalendarViewMode.LIST }
                 }
             }
+=======
+    val calendarDefaultMode: MutableState<String> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "calendar_default_mode",
+            default     = "Список",
+            serialize   = { it },
+            deserialize = { it }
+>>>>>>> d252f445053b776536aff0d571b80c4608c8a4ee
         )
     }
 
