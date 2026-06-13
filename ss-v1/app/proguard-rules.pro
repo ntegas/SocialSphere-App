@@ -22,6 +22,16 @@
 
 # ── Socialsphere ProGuard Rules ──────────────────────────────
 
+# Android-компоненты инстанцируются системой рефлексией по имени из манифеста.
+# R8 не видит этих обращений и без явного keep удаляет классы из dex →
+# ClassNotFoundException в рантайме (BootReceiver на ACTION_BOOT_COMPLETED).
+-keep class com.aistudio.socialsphere.crmlxb.** extends android.content.BroadcastReceiver { *; }
+-keep public class * extends android.content.BroadcastReceiver { *; }
+-keep public class * extends android.app.Service { *; }
+-keep public class * extends android.app.Activity { *; }
+-keep public class * extends android.app.Application { *; }
+-keep public class * extends android.content.ContentProvider { *; }
+
 # Room — не обфусцировать Entity классы
 -keep class com.aistudio.socialsphere.crmlxb.data.local.*Entity { *; }
 -keep class com.aistudio.socialsphere.crmlxb.data.local.*Dao { *; }
