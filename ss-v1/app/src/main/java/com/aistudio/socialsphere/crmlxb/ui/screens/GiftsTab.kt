@@ -32,6 +32,7 @@ import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
 import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -108,15 +109,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = when {
-                                    du in 0L..7L  -> MaterialTheme.colorScheme.error
-                                    du in 8L..30L -> MaterialTheme.colorScheme.tertiary
-                                    else          -> MaterialTheme.colorScheme.secondary
+                                    du in 0L..7L  -> AppleTheme.colors.red
+                                    du in 8L..30L -> AppleTheme.colors.orange
+                                    else          -> AppleTheme.colors.secondaryLabel
                                 },
                                 fontWeight = FontWeight.Medium
                             )
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -249,7 +250,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                 Text(
                     stringResource(R.string.cd_gift_ideas_none),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = AppleTheme.colors.secondaryLabel
                 )
             } else {
                 ideas.forEach { gift ->
@@ -274,13 +275,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                                     Text(
                                         gift.note,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.secondary
+                                        color = AppleTheme.colors.secondaryLabel
                                     )
                                 if (!gift.link.isNullOrBlank())
                                     Text(
                                         gift.link,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = AppleTheme.colors.brand
                                     )
                             }
                         }
@@ -289,11 +290,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                             onClick = { AppStateStore.updateGift(gift.copy(status = GiftStatus.BOUGHT)) },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(stringResource(R.string.cd_gift_buy), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                            Text(stringResource(R.string.cd_gift_buy), fontSize = 11.sp, color = AppleTheme.colors.brand)
                         }
                         GiftMenu(onEdit = { onEditGift(gift) }, onDelete = { onDeleteGift(gift) })
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
             }
         }
@@ -318,11 +319,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                             onClick = { AppStateStore.updateGift(gift.copy(status = GiftStatus.GIVEN)) },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(stringResource(R.string.cd_gift_give), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                            Text(stringResource(R.string.cd_gift_give), fontSize = 11.sp, color = AppleTheme.colors.brand)
                         }
                         GiftMenu(onEdit = { onEditGift(gift) }, onDelete = { onDeleteGift(gift) })
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
             }
         }
@@ -341,7 +342,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                             Text(
                                 gift.date,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = AppleTheme.colors.secondaryLabel
                             )
                     }
                 }
@@ -388,12 +389,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                         Text(
                             stringResource(R.string.cd_sizes),
                             style      = MaterialTheme.typography.labelSmall,
-                            color      = MaterialTheme.colorScheme.primary,
+                            color      = AppleTheme.colors.brand,
                             fontWeight = FontWeight.SemiBold
                         )
                         IconButton(onClick = onEditSizes, modifier = Modifier.size(18.dp)) {
                             Icon(Icons.Default.Edit, stringResource(R.string.cd_sizes),
-                                Modifier.size(13.dp), tint = MaterialTheme.colorScheme.primary)
+                                Modifier.size(13.dp), tint = AppleTheme.colors.brand)
                         }
                     }
                     Spacer(Modifier.height(4.dp))
@@ -414,7 +415,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                         Text(
                             cat.label(ctxLabel),
                             style      = MaterialTheme.typography.labelSmall,
-                            color      = if (cat == PersonalDetailCategory.ALLERGIES || cat == PersonalDetailCategory.RESTRICTIONS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            color      = if (cat == PersonalDetailCategory.ALLERGIES || cat == PersonalDetailCategory.RESTRICTIONS) AppleTheme.colors.red else AppleTheme.colors.brand,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(2.dp))
@@ -424,11 +425,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("• ${pref.value}", style = MaterialTheme.typography.bodySmall, color = if (cat == PersonalDetailCategory.ALLERGIES || cat == PersonalDetailCategory.RESTRICTIONS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                                Text("• ${pref.value}", style = MaterialTheme.typography.bodySmall, color = if (cat == PersonalDetailCategory.ALLERGIES || cat == PersonalDetailCategory.RESTRICTIONS) AppleTheme.colors.red else AppleTheme.colors.label, modifier = Modifier.weight(1f))
                                 IconButton(onClick = { onDeletePref(pref) }, modifier = Modifier.size(20.dp)) {
                                     Icon(Icons.Default.Close, stringResource(R.string.common_delete),
                                         Modifier.size(12.dp),
-                                        tint = MaterialTheme.colorScheme.secondary)
+                                        tint = AppleTheme.colors.secondaryLabel)
                                 }
                             }
                         }
@@ -438,7 +439,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                     Text(
                         stringResource(R.string.cd_hint_sizes),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = AppleTheme.colors.secondaryLabel
                     )
                 }
             }

@@ -127,7 +127,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                    .background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -135,7 +135,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                     (other?.lastName?.firstOrNull()?.toString() ?: ""),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = AppleTheme.colors.brand
                                 )
                             }
                             Column {
@@ -148,7 +148,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                     Text(
                                         role,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = AppleTheme.colors.brand
                                     )
                             }
                         }
@@ -156,15 +156,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                             if (editing) {
                                 IconButton(onClick = { pendingRemoveFamily = rel }, modifier = Modifier.size(32.dp)) {
                                     Icon(Icons.Default.Close, stringResource(R.string.cd_remove_family),
-                                        Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+                                        Modifier.size(16.dp), tint = AppleTheme.colors.secondaryLabel)
                                 }
                             } else if (other != null) {
                                 Icon(Icons.Default.ChevronRight, null, Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.outlineVariant)
+                                    tint = AppleTheme.colors.separator)
                             }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 if (editing) {
                     Spacer(Modifier.height(4.dp))
@@ -291,7 +291,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 }
                 workNotes.forEach { n ->
                     Text("• ${n.text}", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary)
+                        color = AppleTheme.colors.secondaryLabel)
                 }
                 if (editing) {
                     Spacer(Modifier.height(4.dp))
@@ -337,7 +337,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                             if (comps.isEmpty()) {
                                 Text(stringResource(R.string.cd_company_none_hint),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary)
+                                    color = AppleTheme.colors.secondaryLabel)
                             }
                         } else {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -419,7 +419,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     Text(
                         cat.label(ctxLabel),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = AppleTheme.colors.brand,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(2.dp))
@@ -431,14 +431,14 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         items.forEach { detail ->
                             Surface(
                                 shape  = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                                color  = MaterialTheme.colorScheme.secondaryContainer,
+                                color  = AppleTheme.colors.fill,
                                 modifier = if (editing) Modifier.clickable { pendingDeleteInterest = detail } else Modifier
                             ) {
                                 Text(
                                     detail.value,
                                     style    = MaterialTheme.typography.labelMedium,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    color    = MaterialTheme.colorScheme.onSecondaryContainer
+                                    color    = AppleTheme.colors.label
                                 )
                             }
                         }
@@ -554,7 +554,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 Text(
                     stringResource(R.string.cd_restrictions),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = AppleTheme.colors.red,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(2.dp))
@@ -567,7 +567,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         Text(
                             "${r.category.label(ctxLabel)}: ${r.value}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
+                            color = AppleTheme.colors.red
                         )
                     }
                 }
@@ -639,12 +639,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     contact.tags.forEach { tag ->
                         Surface(
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
+                            color = AppleTheme.colors.brand.copy(alpha = 0.10f)
                         ) {
                             Text(
                                 tag,
                                 style    = MaterialTheme.typography.labelMedium,
-                                color    = MaterialTheme.colorScheme.onPrimaryContainer,
+                                color    = AppleTheme.colors.brand,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
@@ -663,13 +663,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     verticalAlignment     = Alignment.Top
                 ) {
                     Icon(Icons.Default.Handshake, null, Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary)
+                        tint = AppleTheme.colors.brand)
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         if (!contact.meetContext.isNullOrBlank())
                             Text(contact.meetContext, style = MaterialTheme.typography.bodyMedium)
                         if (!contact.meetDate.isNullOrBlank())
                             Text(contact.meetDate, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary)
+                                color = AppleTheme.colors.secondaryLabel)
                     }
                 }
             }
@@ -711,7 +711,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         ) {
                             Box(
                                 modifier = Modifier.size(36.dp).clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                    .background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -719,18 +719,18 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                     (other?.lastName?.firstOrNull()?.toString() ?: ""),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = AppleTheme.colors.brand
                                 )
                             }
                             Column {
                                 Text(otherName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                                 if (!theirRole.isNullOrBlank())
-                                    Text(theirRole, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                    Text(theirRole, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand)
                             }
                         }
-                        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outlineVariant)
+                        Icon(Icons.Default.ChevronRight, null, tint = AppleTheme.colors.separator)
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
             }
         }
@@ -766,7 +766,7 @@ private fun FordBlock(
         modifier  = Modifier.fillMaxWidth(),
         shape     = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         colors    = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = AppleTheme.colors.card
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -798,7 +798,7 @@ private fun FordBlock(
                 )
             }
             HorizontalDivider(
-                color     = MaterialTheme.colorScheme.outlineVariant,
+                color     = AppleTheme.colors.separator,
                 thickness = 0.5.dp
             )
             Spacer(Modifier.height(10.dp))
@@ -813,6 +813,6 @@ private fun FordEmptyHint(text: String) {
     Text(
         text,
         style    = MaterialTheme.typography.bodySmall,
-        color    = MaterialTheme.colorScheme.outlineVariant
+        color    = AppleTheme.colors.separator
     )
 }

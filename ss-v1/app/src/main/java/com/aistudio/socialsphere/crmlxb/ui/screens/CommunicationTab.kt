@@ -32,6 +32,7 @@ import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
 import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -62,11 +63,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(phone.number, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(phone.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            Text(phone.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                         }
                         if (editing) {
                             IconButton(onClick = { pendingRemovePhone = phone }) {
-                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
                             }
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -75,7 +76,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                             }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 if (editing) {
                     TextButton(onClick = { editPhone = null; showPhoneDialog = true }) {
@@ -150,17 +151,17 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(email.email, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(email.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            Text(email.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                         }
                         if (editing) {
                             IconButton(onClick = { pendingRemoveEmail = email }) {
-                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
                             }
                         } else {
                             ActionSquare(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(ctx, email.email) }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 if (editing) {
                     TextButton(onClick = { editEmail = null; showEmailDialog = true }) {
@@ -235,20 +236,20 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(m.value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(m.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            Text(m.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                             val c = m.comment
                             if (!c.isNullOrBlank())
-                                Text(c, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outlineVariant)
+                                Text(c, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.separator)
                         }
                         if (editing) {
                             IconButton(onClick = { pendingRemoveMsg = m }) {
-                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
                             }
                         } else {
                             ActionSquare(Icons.AutoMirrored.Filled.Chat, stringResource(R.string.cd_write)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(ctx, m) }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 if (editing) {
                     TextButton(onClick = { editMsg = null; showMsgDialog = true }) {
@@ -266,7 +267,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                         title = { Text(stringResource(if (base == null) R.string.cd_add_messenger else R.string.ce_edit_messenger), fontWeight = FontWeight.Bold) },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(stringResource(R.string.ce_platform), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                                Text(stringResource(R.string.ce_platform), style = MaterialTheme.typography.labelMedium, color = AppleTheme.colors.secondaryLabel)
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     MessengerType.values().forEach { mt ->
                                         FilterChip(selected = mType == mt, onClick = { mType = mt }, label = { Text(mt.label(ctxLabel)) })
@@ -334,11 +335,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                                 listOf(addr.addressLine, addr.city, addr.postalCode.orEmpty(), addr.country).filter { it.isNotBlank() }.joinToString(", "),
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            Text(addr.addressType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            Text(addr.addressType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                         }
                         if (editing) {
                             IconButton(onClick = { pendingRemoveAddr = addr }) {
-                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
                             }
                         } else {
                             ActionSquare(Icons.Outlined.Map, stringResource(R.string.cd_map)) {
@@ -349,7 +350,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                             }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 if (editing) {
                     TextButton(onClick = { editAddr = null; showAddrDialog = true }) {

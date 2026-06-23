@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -51,8 +52,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                 onClick = onShowAdd,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor   = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f),
+                    contentColor   = AppleTheme.colors.brand
                 )
             ) {
                 Icon(Icons.Default.Add, null, Modifier.size(16.dp))
@@ -63,8 +64,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                 onClick = onShowVoice,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor   = MaterialTheme.colorScheme.onSecondaryContainer
+                    containerColor = AppleTheme.colors.fill,
+                    contentColor   = AppleTheme.colors.label
                 )
             ) {
                 Icon(Icons.Default.PersonAdd, null, Modifier.size(16.dp))
@@ -86,11 +87,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.Notes, null, Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.outlineVariant)
-                    Text(stringResource(R.string.cd_no_notes_yet), color = MaterialTheme.colorScheme.secondary)
+                        tint = AppleTheme.colors.separator)
+                    Text(stringResource(R.string.cd_no_notes_yet), color = AppleTheme.colors.secondaryLabel)
                     Text(stringResource(R.string.cd_tap_add_hint),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outlineVariant)
+                        color = AppleTheme.colors.separator)
                 }
             }
             return@item
@@ -105,11 +106,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (importantCnt > 0) StatChip(stringResource(R.string.cd_stat_important, importantCnt),
-                MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
+                AppleTheme.colors.red.copy(alpha = 0.12f), AppleTheme.colors.red)
             if (workCnt > 0) StatChip(stringResource(R.string.cd_stat_work, workCnt),
-                MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.tertiary)
+                AppleTheme.colors.orange.copy(alpha = 0.14f), AppleTheme.colors.orange)
             if (eventCnt > 0) StatChip(stringResource(R.string.cd_stat_events, eventCnt),
-                MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
+                AppleTheme.colors.brand.copy(alpha = 0.10f), AppleTheme.colors.brand)
         }
 
         // Группировка по месяцам
@@ -135,7 +136,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                     monthLabel,
                     style      = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color      = MaterialTheme.colorScheme.secondary,
+                    color      = AppleTheme.colors.secondaryLabel,
                     modifier   = Modifier.padding(top = 16.dp, bottom = 8.dp)
                 )
                 // Заметки месяца с Timeline
@@ -156,13 +157,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                     .background(
                                         when (note.type) {
                                             NoteType.IMPORTANT_TO_REMEMBER ->
-                                                MaterialTheme.colorScheme.error
+                                                AppleTheme.colors.red
                                             NoteType.WORK ->
-                                                MaterialTheme.colorScheme.tertiary
+                                                AppleTheme.colors.orange
                                             NoteType.DATE_EVENT ->
-                                                MaterialTheme.colorScheme.primary
+                                                AppleTheme.colors.brand
                                             else ->
-                                                MaterialTheme.colorScheme.outline
+                                                AppleTheme.colors.tertiaryLabel
                                         }
                                     )
                             )
@@ -172,7 +173,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                         .width(2.dp)
                                         .height(if (note.text.length > 80) 80.dp else 56.dp)
                                         .background(
-                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                            AppleTheme.colors.separator.copy(alpha = 0.4f)
                                         )
                                 )
                             }
@@ -184,11 +185,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                             colors   = CardDefaults.cardColors(
                                 containerColor = when {
                                     note.isImportant ->
-                                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+                                        AppleTheme.colors.red.copy(alpha = 0.12f).copy(alpha = 0.2f)
                                     note.type == NoteType.WORK ->
-                                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
+                                        AppleTheme.colors.orange.copy(alpha = 0.14f).copy(alpha = 0.2f)
                                     else ->
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                        AppleTheme.colors.card.copy(alpha = 0.4f)
                                 }
                             ),
                             elevation = CardDefaults.cardElevation(0.dp)
@@ -205,12 +206,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                     ) {
                                         Surface(
                                             shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                                            color = MaterialTheme.colorScheme.primaryContainer
+                                            color = AppleTheme.colors.brand.copy(alpha = 0.10f)
                                         ) {
                                             Text(
                                                 note.type.label(ctxLabel),
                                                 style    = MaterialTheme.typography.labelSmall,
-                                                color    = MaterialTheme.colorScheme.primary,
+                                                color    = AppleTheme.colors.brand,
                                                 modifier = Modifier.padding(
                                                     horizontal = 6.dp, vertical = 2.dp
                                                 )
@@ -219,7 +220,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                         if (note.isImportant)
                                             Icon(Icons.Outlined.Star, null,
                                                 Modifier.size(12.dp),
-                                                tint = MaterialTheme.colorScheme.error)
+                                                tint = AppleTheme.colors.red)
                                     }
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -228,7 +229,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                         Text(
                                             note.createdAt.take(10),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.secondary
+                                            color = AppleTheme.colors.secondaryLabel
                                         )
                                         Box {
                                             var menuOpen by remember { mutableStateOf(false) }
@@ -238,7 +239,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                             ) {
                                                 Icon(Icons.Default.MoreVert, stringResource(R.string.cd_note_actions),
                                                     Modifier.size(16.dp),
-                                                    tint = MaterialTheme.colorScheme.secondary)
+                                                    tint = AppleTheme.colors.secondaryLabel)
                                             }
                                             DropdownMenu(
                                                 expanded = menuOpen,
@@ -250,9 +251,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                                     onClick = { menuOpen = false; onEditNote(note) }
                                                 )
                                                 DropdownMenuItem(
-                                                    text = { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) },
+                                                    text = { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) },
                                                     leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(18.dp),
-                                                        tint = MaterialTheme.colorScheme.error) },
+                                                        tint = AppleTheme.colors.red) },
                                                     onClick = { menuOpen = false; onDeleteNote(note) }
                                                 )
                                             }
@@ -283,13 +284,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
             CardBlock(title = stringResource(R.string.cd_personal_details)) {
                 pd.groupBy { it.category }.forEach { (cat, items) ->
                     Text(cat.label(ctxLabel), style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(2.dp))
                     items.forEach { d ->
                         Text("• ${d.value}", style = MaterialTheme.typography.bodyMedium)
                         if (!d.note.isNullOrBlank())
                             Text("  ${d.note}", style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary)
+                                color = AppleTheme.colors.secondaryLabel)
                     }
                     Spacer(Modifier.height(8.dp))
                 }

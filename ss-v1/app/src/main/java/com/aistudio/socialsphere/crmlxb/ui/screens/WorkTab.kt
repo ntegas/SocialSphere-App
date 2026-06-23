@@ -30,6 +30,7 @@ import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
 import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -58,7 +59,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                     Text(
                         rel.workNote,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = AppleTheme.colors.secondaryLabel
                     )
                 }
             }
@@ -145,11 +146,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                                 listOf(addr.addressLine, addr.city, addr.postalCode.orEmpty(), addr.country).filter { it.isNotBlank() }.joinToString(", "),
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            Text(addr.addressType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            Text(addr.addressType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                         }
                         if (editing) {
                             IconButton(onClick = { pendingRemoveAddr = addr }) {
-                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
                             }
                         } else {
                             ActionSquare(Icons.Outlined.Map, stringResource(R.string.cd_map)) {
@@ -160,7 +161,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                             }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 if (editing) {
                     TextButton(onClick = { editAddr = null; showAddrDialog = true }) {
