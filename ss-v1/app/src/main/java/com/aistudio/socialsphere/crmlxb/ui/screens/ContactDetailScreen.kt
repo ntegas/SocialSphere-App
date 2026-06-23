@@ -33,6 +33,7 @@ import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
 import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -98,27 +99,29 @@ fun ContactDetailScreen(
     }
 
     Scaffold(
+        containerColor = AppleTheme.colors.groupedBackground,
         topBar = {
             TopAppBar(
                 title = { },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    Row(
+                        modifier = Modifier.clickable { onNavigateBack() }.padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.ChevronLeft, contentDescription = stringResource(R.string.common_back), tint = AppleTheme.colors.brand, modifier = Modifier.size(28.dp))
+                        Text(stringResource(R.string.common_back), color = AppleTheme.colors.brand, fontSize = 17.sp)
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToEdit) {
-                        Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.common_edit))
-                    }
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.common_delete), tint = androidx.compose.ui.graphics.Color.White)
+                    TextButton(onClick = onNavigateToEdit) {
+                        Text(stringResource(R.string.cd_edit_short), color = AppleTheme.colors.brand, fontSize = 17.sp)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.ui.graphics.Color(0xFF7B73E8),
-                    navigationIconContentColor = androidx.compose.ui.graphics.Color.White,
-                    actionIconContentColor = androidx.compose.ui.graphics.Color.White,
-                    titleContentColor = androidx.compose.ui.graphics.Color.White
+                    containerColor = AppleTheme.colors.groupedBackground,
+                    navigationIconContentColor = AppleTheme.colors.brand,
+                    actionIconContentColor = AppleTheme.colors.brand,
+                    titleContentColor = AppleTheme.colors.label
                 )
             )
         }
@@ -131,36 +134,35 @@ fun ContactDetailScreen(
             // Header
             ContactHeader(contact, onNavigateToCheatSheet, onNavigateToCreateCalendarItem)
 
-            // ScrollableTabRow: 5 вкладок не влезают в фиксированный TabRow —
-            // «Подарки» и «Заметки» обрезались на реальном устройстве
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.background,
-                contentColor = MaterialTheme.colorScheme.primary,
-                edgePadding = 0.dp,
-                indicator = { tabPositions ->
-                    if (selectedTab < tabPositions.size) {
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
+            // Сегмент-контрол (спека HTML): трек fill r9, активный — белый r7
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(AppleTheme.colors.fill)
+                    .padding(2.dp)
             ) {
                 tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Text(
-                                text = title,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                softWrap = false,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
+                    val sel = selectedTab == index
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(7.dp))
+                            .then(if (sel) Modifier.background(AppleTheme.colors.card) else Modifier)
+                            .clickable { selectedTab = index }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = title,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium,
+                            color = if (sel) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel
+                        )
+                    }
                 }
             }
 
@@ -176,7 +178,7 @@ fun ContactDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 when (selectedTab) {
-                    0 -> overviewTab(contact, onNavigateToCreateCalendarItem, onNavigateToCalendarItem, onNavigateToContact, onNavigateToCompany, ctxLabel = ctxLabel, editing = editingOverview, onEditingChange = { editingOverview = it })
+                    0 -> overviewTab(contact, onNavigateToCreateCalendarItem, onNavigateToCalendarItem, onNavigateToContact, onNavigateToCompany, ctxLabel = ctxLabel, editing = editingOverview, onEditingChange = { editingOverview = it }, onDelete = { showDeleteDialog = true })
                     1 -> workTab(contact, onNavigateToCompany, ctxLabel = ctxLabel, editing = editingWork, onEditingChange = { editingWork = it })
                     2 -> communicationTab(contact, ctxLabel = ctxLabel, editing = editingComm, onEditingChange = { editingComm = it })
                     3 -> giftsTab(
@@ -648,131 +650,146 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
     val nowIso = { java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // Градиентная полоса: аватар + имя
-        Box(
-            modifier = Modifier.fillMaxWidth()
-                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
-                    androidx.compose.ui.graphics.Color(0xFF7B73E8),
-                    androidx.compose.ui.graphics.Color(0xFF5B53D6),
-                    androidx.compose.ui.graphics.Color(0xFF4A40B8))))
-                .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 28.dp)
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Аватар — коралловый градиент (спека HTML)
+        Box(contentAlignment = Alignment.BottomEnd) {
+            Box(
+                modifier = Modifier.size(96.dp).clip(CircleShape)
+                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+                        androidx.compose.ui.graphics.Color(0xFFFF6B6B),
+                        androidx.compose.ui.graphics.Color(0xFFFF3B30)))),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(initials.uppercase(), color = androidx.compose.ui.graphics.Color.White,
+                    fontSize = 38.sp, fontWeight = FontWeight.SemiBold)
+            }
+            if (badgeColor != null) {
+                Box(Modifier.size(20.dp).clip(CircleShape).background(badgeColor)
+                    .border(3.dp, AppleTheme.colors.groupedBackground, CircleShape))
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(name, color = AppleTheme.colors.label, fontSize = 26.sp, fontWeight = FontWeight.Bold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        if (subtitle.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Text(subtitle, color = AppleTheme.colors.secondaryLabel, fontSize = 15.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp))
+        }
+        if (!contact.nickname.isNullOrBlank()) {
+            Text("«${contact.nickname}»", color = AppleTheme.colors.secondaryLabel, fontSize = 13.sp)
+        }
+
+        // Чипы — редактируемые (функция сохранена), вид по макету
+        Spacer(Modifier.height(11.dp))
+        androidx.compose.foundation.layout.FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                Box(contentAlignment = Alignment.BottomEnd) {
-                    Box(
-                        modifier = Modifier.size(58.dp).clip(CircleShape)
-                            .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.17f))
-                            .border(1.5.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(initials, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    }
-                    if (badgeColor != null) {
-                        Box(modifier = Modifier.size(15.dp).clip(CircleShape).background(badgeColor)
-                            .border(2.5.dp, androidx.compose.ui.graphics.Color(0xFF4A39BD), CircleShape))
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(name, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    if (subtitle.isNotEmpty())
-                        Text(subtitle, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.86f), style = MaterialTheme.typography.bodyMedium)
-                    if (!contact.nickname.isNullOrBlank())
-                        Text("«${contact.nickname}»", color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
+            EditableChip(
+                current = contact.importanceLevel.label(ctxLabel),
+                options = ImportanceLevel.values().map { it.label(ctxLabel) },
+                container = AppleTheme.colors.red.copy(alpha = 0.12f), labelColor = AppleTheme.colors.red
+            ) { picked -> ImportanceLevel.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(importanceLevel = it, updatedAt = nowIso())) } }
+            EditableChip(
+                current = contact.relationshipType.label(ctxLabel),
+                options = RelationshipType.values().map { it.label(ctxLabel) },
+                container = AppleTheme.colors.brand.copy(alpha = 0.10f), labelColor = AppleTheme.colors.brand
+            ) { picked -> RelationshipType.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(relationshipType = it, updatedAt = nowIso())) } }
+            EditableChip(
+                current = contact.communicationRhythm.label(ctxLabel),
+                options = CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) },
+                container = AppleTheme.colors.fill, labelColor = AppleTheme.colors.label
+            ) { picked -> CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(communicationRhythm = it, updatedAt = nowIso())) } }
+            EditableChip(
+                current = contact.contactStatus.label(ctxLabel),
+                options = ContactStatus.values().map { it.label(ctxLabel) },
+                container = AppleTheme.colors.green.copy(alpha = 0.14f), labelColor = AppleTheme.colors.green
+            ) { picked -> ContactStatus.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(contactStatus = it, updatedAt = nowIso())) } }
+        }
+
+        // Теги (сохранены)
+        if (contact.tags.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+            ) {
+                contact.tags.forEach { tag ->
+                    Text(tag, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(AppleTheme.colors.fill).padding(horizontal = 9.dp, vertical = 3.dp))
                 }
             }
         }
 
-        // Плавающая панель действий
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).offset(y = (-22).dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-        ) {
-            Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                HeaderAction(Icons.Outlined.Phone, stringResource(R.string.cd_call)) {
-                    val phone = contact.phones.find { it.isPrimary }?.number ?: contact.phones.firstOrNull()?.number
-                    com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(context, phone)
+        // Контекст-пилюли (сохранены)
+        val hasCtx = daysSince != null || !contact.nextStep.isNullOrBlank() || nearestDate != null
+        if (hasCtx) {
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (daysSince != null) {
+                    val lateColor = when { daysSince > 60 -> AppleTheme.colors.red; daysSince > 30 -> AppleTheme.colors.orange; else -> AppleTheme.colors.green }
+                    val lbl = when { daysSince == 0L -> stringResource(R.string.cd_last_today); daysSince == 1L -> stringResource(R.string.cd_last_yesterday); else -> stringResource(R.string.cd_last_days_ago, daysSince) }
+                    ContextPill(lbl, lateColor, lateColor.copy(alpha = 0.12f))
                 }
-                HeaderAction(Icons.Outlined.ChatBubbleOutline, stringResource(R.string.cd_write)) {
-                    val m = contact.messengers.find { it.isPrimary } ?: contact.messengers.firstOrNull()
-                    if (m != null) com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(context, m)
-                    else com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(context, contact.phones.firstOrNull()?.number)
+                if (!contact.nextStep.isNullOrBlank()) {
+                    ContextPill("→ " + contact.nextStep, AppleTheme.colors.brand, AppleTheme.colors.brand.copy(alpha = 0.10f), modifier = Modifier.weight(1f), ellipsize = true)
                 }
-                HeaderAction(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) {
-                    val email = contact.emails.find { it.isPrimary }?.email ?: contact.emails.firstOrNull()?.email
-                    com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(context, email)
-                }
-                if (address != null) HeaderAction(Icons.Outlined.Map, stringResource(R.string.cd_map)) {
-                    if (address.latitude != null && address.longitude != null)
-                        com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRouteByCoordinates(context, address.latitude, address.longitude)
-                    else
-                        com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
-                }
-                HeaderAction(Icons.Outlined.Event, stringResource(R.string.cd_create_event), accent = true) {
-                    onNavigateToCreateCalendarItem()
-                }
-                HeaderAction(Icons.Default.Lightbulb, stringResource(R.string.cd_cheatsheet)) {
-                    onNavigateToCheatSheet()
+                if (nearestDate != null) {
+                    ContextPill(com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(nearestDate.title, nearestDate.type, ctxLabel) + " · " + nearestDate.startDate, AppleTheme.colors.orange, AppleTheme.colors.orange.copy(alpha = 0.12f))
                 }
             }
         }
 
-        // Чипы / теги / контекст
-        Column(
-            modifier = Modifier.fillMaxWidth().offset(y = (-22).dp).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                EditableChip(
-                    current = contact.contactStatus.label(ctxLabel),
-                    options = ContactStatus.values().map { it.label(ctxLabel) },
-                    container = androidx.compose.ui.graphics.Color(0xFFE6F6EE), labelColor = androidx.compose.ui.graphics.Color(0xFF059669)
-                ) { picked -> ContactStatus.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(contactStatus = it, updatedAt = nowIso())) } }
-                EditableChip(
-                    current = contact.relationshipType.label(ctxLabel),
-                    options = RelationshipType.values().map { it.label(ctxLabel) },
-                    container = androidx.compose.ui.graphics.Color(0xFFE8EAFE), labelColor = androidx.compose.ui.graphics.Color(0xFF3B49C9)
-                ) { picked -> RelationshipType.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(relationshipType = it, updatedAt = nowIso())) } }
-                EditableChip(
-                    current = contact.importanceLevel.label(ctxLabel),
-                    options = ImportanceLevel.values().map { it.label(ctxLabel) },
-                    container = androidx.compose.ui.graphics.Color(0xFFFCE9E4), labelColor = androidx.compose.ui.graphics.Color(0xFFE8593C)
-                ) { picked -> ImportanceLevel.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(importanceLevel = it, updatedAt = nowIso())) } }
-                EditableChip(
-                    current = contact.communicationRhythm.label(ctxLabel),
-                    options = CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) }
-                ) { picked -> CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(communicationRhythm = it, updatedAt = nowIso())) } }
+        // Быстрые действия — белые плитки (спека HTML); все функции сохранены
+        Spacer(Modifier.height(18.dp))
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+            ActionTile(Icons.Outlined.Phone, stringResource(R.string.cd_call)) {
+                val phone = contact.phones.find { it.isPrimary }?.number ?: contact.phones.firstOrNull()?.number
+                com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(context, phone)
             }
-
-            if (contact.tags.isNotEmpty()) {
-                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    contact.tags.forEach { tag ->
-                        Text(tag, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.primaryContainer).padding(horizontal = 9.dp, vertical = 3.dp))
-                    }
-                }
+            ActionTile(Icons.Outlined.ChatBubbleOutline, stringResource(R.string.cd_write)) {
+                val m = contact.messengers.find { it.isPrimary } ?: contact.messengers.firstOrNull()
+                if (m != null) com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(context, m)
+                else com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(context, contact.phones.firstOrNull()?.number)
             }
-
-            val hasCtx = daysSince != null || !contact.nextStep.isNullOrBlank() || nearestDate != null
-            if (hasCtx) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (daysSince != null) {
-                        val lateColor = when { daysSince > 60 -> androidx.compose.ui.graphics.Color(0xFFDC2626); daysSince > 30 -> androidx.compose.ui.graphics.Color(0xFFD97706); else -> androidx.compose.ui.graphics.Color(0xFF059669) }
-                        val lbl = when { daysSince == 0L -> stringResource(R.string.cd_last_today); daysSince == 1L -> stringResource(R.string.cd_last_yesterday); else -> stringResource(R.string.cd_last_days_ago, daysSince) }
-                        ContextPill(lbl, lateColor, lateColor.copy(alpha = 0.12f))
-                    }
-                    if (!contact.nextStep.isNullOrBlank()) {
-                        ContextPill("→ " + contact.nextStep, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.weight(1f), ellipsize = true)
-                    }
-                    if (nearestDate != null) {
-                        ContextPill(com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(nearestDate.title, nearestDate.type, ctxLabel) + " · " + nearestDate.startDate, MaterialTheme.colorScheme.tertiary, androidx.compose.ui.graphics.Color(0xFFFCE9E4))
-                    }
-                }
+            ActionTile(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) {
+                val email = contact.emails.find { it.isPrimary }?.email ?: contact.emails.firstOrNull()?.email
+                com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(context, email)
             }
+            if (address != null) ActionTile(Icons.Outlined.Map, stringResource(R.string.cd_map)) {
+                if (address.latitude != null && address.longitude != null)
+                    com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRouteByCoordinates(context, address.latitude, address.longitude)
+                else
+                    com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
+            }
+            ActionTile(Icons.Outlined.Event, stringResource(R.string.cd_create_event)) { onNavigateToCreateCalendarItem() }
+            ActionTile(Icons.Default.Lightbulb, stringResource(R.string.cd_cheatsheet)) { onNavigateToCheatSheet() }
         }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.ActionTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
+            .background(AppleTheme.colors.card)
+            .clickable { onClick() }
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(icon, contentDescription = label, tint = AppleTheme.colors.brand, modifier = Modifier.size(22.dp))
+        Text(label, color = AppleTheme.colors.secondaryLabel, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 

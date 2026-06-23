@@ -150,6 +150,7 @@
     <string name="cd_not_found">Контакт не найден</string>
     <string name="cd_deleted">Контакт удалён</string>
     <string name="cd_delete_q">Удалить контакт?</string>
+    <string name="cd_delete_contact">Удалить контакт</string>
     <string name="cd_call">Позвонить</string>
     <string name="cd_write">Написать</string>
     <string name="cd_cheatsheet">Шпаргалка</string>

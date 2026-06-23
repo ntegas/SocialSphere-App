@@ -150,6 +150,7 @@
     <string name="cd_not_found">Η επαφή δεν βρέθηκε</string>
     <string name="cd_deleted">Η επαφή διαγράφηκε</string>
     <string name="cd_delete_q">Διαγραφή επαφής;</string>
+    <string name="cd_delete_contact">Διαγραφή επαφής</string>
     <string name="cd_call">Κλήση</string>
     <string name="cd_write">Μήνυμα</string>
     <string name="cd_cheatsheet">Σκονάκι</string>

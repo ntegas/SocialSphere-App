@@ -32,6 +32,7 @@ import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
 import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -41,7 +42,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     onNavigateToCalendarItem: (String) -> Unit = {},
     onNavigateToContact: (String) -> Unit = {},
     onNavigateToCompany: (String) -> Unit = {}
-, ctxLabel: android.content.Context, editing: Boolean = false, onEditingChange: (Boolean) -> Unit = {}) {
+, ctxLabel: android.content.Context, editing: Boolean = false, onEditingChange: (Boolean) -> Unit = {}, onDelete: () -> Unit = {}) {
     item {
         TabEditBar(isEditing = editing, onEdit = { onEditingChange(true) }, onDone = { onEditingChange(false) })
     }
@@ -731,6 +732,21 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                 }
+            }
+        }
+    }
+
+    // Удалить контакт — красная строка внизу (спека HTML)
+    item {
+        Spacer(Modifier.height(8.dp))
+        Box(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                .background(AppleTheme.colors.card).clickable { onDelete() }.padding(13.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Delete, contentDescription = null, tint = AppleTheme.colors.red, modifier = Modifier.size(18.dp))
+                Text(stringResource(R.string.cd_delete_contact), color = AppleTheme.colors.red, fontWeight = FontWeight.Medium)
             }
         }
     }

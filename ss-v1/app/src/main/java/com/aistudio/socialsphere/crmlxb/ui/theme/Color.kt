@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.Color
 val Brand900 = Color(0xFF1A1347)
 val Brand800 = Color(0xFF2D2175)
 val Brand700 = Color(0xFF3D2FA3)
-val Brand600 = Color(0xFF4F3DC7)
+val Brand600 = Color(0xFF5B53D6) // единый бренд-индиго (совпадает с AppleColors.brand)
 val Brand500 = Color(0xFF6452D8)
 val Brand400 = Color(0xFF8474E8)
 val Brand300 = Color(0xFFA99EF0)

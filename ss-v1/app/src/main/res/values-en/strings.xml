@@ -150,6 +150,7 @@
     <string name="cd_not_found">Contact not found</string>
     <string name="cd_deleted">Contact deleted</string>
     <string name="cd_delete_q">Delete contact?</string>
+    <string name="cd_delete_contact">Delete contact</string>
     <string name="cd_call">Call</string>
     <string name="cd_write">Message</string>
     <string name="cd_cheatsheet">Cheat sheet</string>
