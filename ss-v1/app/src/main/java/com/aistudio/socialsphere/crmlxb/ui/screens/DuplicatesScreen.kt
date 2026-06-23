@@ -36,6 +36,8 @@ private fun contactSubtitle(c: Contact): String =
 @Composable
 fun DuplicatesScreen(onNavigateBack: () -> Unit) {
     val pairs by remember { derivedStateOf { AppStateStore.findDuplicatePairs() } }
+    // Слияние — деструктив (удаляет один контакт), поэтому через подтверждение.
+    var pendingMerge by remember { mutableStateOf<Pair<Contact, Contact>?>(null) }
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
@@ -89,7 +91,7 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Button(
-                                onClick = { AppStateStore.mergeContacts(keep.id, drop.id) },
+                                onClick = { pendingMerge = keep to drop },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(Icons.Default.Merge, null, Modifier.size(18.dp))
@@ -101,6 +103,29 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(24.dp))
+        }
+
+        pendingMerge?.let { (keep, drop) ->
+            AlertDialog(
+                onDismissRequest = { pendingMerge = null },
+                title = { Text(stringResource(R.string.dup_merge_confirm_title), fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(stringResource(
+                        R.string.dup_merge_confirm_text,
+                        "${keep.firstName} ${keep.lastName}".trim(),
+                        "${drop.firstName} ${drop.lastName}".trim()
+                    ))
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        AppStateStore.mergeContacts(keep.id, drop.id)
+                        pendingMerge = null
+                    }) { Text(stringResource(R.string.dup_merge)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingMerge = null }) { Text(stringResource(R.string.common_cancel)) }
+                }
+            )
         }
     }
 }

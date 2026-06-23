@@ -49,7 +49,9 @@ object CalendarExporter {
 
     /** Время начала события в миллисекундах. Весь день → полночь UTC. */
     private fun startMillis(item: CalendarItem): Long? = try {
-        val date = LocalDate.parse(item.startDate.take(10))
+        // parseFlexibleDate: ISO + legacy («30 мая», «15 08 2025») — иначе события
+        // с не-ISO датой молча не экспортировались (та же причина, что в напоминаниях).
+        val date = parseFlexibleDate(item.startDate) ?: return null
         if (item.isAllDay) {
             date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
         } else {

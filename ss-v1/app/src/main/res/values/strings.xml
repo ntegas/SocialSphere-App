@@ -355,6 +355,8 @@
     <string name="dup_none">Возможных дубликатов не найдено</string>
     <string name="dup_merge">Объединить</string>
     <string name="dup_will_keep">Останется: %1$s</string>
+    <string name="dup_merge_confirm_title">Объединить контакты?</string>
+    <string name="dup_merge_confirm_text">«%2$s» будет удалён, а его данные перейдут к «%1$s». Действие нельзя отменить.</string>
     <string name="settings_import_export_sub">Контакты, файлы, резервные копии</string>
     <string name="appearance_theme">Тема приложения</string>
     <string name="appearance_light">светлая</string>

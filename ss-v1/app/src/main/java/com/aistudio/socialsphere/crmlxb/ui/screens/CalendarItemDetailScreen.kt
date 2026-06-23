@@ -86,7 +86,7 @@ fun CalendarItemDetailScreen(
                         placeholder = {
                             // Suggest next week as hint
                             val next = try {
-                                java.time.LocalDate.parse(event.startDate)
+                                (parseFlexibleDate(event.startDate) ?: error("bad date"))
                                     .plusWeeks(1).toString()
                             } catch (e: Exception) {
                                 java.time.LocalDate.now().plusWeeks(1).toString()
@@ -112,7 +112,7 @@ fun CalendarItemDetailScreen(
                                 OutlinedButton(
                                     onClick = {
                                         postponeDate = try {
-                                            java.time.LocalDate.parse(event.startDate)
+                                            (parseFlexibleDate(event.startDate) ?: error("bad date"))
                                                 .plusDays(days).toString()
                                         } catch (e: Exception) {
                                             java.time.LocalDate.now().plusDays(days).toString()
@@ -459,7 +459,7 @@ fun RelatedCompanyCard(company: Company, onClick: () -> Unit) {
 private fun isValidDate(date: String): Boolean {
     if (date.length != 10) return false
     return try {
-        java.time.LocalDate.parse(date)
+        (parseFlexibleDate(date) ?: error("bad date"))
         true
     } catch (e: Exception) {
         false

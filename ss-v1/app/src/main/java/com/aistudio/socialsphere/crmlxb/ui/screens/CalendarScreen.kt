@@ -265,7 +265,7 @@ fun MonthGridView(
                 ev.recurrenceRule?.contains("YEARLY", ignoreCase = true) == true
             val key = if (isYearly) {
                 try {
-                    java.time.LocalDate.parse(ev.startDate.take(10))
+                    (parseFlexibleDate(ev.startDate) ?: error("bad date"))
                         .withYear(month.year).toString()
                 } catch (e: Exception) { ev.startDate.take(10) }
             } else ev.startDate.take(10)

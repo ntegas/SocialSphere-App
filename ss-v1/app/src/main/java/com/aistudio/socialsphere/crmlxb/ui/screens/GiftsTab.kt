@@ -64,7 +64,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
             CardBlock(title = stringResource(R.string.cd_important_dates)) {
                 importantDates.forEach { date ->
                     val daysUntil = try {
-                        val d = java.time.LocalDate.parse(date.startDate)
+                        val d = parseFlexibleDate(date.startDate) ?: error("bad date")
                         // Переносим на текущий год; недавно прошедшие (≤30 дн.)
                         // оставляем в прошлом — покажется «N дн. назад»
                         val thisYear = d.withYear(today.year)

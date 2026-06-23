@@ -296,7 +296,7 @@ fun HomeScreen(
                 try {
                     // startDate может быть в формате "30 мая" или "2026-05-30"
                     val d = try {
-                        java.time.LocalDate.parse(item.startDate)
+                        (parseFlexibleDate(item.startDate) ?: error("bad date"))
                     } catch (e: Exception) {
                         null
                     }
@@ -343,7 +343,7 @@ fun HomeScreen(
                         ?: return@mapNotNull null
                     // Normalise birthday to current year
                     val daysUntil = try {
-                        val bday = java.time.LocalDate.parse(dateStr)
+                        val bday = (parseFlexibleDate(dateStr) ?: error("bad date"))
                         val thisYear = bday.withYear(today.year)
                         val next = if (thisYear.isBefore(today)) thisYear.plusYears(1) else thisYear
                         java.time.temporal.ChronoUnit.DAYS.between(today, next)

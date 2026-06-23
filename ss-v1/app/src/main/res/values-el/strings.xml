@@ -355,6 +355,8 @@
     <string name="dup_none">Δεν βρέθηκαν πιθανά διπλότυπα</string>
     <string name="dup_merge">Συγχώνευση</string>
     <string name="dup_will_keep">Παραμένει: %1$s</string>
+    <string name="dup_merge_confirm_title">Συγχώνευση επαφών;</string>
+    <string name="dup_merge_confirm_text">Το «%2$s» θα διαγραφεί και τα δεδομένα του θα μεταφερθούν στο «%1$s». Δεν αναιρείται.</string>
     <string name="settings_import_export_sub">Επαφές, αρχεία, αντίγραφα</string>
     <string name="appearance_theme">Θέμα εφαρμογής</string>
     <string name="appearance_light">φωτεινό</string>
