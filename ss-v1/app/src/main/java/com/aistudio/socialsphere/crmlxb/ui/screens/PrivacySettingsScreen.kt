@@ -106,7 +106,9 @@ fun PrivacySettingsScreen(
                     ),
                     onClick = {
                         showWipeConfirm = false
-                        AppStateStore.wipeAllData { wipeDone = true }
+                        // wipeDone = ok: при ошибке БД сообщение «удалено» НЕ
+                        // показываем, чтобы не давать ложного подтверждения.
+                        AppStateStore.wipeAllData { ok -> wipeDone = ok }
                     }
                 ) { Text(stringResource(R.string.priv_delete_confirm)) }
             },

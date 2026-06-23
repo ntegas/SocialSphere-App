@@ -228,26 +228,30 @@ fun ContactsScreen(
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
 
-            // Header по макету: заголовок + круглая «+»
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(stringResource(R.string.common_contacts), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label)
-                Box(
-                    Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { onNavigateToCreateContact() },
-                    contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.Add, stringResource(R.string.contacts_add), tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp)) }
-            }
-            // Капсула поиска
-            Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
+            // Header + капсула поиска показываются только когда поиск НЕ активен —
+            // в активном режиме поле ввода живёт в TopAppBar, иначе было два поля.
+            if (!searchActive) {
+                // Header по макету: заголовок + круглая «+»
                 Row(
-                    Modifier.fillMaxWidth().height(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(Color(0x1F767680)).clickable { searchActive = true }.padding(horizontal = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Search, null, tint = Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
-                    Text(stringResource(R.string.contacts_search_placeholder), fontSize = 17.sp, color = Color(0xFF8E8E93), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(R.string.common_contacts), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label)
+                    Box(
+                        Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { onNavigateToCreateContact() },
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Default.Add, stringResource(R.string.contacts_add), tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp)) }
+                }
+                // Капсула поиска
+                Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().height(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(Color(0x1F767680)).clickable { searchActive = true }.padding(horizontal = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        Icon(Icons.Default.Search, null, tint = Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
+                        Text(stringResource(R.string.contacts_search_placeholder), fontSize = 17.sp, color = Color(0xFF8E8E93), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
             // Controls: сортировка + вид + фильтр
@@ -323,7 +327,13 @@ fun ContactsScreen(
             }
 
             // ── List / Grid ────────────────────────────────────
-            if (filteredContacts.isEmpty()) {
+            if (AppStateStore.isLoading && AppStateStore.contacts.isEmpty()) {
+                // Холодный старт: показываем спиннер, а не «ничего не найдено»,
+                // иначе пустой экран выглядел как потеря данных.
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (filteredContacts.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outlineVariant)
@@ -420,7 +430,22 @@ private fun ContactFilterSheet(
     onDismiss: () -> Unit
 ) {
     val ctxLabel = LocalContext.current
-    ModalBottomSheet(onDismissRequest = onDismiss, shape = SocialShape.Sheet) {
+    // Локальная копия выбора: тапы по чипам мгновенные (рекомпозится только
+    // шторка), тяжёлый пересчёт списка у родителя — один раз при «Применить»/
+    // закрытии, а не на каждый тап (раньше это заметно тормозило).
+    var lRelTypes   by remember { mutableStateOf(filterRelTypes) }
+    var lImportance by remember { mutableStateOf(filterImportance) }
+    var lConnLevel  by remember { mutableStateOf(filterConnLevel) }
+    var lRhythm     by remember { mutableStateOf(filterRhythm) }
+    var lStatus     by remember { mutableStateOf(filterStatus) }
+    var lCity       by remember { mutableStateOf(cityFilter) }
+    var lTag        by remember { mutableStateOf(tagFilter) }
+    fun pushAndClose() {
+        onStatusChange(lStatus); onRelTypesChange(lRelTypes); onImportanceChange(lImportance)
+        onConnLevelChange(lConnLevel); onRhythmChange(lRhythm); onCityChange(lCity); onTagChange(lTag)
+        onDismiss()
+    }
+    ModalBottomSheet(onDismissRequest = { pushAndClose() }, shape = SocialShape.Sheet) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -430,17 +455,17 @@ private fun ContactFilterSheet(
         ) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                 Text(stringResource(R.string.contacts_filters), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                TextButton(onClick = onClear) { Text(stringResource(R.string.contacts_reset_all)) }
+                TextButton(onClick = {
+                    lRelTypes = emptySet(); lImportance = emptySet(); lConnLevel = emptySet()
+                    lRhythm = emptySet(); lStatus = emptySet(); lCity = ""; lTag = ""
+                }) { Text(stringResource(R.string.contacts_reset_all)) }
             }
 
             // Status
             FilterSection(stringResource(R.string.filter_status)) {
                 ContactStatus.values().forEach { status ->
-                    MultiSelectChip(status.label(ctxLabel), status in filterStatus) {
-                        onStatusChange(
-                            if (status in filterStatus) filterStatus - status
-                            else filterStatus + status
-                        )
+                    MultiSelectChip(status.label(ctxLabel), status in lStatus) {
+                        lStatus = if (status in lStatus) lStatus - status else lStatus + status
                     }
                 }
             }
@@ -449,8 +474,8 @@ private fun ContactFilterSheet(
             FilterSection(stringResource(R.string.filter_relation)) {
                 listOf(RelationshipType.FAMILY, RelationshipType.FRIEND, RelationshipType.COLLEAGUE,
                        RelationshipType.CLIENT, RelationshipType.PARTNER, RelationshipType.ACQUAINTANCE).forEach { type ->
-                    MultiSelectChip(type.label(ctxLabel), type in filterRelTypes) {
-                        onRelTypesChange(if (type in filterRelTypes) filterRelTypes - type else filterRelTypes + type)
+                    MultiSelectChip(type.label(ctxLabel), type in lRelTypes) {
+                        lRelTypes = if (type in lRelTypes) lRelTypes - type else lRelTypes + type
                     }
                 }
             }
@@ -458,8 +483,8 @@ private fun ContactFilterSheet(
             // Importance
             FilterSection(stringResource(R.string.filter_importance)) {
                 ImportanceLevel.values().forEach { level ->
-                    MultiSelectChip(level.label(ctxLabel), level in filterImportance) {
-                        onImportanceChange(if (level in filterImportance) filterImportance - level else filterImportance + level)
+                    MultiSelectChip(level.label(ctxLabel), level in lImportance) {
+                        lImportance = if (level in lImportance) lImportance - level else lImportance + level
                     }
                 }
             }
@@ -467,8 +492,8 @@ private fun ContactFilterSheet(
             // Connection level
             FilterSection(stringResource(R.string.filter_connection)) {
                 listOf(ConnectionLevel.CLOSE, ConnectionLevel.NORMAL, ConnectionLevel.WEAK, ConnectionLevel.NEW).forEach { lvl ->
-                    MultiSelectChip(lvl.label(ctxLabel), lvl in filterConnLevel) {
-                        onConnLevelChange(if (lvl in filterConnLevel) filterConnLevel - lvl else filterConnLevel + lvl)
+                    MultiSelectChip(lvl.label(ctxLabel), lvl in lConnLevel) {
+                        lConnLevel = if (lvl in lConnLevel) lConnLevel - lvl else lConnLevel + lvl
                     }
                 }
             }
@@ -477,8 +502,8 @@ private fun ContactFilterSheet(
             FilterSection(stringResource(R.string.filter_rhythm)) {
                 listOf(CommunicationRhythm.WEEKLY, CommunicationRhythm.MONTHLY,
                        CommunicationRhythm.EVERY_3_MONTHS, CommunicationRhythm.EVERY_6_MONTHS).forEach { r ->
-                    MultiSelectChip(r.label(ctxLabel), r in filterRhythm) {
-                        onRhythmChange(if (r in filterRhythm) filterRhythm - r else filterRhythm + r)
+                    MultiSelectChip(r.label(ctxLabel), r in lRhythm) {
+                        lRhythm = if (r in lRhythm) lRhythm - r else lRhythm + r
                     }
                 }
             }
@@ -486,13 +511,13 @@ private fun ContactFilterSheet(
             // City
             FilterSection(stringResource(R.string.filter_city)) {
                 OutlinedTextField(
-                    value = cityFilter,
-                    onValueChange = onCityChange,
+                    value = lCity,
+                    onValueChange = { lCity = it },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(stringResource(R.string.filter_city_hint)) },
                     leadingIcon  = { Icon(Icons.Default.LocationCity, null, Modifier.size(18.dp)) },
                     trailingIcon = {
-                        if (cityFilter.isNotEmpty()) IconButton(onClick = { onCityChange("") }) { Icon(Icons.Default.Clear, null, Modifier.size(16.dp)) }
+                        if (lCity.isNotEmpty()) IconButton(onClick = { lCity = "" }) { Icon(Icons.Default.Clear, null, Modifier.size(16.dp)) }
                     },
                     singleLine = true,
                     shape = SocialShape.Small
@@ -503,13 +528,13 @@ private fun ContactFilterSheet(
             if (allTags.isNotEmpty()) {
                 FilterSection(stringResource(R.string.filter_tag)) {
                     OutlinedTextField(
-                        value = tagFilter,
-                        onValueChange = onTagChange,
+                        value = lTag,
+                        onValueChange = { lTag = it },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text(stringResource(R.string.filter_tag_hint)) },
                         leadingIcon  = { Icon(Icons.AutoMirrored.Filled.Label, null, Modifier.size(18.dp)) },
                         trailingIcon = {
-                            if (tagFilter.isNotEmpty()) IconButton(onClick = { onTagChange("") }) {
+                            if (lTag.isNotEmpty()) IconButton(onClick = { lTag = "" }) {
                                 Icon(Icons.Default.Clear, null, Modifier.size(16.dp))
                             }
                         },
@@ -521,8 +546,8 @@ private fun ContactFilterSheet(
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         allTags.take(8).forEach { tag ->
                             FilterChip(
-                                selected = tag.equals(tagFilter, ignoreCase = true),
-                                onClick  = { onTagChange(if (tag.equals(tagFilter, ignoreCase = true)) "" else tag) },
+                                selected = tag.equals(lTag, ignoreCase = true),
+                                onClick  = { lTag = if (tag.equals(lTag, ignoreCase = true)) "" else tag },
                                 label    = { Text(tag, fontSize = 12.sp) },
                                 shape    = SocialShape.Full
                             )
@@ -531,7 +556,7 @@ private fun ContactFilterSheet(
                 }
             }
 
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.common_apply)) }
+            Button(onClick = { pushAndClose() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.common_apply)) }
         }
     }
 }

@@ -364,10 +364,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
         run {
             CardBlock(title = stringResource(R.string.cd_prefs_sizes)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onEditSizes, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                        Icon(Icons.Default.Edit, null, Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_sizes), fontSize = 12.sp)
+                    // Кнопка «+ Размеры» — только когда размеров ещё нет. Если они
+                    // заданы, редактирование вынесено к самой секции «Размеры» ниже
+                    // (иконка-карандаш), иначе слово «Размеры» дублировалось.
+                    if (size == null) {
+                        TextButton(onClick = onEditSizes, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                            Icon(Icons.Default.Add, null, Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.cd_sizes), fontSize = 12.sp)
+                        }
                     }
                     TextButton(onClick = onAddPref, contentPadding = PaddingValues(horizontal = 8.dp)) {
                         Icon(Icons.Default.Add, null, Modifier.size(14.dp))
@@ -376,12 +381,21 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                     }
                 }
                 if (size != null) {
-                    Text(
-                        stringResource(R.string.cd_sizes),
-                        style      = MaterialTheme.typography.labelSmall,
-                        color      = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.cd_sizes),
+                            style      = MaterialTheme.typography.labelSmall,
+                            color      = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        IconButton(onClick = onEditSizes, modifier = Modifier.size(18.dp)) {
+                            Icon(Icons.Default.Edit, stringResource(R.string.cd_sizes),
+                                Modifier.size(13.dp), tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                     Spacer(Modifier.height(4.dp))
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(

@@ -3,7 +3,13 @@ package com.aistudio.socialsphere.crmlxb.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import kotlin.math.abs
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -128,31 +134,11 @@ fun DatePickerField(
         )
     )
     if (show) {
-        val initialMillis = try {
-            if (value.isNotBlank())
-                java.time.LocalDate.parse(value)
-                    .atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
-            else null
-        } catch (e: Exception) { null }
-        val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-        DatePickerDialog(
-            onDismissRequest = { show = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    state.selectedDateMillis?.let { ms ->
-                        val d = java.time.Instant.ofEpochMilli(ms)
-                            .atZone(java.time.ZoneOffset.UTC).toLocalDate()
-                        onValueChange(d.toString())
-                    }
-                    show = false
-                }) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { show = false }) { Text(stringResource(R.string.common_cancel)) }
-            }
-        ) {
-            DatePicker(state = state)
-        }
+        WheelDateSheet(
+            value     = value,
+            onConfirm = { onValueChange(it) },
+            onDismiss = { show = false }
+        )
     }
 }
 
@@ -184,29 +170,216 @@ fun TimePickerField(
         )
     )
     if (show) {
-        val parts = value.split(":")
-        val state = rememberTimePickerState(
-            initialHour   = parts.getOrNull(0)?.toIntOrNull() ?: 9,
-            initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0,
-            is24Hour      = true
+        WheelTimeSheet(
+            value     = value,
+            onConfirm = { onValueChange(it) },
+            onDismiss = { show = false }
         )
-        AlertDialog(
-            onDismissRequest = { show = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    onValueChange(String.format("%02d:%02d", state.hour, state.minute))
-                    show = false
-                }) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { show = false }) { Text(stringResource(R.string.common_cancel)) }
-            },
-            text = {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
-                    TimePicker(state = state)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  Барабан-пикеры (wheel) для даты и времени — iOS-style прокрутка,
+//  компактно, с быстрыми пресетами. Без сторонних библиотек.
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Универсальный вертикальный барабан. Центрированный элемент выделен,
+ * прокрутка прилипает (snap). Сообщает выбор по оседанию прокрутки.
+ * Реализация через невидимые spacer-элементы сверху/снизу, чтобы крайние
+ * значения могли встать в центр.
+ */
+@Composable
+private fun <T> WheelPicker(
+    items: List<T>,
+    selectedIndex: Int,
+    onSelectedIndexChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    visibleCount: Int = 5,
+    itemHeight: androidx.compose.ui.unit.Dp = 38.dp,
+    label: (T) -> String
+) {
+    if (items.isEmpty()) return
+    val half = visibleCount / 2
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = selectedIndex.coerceIn(0, items.lastIndex)
+    )
+    val fling = rememberSnapFlingBehavior(lazyListState = listState)
+
+    val centerRealIndex by remember {
+        derivedStateOf {
+            val li = listState.layoutInfo
+            val center = (li.viewportStartOffset + li.viewportEndOffset) / 2f
+            val centeredLazy = li.visibleItemsInfo.minByOrNull {
+                abs((it.offset + it.size / 2f) - center)
+            }?.index
+            if (centeredLazy == null) selectedIndex
+            else (centeredLazy - half).coerceIn(0, items.lastIndex)
+        }
+    }
+
+    // Сообщаем выбор только когда прокрутка осела
+    LaunchedEffect(centerRealIndex, listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress && centerRealIndex != selectedIndex) {
+            onSelectedIndexChange(centerRealIndex)
+        }
+    }
+    // Внешнее изменение (пресет) — доезжаем до нужного значения
+    LaunchedEffect(selectedIndex) {
+        if (!listState.isScrollInProgress && centerRealIndex != selectedIndex) {
+            listState.animateScrollToItem(selectedIndex.coerceIn(0, items.lastIndex))
+        }
+    }
+
+    Box(modifier.height(itemHeight * visibleCount), contentAlignment = Alignment.Center) {
+        // Подсветка центральной полосы
+        Box(
+            Modifier.fillMaxWidth().height(itemHeight)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+        )
+        LazyColumn(
+            state = listState,
+            flingBehavior = fling,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(count = items.size + half * 2) { lazyIndex ->
+                val realIndex = lazyIndex - half
+                Box(
+                    Modifier.fillMaxWidth().height(itemHeight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (realIndex in items.indices) {
+                        val isCenter = realIndex == centerRealIndex
+                        Text(
+                            label(items[realIndex]),
+                            fontSize = if (isCenter) 19.sp else 15.sp,
+                            fontWeight = if (isCenter) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isCenter) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        )
+                    }
                 }
             }
-        )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WheelDateSheet(
+    value: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val today = java.time.LocalDate.now()
+    val initial = remember(value) {
+        try { if (value.isNotBlank()) java.time.LocalDate.parse(value.take(10)) else today }
+        catch (e: Exception) { today }
+    }
+    var year  by remember { mutableStateOf(initial.year) }
+    var month by remember { mutableStateOf(initial.monthValue) }
+    var day   by remember { mutableStateOf(initial.dayOfMonth) }
+
+    val monthNames = listOf(
+        stringResource(R.string.month_1), stringResource(R.string.month_2),
+        stringResource(R.string.month_3), stringResource(R.string.month_4),
+        stringResource(R.string.month_5), stringResource(R.string.month_6),
+        stringResource(R.string.month_7), stringResource(R.string.month_8),
+        stringResource(R.string.month_9), stringResource(R.string.month_10),
+        stringResource(R.string.month_11), stringResource(R.string.month_12)
+    )
+    val years  = remember { (1920..today.year + 5).toList() }
+    val months = (1..12).toList()
+    val daysInMonth = java.time.YearMonth.of(year, month).lengthOfMonth()
+    if (day > daysInMonth) day = daysInMonth
+    val days = (1..daysInMonth).toList()
+
+    fun setDate(d: java.time.LocalDate) { year = d.year; month = d.monthValue; day = d.dayOfMonth }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                "$day ${monthNames[month - 1]} $year",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(onClick = { setDate(today) }, label = { Text(stringResource(R.string.cal_today)) })
+                AssistChip(onClick = { setDate(today.plusDays(1)) }, label = { Text(stringResource(R.string.cal_tomorrow)) })
+                AssistChip(onClick = { setDate(today.plusWeeks(1)) }, label = { Text("+7") })
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WheelPicker(days, days.indexOf(day).coerceAtLeast(0),
+                    { day = days[it] }, Modifier.weight(1f)) { it.toString() }
+                WheelPicker(months, month - 1,
+                    { month = it + 1 }, Modifier.weight(1.5f)) { monthNames[it - 1] }
+                WheelPicker(years, years.indexOf(year).coerceAtLeast(0),
+                    { year = years[it] }, Modifier.weight(1f)) { it.toString() }
+            }
+            Button(
+                onClick = {
+                    val safeDay = day.coerceAtMost(java.time.YearMonth.of(year, month).lengthOfMonth())
+                    onConfirm(java.time.LocalDate.of(year, month, safeDay).toString())
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(stringResource(R.string.common_save)) }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WheelTimeSheet(
+    value: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val parts = value.split(":")
+    var hour   by remember { mutableStateOf(parts.getOrNull(0)?.toIntOrNull() ?: 9) }
+    var minute by remember { mutableStateOf(parts.getOrNull(1)?.toIntOrNull() ?: 0) }
+    val hours   = (0..23).toList()
+    val minutes = (0..59).toList()
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                String.format("%02d:%02d", hour, minute),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(9 to 0, 12 to 0, 18 to 0).forEach { (h, m) ->
+                    AssistChip(
+                        onClick = { hour = h; minute = m },
+                        label = { Text(String.format("%02d:%02d", h, m)) }
+                    )
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                WheelPicker(hours, hour, { hour = it }, Modifier.weight(1f)) { String.format("%02d", it) }
+                Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                WheelPicker(minutes, minute, { minute = it }, Modifier.weight(1f)) { String.format("%02d", it) }
+            }
+            Button(
+                onClick = { onConfirm(String.format("%02d:%02d", hour, minute)); onDismiss() },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(stringResource(R.string.common_save)) }
+        }
     }
 }
 

@@ -106,23 +106,33 @@ object ExportManager {
     }
 
     // ─── vCard (.vcf) ──────────────────────────────────────────
+    // Экранирование значений по RFC 6350/2426: иначе имя/заметка/адрес с
+    // запятой, точкой-с-запятой или переносом строки ломали карточку при импорте.
+    private fun vEsc(s: String?): String = (s ?: "")
+        .replace("\\", "\\\\")
+        .replace(";", "\\;")
+        .replace(",", "\\,")
+        .replace("\r\n", "\\n")
+        .replace("\n", "\\n")
+        .replace("\r", "\\n")
+
     suspend fun exportVCard(context: Context): File = withContext(Dispatchers.IO) {
         val file = File(context.cacheDir, "contacts_$ts.vcf")
         PrintWriter(FileWriter(file)).use { pw ->
             AppStateStore.contacts.forEach { c ->
                 pw.println("BEGIN:VCARD")
                 pw.println("VERSION:3.0")
-                pw.println("N:${c.lastName};${c.firstName};;;")
-                pw.println("FN:${c.firstName} ${c.lastName}".trim())
+                pw.println("N:${vEsc(c.lastName)};${vEsc(c.firstName)};;;")
+                pw.println("FN:${vEsc("${c.firstName} ${c.lastName}".trim())}")
 
                 val compRel = c.companyRelations.firstOrNull { it.isPrimary }
                     ?: c.companyRelations.firstOrNull()
                 val company = compRel?.companyId
                     ?.let { AppStateStore.getCompany(it)?.name } ?: ""
                 if (company.isNotBlank() || !compRel?.position.isNullOrBlank()) {
-                    pw.println("ORG:${company}")
+                    pw.println("ORG:${vEsc(company)}")
                     if (!compRel?.position.isNullOrBlank())
-                        pw.println("TITLE:${compRel?.position}")
+                        pw.println("TITLE:${vEsc(compRel?.position)}")
                 }
 
                 c.phones.forEach { p ->
@@ -143,14 +153,14 @@ object ExportManager {
                 }
 
                 c.messengers.forEach { m ->
-                    pw.println("X-${m.type.name}:${m.value}")
+                    pw.println("X-${m.type.name}:${vEsc(m.value)}")
                 }
 
                 val addr = AppStateStore.addresses.find {
                     it.ownerId == c.id && it.ownerType == AddressOwnerType.CONTACT
                 }
                 if (addr != null) {
-                    pw.println("ADR:;;${addr.addressLine};${addr.city};;;${addr.country}")
+                    pw.println("ADR:;;${vEsc(addr.addressLine)};${vEsc(addr.city)};;;${vEsc(addr.country)}")
                 }
 
                 val birthday = AppStateStore.calendarItems.find {
@@ -162,13 +172,30 @@ object ExportManager {
 
                 val notes = c.notes.take(3).joinToString(" | ") { it.text }
                 if (notes.isNotBlank())
-                    pw.println("NOTE:${notes.replace("\n", " ")}")
+                    pw.println("NOTE:${vEsc(notes)}")
 
                 pw.println("END:VCARD")
                 pw.println()
             }
         }
         file
+    }
+
+    /** Открывает .vcf системным импортом в «Контакты» (ACTION_VIEW). В отличие
+     *  от shareFile, ведёт прямо в приложение Контакты с предпросмотром импорта. */
+    fun openVcfInContacts(context: Context, file: File): Boolean {
+        val uri = FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", file
+        )
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "text/x-vcard")
+            addFlags(
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            )
+        }
+        return try { context.startActivity(intent); true }
+        catch (e: Exception) { false }
     }
 
     // ─── Full JSON backup (полный, с восстановлением) ──────────
@@ -212,6 +239,10 @@ object ExportManager {
      */
     fun importJsonBackup(json: String): Int {
         val data = parseJsonBackup(json) ?: return -1
+        // Лёгкая проверка целостности: версия формата в разумных границах.
+        // Отсекает мусор/чужой JSON, который Moshi случайно распарсил.
+        // (Криптоподпись для локального личного бэкапа намеренно вне рамок.)
+        if (data.version < 1 || data.version > 5) return -1
         data.companies.forEach { co ->
             if (AppStateStore.companies.any { it.id == co.id }) AppStateStore.updateCompany(co)
             else AppStateStore.addCompany(co)

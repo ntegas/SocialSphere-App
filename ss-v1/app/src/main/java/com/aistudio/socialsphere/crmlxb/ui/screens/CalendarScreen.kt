@@ -172,12 +172,10 @@ fun CalendarScreen(
 
                     val grouped = mutableMapOf<String, List<CalendarItem>>()
                     if (selectedMode == CalendarViewMode.TODAY) {
-                        val todayEvents = filteredEvents.filter { it.effectiveDate() == todayDate }
-                        if (todayEvents.isNotEmpty()) {
-                            grouped[strToday] = todayEvents
-                        } else {
-                            grouped[strNearest] = filteredEvents.sortedBy { it.effectiveDate() }.take(5)
-                        }
+                        // «Сегодня» показывает СТРОГО события сегодняшнего дня.
+                        // Если их нет — пустое состояние, а не 5 будущих событий
+                        // в разных месяцах (это путало). Ближайшие — во вкладке «Неделя».
+                        grouped[strToday] = filteredEvents.filter { it.effectiveDate() == todayDate }
                     } else if (selectedMode == CalendarViewMode.LIST) {
                         val today    = filteredEvents.filter { it.effectiveDate() == todayDate }
                         val tomorrow = filteredEvents.filter { it.effectiveDate() == tomorrowDate }

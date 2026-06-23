@@ -78,9 +78,16 @@ object ExternalActionHandler {
             Toast.makeText(context, "Сайт не указан", Toast.LENGTH_SHORT).show()
             return
         }
-        var formattedUrl = url
+        var formattedUrl = url.trim()
         if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
             formattedUrl = "https://$formattedUrl"
+        }
+        // Белый список схем: только http/https. Защищает от javascript:/intent:/
+        // file:/content: из сохранённого поля сайта (в т.ч. из чужого бэкапа).
+        val scheme = Uri.parse(formattedUrl).scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") {
+            Toast.makeText(context, "Недопустимая ссылка", Toast.LENGTH_SHORT).show()
+            return
         }
         val intent = Intent(Intent.ACTION_VIEW).apply {
             data = Uri.parse(formattedUrl)

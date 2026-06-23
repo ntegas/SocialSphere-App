@@ -349,6 +349,12 @@
     <string name="settings_privacy">Приватность</string>
     <string name="settings_privacy_sub">Защитные настройки приложения</string>
     <string name="settings_import_export">Импорт и экспорт</string>
+    <string name="settings_duplicates">Поиск дублей</string>
+    <string name="dup_title">Дубликаты</string>
+    <string name="dup_backup_hint">Совет: перед объединением сделайте бэкап (Настройки → Импорт и экспорт). Объединение нельзя отменить.</string>
+    <string name="dup_none">Возможных дубликатов не найдено</string>
+    <string name="dup_merge">Объединить</string>
+    <string name="dup_will_keep">Останется: %1$s</string>
     <string name="settings_import_export_sub">Контакты, файлы, резервные копии</string>
     <string name="appearance_theme">Тема приложения</string>
     <string name="appearance_light">светлая</string>
@@ -428,6 +434,13 @@
     <string name="ie_export_data">Экспорт данных</string>
     <string name="ie_contacts_csv">Контакты → CSV</string>
     <string name="ie_contacts_vcard">Контакты → vCard (.vcf)</string>
+    <string name="ie_to_phone_contacts">Экспорт всех в Контакты телефона</string>
+    <string name="ie_to_phone_sub">Открыть импорт в приложении «Контакты»</string>
+    <string name="ie_to_calendar">Экспорт событий в календарь телефона</string>
+    <string name="ie_to_calendar_sub">Дни рождения, звонки, встречи → системный календарь</string>
+    <string name="ie_calendar_done">Добавлено: %1$d, пропущено: %2$d</string>
+    <string name="ie_calendar_no_cal">Нет доступного календаря для записи</string>
+    <string name="ie_calendar_no_perm">Нет разрешения на календарь</string>
     <string name="ie_companies_csv">Компании → CSV</string>
     <string name="ie_full_json">Полный бэкап → JSON</string>
     <string name="ie_full_zip">Полный архив → ZIP</string>
@@ -624,6 +637,7 @@
     <string name="cie_recurrence">Повтор</string>
     <string name="cie_notifications_visual">Уведомления (визуально)</string>
     <string name="cie_reminders">Напоминания</string>
+    <string name="cie_reminder_multi">Можно выбрать несколько</string>
     <string name="cie_importance">Важность</string>
     <string name="cie_status">Статус</string>
     <string name="rec_none">Не повторять</string>

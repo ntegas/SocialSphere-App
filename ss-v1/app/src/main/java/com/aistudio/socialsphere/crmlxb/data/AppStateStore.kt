@@ -1,6 +1,9 @@
 package com.aistudio.socialsphere.crmlxb.data
 
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.data.local.*
 import kotlinx.coroutines.*
@@ -23,6 +26,12 @@ object AppStateStore {
     private var database: SocialsphereDatabase? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var isInitialized = false
+
+    // true пока идёт первичная загрузка из БД. Экраны показывают спиннер вместо
+    // «ничего не найдено», иначе на холодном старте пустой экран выглядел как
+    // потеря данных.
+    var isLoading by mutableStateOf(true)
+        private set
 
     fun initialize(db: SocialsphereDatabase) {
         if (isInitialized) return
@@ -48,6 +57,7 @@ object AppStateStore {
     //  INITIAL LOAD
     // ──────────────────────────────────────────────────────────
     private suspend fun loadInitialData() {
+        try {
         val db = db() ?: return
         val contactDao = db.contactDao()
         val existingContacts = contactDao.getAllContacts()
@@ -64,6 +74,9 @@ object AppStateStore {
             contactDao.insertPersonalDetails(DemoDataProvider.personalDetails.map { it.toEntity() })
         }
         reloadFromDb()
+        } finally {
+            withContext(Dispatchers.Main) { isLoading = false }
+        }
     }
 
     suspend fun reloadFromDb() {
@@ -169,6 +182,11 @@ object AppStateStore {
     fun addContact(contact: Contact) {
         val c = contact.copy(createdAt = nowIso(), updatedAt = nowIso())
         contacts.add(c)
+        // Карта/карточка компании читают ГЛОБАЛЬНЫЕ addresses/companyRelations —
+        // синхронизируем сразу, иначе связь контакт↔компания и адреса на карте
+        // не видны до перезапуска приложения (аналогично updateContact).
+        addresses.addAll(c.addresses)
+        companyRelations.addAll(c.companyRelations)
         scope.launch { addContactDb(c) }
     }
 
@@ -250,6 +268,123 @@ object AppStateStore {
             db.noteDao().deleteNotesForContact(contactId)
             db.giftDao().deleteGiftsForContact(contactId)
         }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    //  ДУБЛИКАТЫ: поиск и слияние
+    // ──────────────────────────────────────────────────────────
+    private fun phoneDigits(s: String): String = s.filter { it.isDigit() }.takeLast(10)
+
+    /** Пары возможных дублей: совпадение по нормализованному телефону (≥7 цифр)
+     *  или по email. Без повторов и без пар «сам с собой». */
+    fun findDuplicatePairs(): List<Pair<Contact, Contact>> {
+        val list = contacts.toList()
+        val result = mutableListOf<Pair<Contact, Contact>>()
+        for (i in list.indices) {
+            for (j in i + 1 until list.size) {
+                val a = list[i]; val b = list[j]
+                val ap = a.phones.map { phoneDigits(it.number) }.filter { it.length >= 7 }
+                val bp = b.phones.map { phoneDigits(it.number) }.filter { it.length >= 7 }
+                val ae = a.emails.map { it.email.trim().lowercase() }.filter { it.isNotBlank() }
+                val be = b.emails.map { it.email.trim().lowercase() }.filter { it.isNotBlank() }
+                if (ap.any { it in bp } || ae.any { it in be }) result.add(a to b)
+            }
+        }
+        return result
+    }
+
+    /**
+     * Слияние контакта other в keep. Под-данные объединяются (новые id у
+     * перенесённых, чтобы не было коллизий PK), заметки/подарки/связи/ссылки
+     * событий пере-привязываются на keep, затем other удаляется каскадом.
+     * Переиспользует существующие безопасные методы (updateContact/deleteContact/
+     * updateNote/updateGift/updateCalendarItem) — без сырых DAO-вызовов.
+     */
+    fun mergeContacts(keepId: String, otherId: String) {
+        if (keepId == otherId) return
+        val keep = getContact(keepId) ?: return
+        val other = getContact(otherId) ?: return
+
+        val mergedPhones = keep.phones.toMutableList()
+        other.phones.forEach { p ->
+            val d = phoneDigits(p.number)
+            if (d.isEmpty() || mergedPhones.none { phoneDigits(it.number) == d })
+                mergedPhones.add(p.copy(id = generateId(), contactId = keepId, isPrimary = false))
+        }
+        val mergedEmails = keep.emails.toMutableList()
+        other.emails.forEach { e ->
+            if (mergedEmails.none { it.email.equals(e.email, true) })
+                mergedEmails.add(e.copy(id = generateId(), contactId = keepId, isPrimary = false))
+        }
+        val mergedMessengers = keep.messengers.toMutableList()
+        other.messengers.forEach { m ->
+            if (mergedMessengers.none { it.type == m.type && it.value.equals(m.value, true) })
+                mergedMessengers.add(m.copy(id = generateId(), contactId = keepId, isPrimary = false))
+        }
+        val mergedCompRels = keep.companyRelations.toMutableList()
+        other.companyRelations.forEach { r ->
+            if (mergedCompRels.none { it.companyId == r.companyId })
+                mergedCompRels.add(r.copy(id = generateId(), contactId = keepId, isPrimary = false))
+        }
+        val mergedAddresses = keep.addresses.toMutableList()
+        other.addresses.forEach { a ->
+            if (mergedAddresses.none { it.addressLine.equals(a.addressLine, true) && it.city.equals(a.city, true) })
+                mergedAddresses.add(a.copy(id = generateId(), ownerId = keepId))
+        }
+        val mergedPd = keep.personalDetails.toMutableList()
+        other.personalDetails.forEach { pd ->
+            if (mergedPd.none { it.category == pd.category && it.value.equals(pd.value, true) })
+                mergedPd.add(pd.copy(id = generateId(), contactId = keepId))
+        }
+
+        val merged = keep.copy(
+            nickname        = keep.nickname ?: other.nickname,
+            photoUri        = keep.photoUri ?: other.photoUri,
+            nextStep        = keep.nextStep ?: other.nextStep,
+            canHelpWith     = keep.canHelpWith ?: other.canHelpWith,
+            iCanHelpWith    = keep.iCanHelpWith ?: other.iCanHelpWith,
+            talkingPoints   = keep.talkingPoints ?: other.talkingPoints,
+            meetContext     = keep.meetContext ?: other.meetContext,
+            meetDate        = keep.meetDate ?: other.meetDate,
+            lastContactDate = listOfNotNull(keep.lastContactDate, other.lastContactDate).maxOrNull(),
+            tags            = (keep.tags + other.tags).distinct(),
+            phones          = mergedPhones,
+            emails          = mergedEmails,
+            messengers      = mergedMessengers,
+            companyRelations= mergedCompRels,
+            addresses       = mergedAddresses,
+            personalDetails = mergedPd,
+            sizeInfo        = keep.sizeInfo ?: other.sizeInfo?.copy(id = generateId(), contactId = keepId)
+        )
+
+        // Заметки и подарки: пере-привязка (тот же id, меняем contactId).
+        notes.filter { it.contactId == otherId }.toList().forEach { updateNote(it.copy(contactId = keepId)) }
+        gifts.filter { it.contactId == otherId }.toList().forEach { updateGift(it.copy(contactId = keepId)) }
+
+        // Связи (семья): пере-привязка без само-связей и дублей.
+        contactRelations.filter { it.firstContactId == otherId || it.secondContactId == otherId }.toList().forEach { rel ->
+            val nf = if (rel.firstContactId == otherId) keepId else rel.firstContactId
+            val ns = if (rel.secondContactId == otherId) keepId else rel.secondContactId
+            removeContactRelation(rel.id)
+            if (nf != ns && contactRelations.none {
+                    (it.firstContactId == nf && it.secondContactId == ns) ||
+                    (it.firstContactId == ns && it.secondContactId == nf)
+                }) {
+                addContactRelation(rel.copy(id = generateId(), firstContactId = nf, secondContactId = ns))
+            }
+        }
+
+        // Ссылки событий: targetId other → keep.
+        calendarItems.filter { ci -> ci.links.any { it.targetType == CalendarTargetType.CONTACT && it.targetId == otherId } }
+            .toList().forEach { ci ->
+                val newLinks = ci.links.map {
+                    if (it.targetType == CalendarTargetType.CONTACT && it.targetId == otherId) it.copy(targetId = keepId) else it
+                }.distinctBy { it.targetType to it.targetId }
+                updateCalendarItem(ci.copy(links = newLinks))
+            }
+
+        updateContact(merged)
+        deleteContact(otherId)
     }
 
     // ──────────────────────────────────────────────────────────
@@ -359,15 +494,20 @@ object AppStateStore {
     // ──────────────────────────────────────────────────────────
     /** Полное удаление всех данных пользователя: все таблицы Room +
      *  in-memory списки. После перезапуска засеются демо-данные (чистый старт). */
-    fun wipeAllData(onDone: () -> Unit = {}) {
+    fun wipeAllData(onDone: (Boolean) -> Unit = {}) {
         scope.launch {
-            try { db()?.clearAllTables() } catch (e: Exception) { /* БД могла не открыться */ }
+            // Сначала пытаемся очистить БД. Если упало — in-memory НЕ трогаем,
+            // иначе состояние разойдётся с диском и при перезапуске данные
+            // «вернутся», а пользователь думал, что всё стёр.
+            val dbOk = try { db()?.clearAllTables(); true } catch (e: Exception) { false }
             kotlinx.coroutines.withContext(Dispatchers.Main) {
-                contacts.clear(); companies.clear(); calendarItems.clear()
-                notes.clear(); gifts.clear(); companyRelations.clear()
-                contactRelations.clear(); addresses.clear()
-                sizeInfos.clear(); personalDetails.clear()
-                onDone()
+                if (dbOk) {
+                    contacts.clear(); companies.clear(); calendarItems.clear()
+                    notes.clear(); gifts.clear(); companyRelations.clear()
+                    contactRelations.clear(); addresses.clear()
+                    sizeInfos.clear(); personalDetails.clear()
+                }
+                onDone(dbOk)
             }
         }
     }

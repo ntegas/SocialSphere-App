@@ -11,8 +11,15 @@ import kotlinx.coroutines.launch
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            val pendingResult = goAsync()
             val db = SocialsphereDatabase.getDatabase(context)
-            NotificationScheduler.rescheduleAll(context, db)
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    NotificationScheduler.rescheduleAll(context, db)
+                } finally {
+                    pendingResult.finish()
+                }
+            }
         }
     }
 }

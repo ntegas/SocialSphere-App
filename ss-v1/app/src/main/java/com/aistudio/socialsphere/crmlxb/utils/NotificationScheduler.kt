@@ -10,9 +10,6 @@ import com.aistudio.socialsphere.crmlxb.model.CalendarItem
 import com.aistudio.socialsphere.crmlxb.model.ReminderRule
 import com.aistudio.socialsphere.crmlxb.model.ReminderType
 import com.aistudio.socialsphere.crmlxb.model.ReminderOffsetUnit
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -91,26 +88,24 @@ object NotificationScheduler {
         }
     }
 
-    fun rescheduleAll(context: Context, db: SocialsphereDatabase) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val calendars = db.calendarDao().getAllCalendarItems()
-            val calendarLinks = db.calendarDao().getCalendarItemLinks()
-            val reminderRules = db.calendarDao().getReminderRules()
+    suspend fun rescheduleAll(context: Context, db: SocialsphereDatabase) {
+        val calendars = db.calendarDao().getAllCalendarItems()
+        val calendarLinks = db.calendarDao().getCalendarItemLinks()
+        val reminderRules = db.calendarDao().getReminderRules()
 
-            calendars.forEach { entity ->
-                val links = calendarLinks.filter { it.calendarItemId == entity.id }.map { it.toDomain() }
-                val reminders = reminderRules.filter { it.calendarItemId == entity.id }.map { it.toDomain() }
-                val item = entity.toDomain().copy(links = links, reminders = reminders)
-                
-                item.reminders.forEach { rule ->
-                    scheduleReminder(context, item, rule)
-                }
+        calendars.forEach { entity ->
+            val links = calendarLinks.filter { it.calendarItemId == entity.id }.map { it.toDomain() }
+            val reminders = reminderRules.filter { it.calendarItemId == entity.id }.map { it.toDomain() }
+            val item = entity.toDomain().copy(links = links, reminders = reminders)
+
+            item.reminders.forEach { rule ->
+                scheduleReminder(context, item, rule)
             }
         }
     }
 
     private fun getNotificationId(calendarItemId: String, reminderRuleId: String): Int {
-        return (calendarItemId.hashCode() * 31) + reminderRuleId.hashCode()
+        return (calendarItemId + "|" + reminderRuleId).hashCode()
     }
 
     private fun calculateNotificationTime(calendarItem: CalendarItem, reminderRule: ReminderRule): Long? {
@@ -140,7 +135,7 @@ object NotificationScheduler {
                     // targetDateTime remains unchanged
                 }
                 ReminderType.BEFORE -> {
-                    val value = reminderRule.offsetValue?.toLong() ?: 0L
+                    val value = reminderRule.offsetValue?.toLong() ?: return null
                     targetDateTime = when (reminderRule.offsetUnit) {
                         ReminderOffsetUnit.MINUTES -> targetDateTime.minusMinutes(value)
                         ReminderOffsetUnit.HOURS -> targetDateTime.minusHours(value)
@@ -163,12 +158,19 @@ object NotificationScheduler {
             if (calendarItem.recurrenceRule?.contains("YEARLY") == true) {
                 val now = LocalDateTime.now()
                 if (targetDateTime.isBefore(now)) {
-                    var newYear = now.year
-                    var nextOccurrence = targetDateTime.withYear(newYear)
-                    if (nextOccurrence.isBefore(now)) {
-                        nextOccurrence = targetDateTime.withYear(newYear + 1)
+                    val candidate = try {
+                        targetDateTime.withYear(now.year).let { t ->
+                            if (t.isBefore(now)) t.withYear(now.year + 1) else t
+                        }
+                    } catch (e: java.time.DateTimeException) {
+                        // Feb 29 on non-leap year — shift to Mar 1
+                        targetDateTime
+                            .withMonth(3).withDayOfMonth(1)
+                            .withYear(now.year).let { t ->
+                                if (t.isBefore(now)) t.withYear(now.year + 1) else t
+                            }
                     }
-                    targetDateTime = nextOccurrence
+                    targetDateTime = candidate
                 }
             }
 

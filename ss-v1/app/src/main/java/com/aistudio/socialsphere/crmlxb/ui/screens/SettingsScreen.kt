@@ -36,6 +36,7 @@ fun SettingsScreen(
     onNavigateToImportExport: () -> Unit,
     onNavigateToAppearance: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
+    onNavigateToDuplicates: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -91,6 +92,8 @@ fun SettingsScreen(
                 SettingsNavRow(AppleTheme.colors.orange, Icons.Default.CalendarMonth, stringResource(R.string.settings_calendar), null, "setting_calendar", onNavigateToCalendar)
                 AppleDivider()
                 SettingsNavRow(AppleTheme.colors.green, Icons.Default.SwapVert, stringResource(R.string.settings_import_export), null, "setting_import_export", onNavigateToImportExport)
+                AppleDivider()
+                SettingsNavRow(Color(0xFF34C759), Icons.Default.Merge, stringResource(R.string.settings_duplicates), null, "setting_duplicates", onNavigateToDuplicates)
                 AppleDivider()
                 InsetRow(
                     title = stringResource(R.string.settings_dark_theme),

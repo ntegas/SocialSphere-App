@@ -268,7 +268,16 @@ fun CalendarItemDetailScreen(
 
             item {
                 CardBlock(title = stringResource(R.string.cid_recurrence)) {
-                    Text(event.recurrenceRule ?: stringResource(R.string.cid_no_recurrence), style = MaterialTheme.typography.bodyMedium)
+                    // Показываем человекочитаемый русский лейбл, а не сырой RRULE
+                    // («FREQ=YEARLY» выглядело как английское «frequency»).
+                    val recurText = when (RecurrenceMode.fromRule(event.recurrenceRule)) {
+                        RecurrenceMode.NONE    -> stringResource(R.string.cid_no_recurrence)
+                        RecurrenceMode.DAILY   -> stringResource(R.string.rec_daily)
+                        RecurrenceMode.WEEKLY  -> stringResource(R.string.rec_weekly)
+                        RecurrenceMode.MONTHLY -> stringResource(R.string.rec_monthly)
+                        RecurrenceMode.YEARLY  -> stringResource(R.string.rec_yearly)
+                    }
+                    Text(recurText, style = MaterialTheme.typography.bodyMedium)
                 }
             }
 

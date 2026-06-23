@@ -196,8 +196,12 @@ fun SocialsphereApp() {
                     onNavigateToCalendar = { navController.navigate("settings_calendar") },
                     onNavigateToImportExport = { navController.navigate("settings_import_export") },
                     onNavigateToAppearance = { navController.navigate("settings_appearance") },
-                    onNavigateToPrivacy = { navController.navigate("settings_privacy") }
+                    onNavigateToPrivacy = { navController.navigate("settings_privacy") },
+                    onNavigateToDuplicates = { navController.navigate("settings_duplicates") }
                 )
+            }
+            composable("settings_duplicates") {
+                DuplicatesScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable("settings_language") {
                 LanguageSettingsScreen(onNavigateBack = { navController.popBackStack() })

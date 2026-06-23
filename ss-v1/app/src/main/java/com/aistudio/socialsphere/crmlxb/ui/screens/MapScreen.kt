@@ -186,8 +186,9 @@ fun MapScreen(
                 val q = "${obj.title} ${obj.subtitle} ${obj.city} ${obj.addressLine}"
                 val matchSearch = q.contains(searchQuery, ignoreCase = true)
                 val matchTab = when (selectedTab) {
-                    0 -> // Контакты — все адреса людей (дом + работа)
-                        obj.ownerType == AddressOwnerType.CONTACT
+                    0 -> // Контакты — ТОЛЬКО личные адреса людей (рабочие — на вкладке «Работа»)
+                        obj.ownerType == AddressOwnerType.CONTACT &&
+                        obj.locationType !in listOf(AddressType.WORK, AddressType.OFFICE)
                     1 -> // Рабочие адреса — только рабочие адреса контактов
                         obj.ownerType == AddressOwnerType.CONTACT &&
                         obj.locationType in listOf(AddressType.WORK, AddressType.OFFICE)
@@ -249,12 +250,33 @@ fun MapScreen(
     }
     val listItems = filteredList
 
-    val defaultLatLng = geoItems.firstOrNull()?.latLng ?: LatLng(37.9838, 23.7275)
+    // Местоположение пользователя (last-known) — чтобы карта открывалась там,
+    // где он сейчас, а не на первом адресе из данных (был в другом городе).
+    var userLatLng by remember { mutableStateOf<LatLng?>(null) }
+    LaunchedEffect(locationPermGranted) {
+        if (!locationPermGranted) return@LaunchedEffect
+        userLatLng = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            lastKnownLatLng(context)
+        }
+    }
+
+    val defaultLatLng = userLatLng ?: geoItems.firstOrNull()?.latLng ?: LatLng(37.9838, 23.7275)
     val cameraState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(
             defaultLatLng,
             if (geoItems.isNotEmpty()) 12f else 5f
         )
+    }
+
+    // Когда местоположение получено и пользователь ничего не выбрал — центрируем
+    // карту на нём (камера инициализируется один раз, поэтому двигаем эффектом).
+    LaunchedEffect(userLatLng) {
+        val u = userLatLng ?: return@LaunchedEffect
+        if (selectedItem == null) {
+            try {
+                cameraState.animate(CameraUpdateFactory.newLatLngZoom(u, 12f))
+            } catch (e: Exception) { /* карта ещё инициализируется */ }
+        }
     }
 
     LaunchedEffect(selectedItem, geoCache.size, showMapView) {
@@ -429,16 +451,19 @@ fun MapScreen(
                             geoItems.forEach { obj ->
                                 val latLng = coordsOf(obj) ?: return@forEach
                                 val isSelected = obj.id == selectedItem?.id
+                                // Цвета маркеров СТРОГО совпадают с легендой ниже:
+                                // дом — синий, работа — зелёный, компания — фиолетовый,
+                                // выбранный — оранжевый.
                                 val hue = when {
                                     isSelected -> BitmapDescriptorFactory.HUE_ORANGE
                                     obj.ownerType == AddressOwnerType.COMPANY ->
-                                        BitmapDescriptorFactory.HUE_AZURE
-                                    obj.locationType == AddressType.HOME ->
                                         BitmapDescriptorFactory.HUE_VIOLET
+                                    obj.locationType == AddressType.HOME ->
+                                        BitmapDescriptorFactory.HUE_AZURE
                                     obj.locationType in listOf(
                                         AddressType.WORK, AddressType.OFFICE
                                     ) -> BitmapDescriptorFactory.HUE_GREEN
-                                    else -> BitmapDescriptorFactory.HUE_RED
+                                    else -> BitmapDescriptorFactory.HUE_AZURE
                                 }
                                 Marker(
                                     state   = MarkerState(position = latLng),
@@ -490,9 +515,10 @@ fun MapScreen(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            MapLegendDot(color = MaterialTheme.colorScheme.primary,   label = stringResource(R.string.addr_home))
-                            MapLegendDot(color = MaterialTheme.colorScheme.tertiary,  label = stringResource(R.string.addr_work))
-                            MapLegendDot(color = MaterialTheme.colorScheme.secondary, label = stringResource(R.string.addr_company))
+                            // Цвета совпадают с цветами маркеров на карте (HUE_*)
+                            MapLegendDot(color = Color(0xFF2196F3), label = stringResource(R.string.addr_home))    // синий = дом
+                            MapLegendDot(color = Color(0xFF4CAF50), label = stringResource(R.string.addr_work))    // зелёный = работа
+                            MapLegendDot(color = Color(0xFF9C27B0), label = stringResource(R.string.addr_company)) // фиолетовый = компания
                         }
                     }
 
@@ -657,12 +683,14 @@ fun MapListRow(obj: MapLocationItem, onClick: () -> Unit) {
         obj.locationType in listOf(AddressType.WORK, AddressType.OFFICE) -> Icons.Default.Work
         else -> Icons.Default.Person
     }
+    // Те же цвета, что у маркеров и легенды: дом — синий, работа — зелёный,
+    // компания — фиолетовый.
     val tint = when {
-        obj.ownerType == AddressOwnerType.COMPANY -> MaterialTheme.colorScheme.secondary
-        obj.locationType == AddressType.HOME      -> MaterialTheme.colorScheme.primary
+        obj.ownerType == AddressOwnerType.COMPANY -> Color(0xFF9C27B0)
+        obj.locationType == AddressType.HOME      -> Color(0xFF2196F3)
         obj.locationType in listOf(AddressType.WORK, AddressType.OFFICE) ->
-            MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.onSurface
+            Color(0xFF4CAF50)
+        else -> Color(0xFF2196F3)
     }
 
     Card(
@@ -829,3 +857,26 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
 
 private fun AddressType.mapLabel(labels: Map<AddressType, String>): String =
     labels[this] ?: this.name
+
+/**
+ * Последняя известная позиция устройства через системный LocationManager
+ * (без play-services-location). Вызывается только при выданном разрешении.
+ * Берём самый точный из доступных провайдеров. null — если ничего нет.
+ */
+private fun lastKnownLatLng(context: android.content.Context): LatLng? {
+    return try {
+        val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE)
+            as? android.location.LocationManager ?: return null
+        var best: android.location.Location? = null
+        for (provider in lm.getProviders(true)) {
+            @Suppress("MissingPermission")
+            val loc = try { lm.getLastKnownLocation(provider) } catch (e: SecurityException) { null }
+                ?: continue
+            val current = best
+            if (current == null || loc.accuracy < current.accuracy) best = loc
+        }
+        best?.let { LatLng(it.latitude, it.longitude) }
+    } catch (e: Exception) {
+        null
+    }
+}

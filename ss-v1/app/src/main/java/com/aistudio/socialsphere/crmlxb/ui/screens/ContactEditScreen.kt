@@ -117,7 +117,7 @@ fun ContactEditScreen(
         val compRelList = if (selectedCompanyId.isNotBlank()) listOf(
             ContactCompanyRelation(
                 id = originalContact?.companyRelations?.firstOrNull()?.id ?: UUID.randomUUID().toString(),
-                contactId  = originalContact?.id ?: UUID.randomUUID().toString(),
+                contactId  = editedContactId,
                 companyId  = selectedCompanyId,
                 position   = companyPosition.ifBlank { null },
                 department = companyDept.ifBlank { null },
@@ -350,7 +350,7 @@ fun ContactEditScreen(
             confirmButton = {
                 Button(onClick = {
                     if (newPhone.isNotBlank()) {
-                        phones = phones + ContactPhone(UUID.randomUUID().toString(), originalContact?.id ?: "new", newPhone.trim(), newPhoneType, phones.isEmpty())
+                        phones = phones + ContactPhone(UUID.randomUUID().toString(), editedContactId, newPhone.trim(), newPhoneType, phones.isEmpty())
                         newPhone = ""; showAddPhone = false
                     }
                 }) { Text(stringResource(R.string.common_add)) }
@@ -372,7 +372,7 @@ fun ContactEditScreen(
             confirmButton = {
                 Button(onClick = {
                     if (newEmail.isNotBlank()) {
-                        emails = emails + ContactEmail(UUID.randomUUID().toString(), originalContact?.id ?: "new", newEmail.trim(), newEmailType, emails.isEmpty())
+                        emails = emails + ContactEmail(UUID.randomUUID().toString(), editedContactId, newEmail.trim(), newEmailType, emails.isEmpty())
                         newEmail = ""; showAddEmail = false
                     }
                 }) { Text(stringResource(R.string.common_add)) }
@@ -403,7 +403,7 @@ fun ContactEditScreen(
             confirmButton = {
                 Button(onClick = {
                     if (newMessenger.isNotBlank()) {
-                        messengers = messengers + Messenger(UUID.randomUUID().toString(), originalContact?.id ?: "new", newMessengerType, newMessenger.trim(), null, messengers.isEmpty())
+                        messengers = messengers + Messenger(UUID.randomUUID().toString(), editedContactId, newMessengerType, newMessenger.trim(), null, messengers.isEmpty())
                         newMessenger = ""; showAddMessenger = false
                     }
                 }) { Text(stringResource(R.string.common_add)) }

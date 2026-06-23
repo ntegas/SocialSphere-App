@@ -523,23 +523,29 @@ fun HomeScreen(
                             Text(stringResource(R.string.home_today), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label, modifier = Modifier.padding(top = 3.dp))
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                            HomeCircleButton(Icons.Default.Search, null) { searchActive = true }
+                            // Лупу прячем когда поиск активен — поле ввода уже в
+                            // TopAppBar, иначе на экране две лупы.
+                            if (!searchActive) HomeCircleButton(Icons.Default.Search, null) { searchActive = true }
                             HomeCircleButton(Icons.Default.Settings, "home_settings_button") { onNavigateToSettings() }
                         }
                     }
-                    // Капсула поиска
-                    Box(modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().height(38.dp)
-                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
-                                .background(androidx.compose.ui.graphics.Color(0x1F767680))
-                                .clickable { searchActive = true }
-                                .padding(horizontal = 11.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp)
-                        ) {
-                            Icon(Icons.Default.Search, null, tint = androidx.compose.ui.graphics.Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
-                            Text(stringResource(R.string.home_search_placeholder), fontSize = 17.sp, color = androidx.compose.ui.graphics.Color(0xFF8E8E93))
+                    // Капсула поиска — прячется когда поиск активен (поле ввода
+                    // живёт в TopAppBar), иначе было два поля. Остальной дашборд
+                    // остаётся видимым.
+                    if (!searchActive) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(38.dp)
+                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
+                                    .background(androidx.compose.ui.graphics.Color(0x1F767680))
+                                    .clickable { searchActive = true }
+                                    .padding(horizontal = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(7.dp)
+                            ) {
+                                Icon(Icons.Default.Search, null, tint = androidx.compose.ui.graphics.Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
+                                Text(stringResource(R.string.home_search_placeholder), fontSize = 17.sp, color = androidx.compose.ui.graphics.Color(0xFF8E8E93))
+                            }
                         }
                     }
                     // Stats
@@ -1033,7 +1039,9 @@ private fun HomeRecentCard(contact: HomeContact, onClick: () -> Unit) {
     val g = grads[kotlin.math.abs(contact.id.hashCode()) % grads.size]
     Card(
         onClick   = onClick,
-        modifier  = Modifier.width(128.dp),
+        // Фиксированная высота: строка должности опциональна, без неё карточка
+        // была ниже и карточки в ряду «прыгали» по размеру.
+        modifier  = Modifier.width(128.dp).height(140.dp),
         shape     = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
         colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)

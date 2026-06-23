@@ -2,11 +2,14 @@
 
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -14,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,8 +87,12 @@ fun CalendarItemEditScreen(
 
     var showContactDropdown by remember { mutableStateOf(false) }
     var showCompanyDropdown by remember { mutableStateOf(false) }
-    var showTypeDropdown by remember { mutableStateOf(false) }
     var showRecurrenceDropdown by remember { mutableStateOf(false) }
+    var contactQuery by remember { mutableStateOf("") }
+    var showTypeSheet by remember { mutableStateOf(false) }
+    var showImportanceMenu by remember { mutableStateOf(false) }
+    var showStatusMenu by remember { mutableStateOf(false) }
+    var showReminderSheet by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -206,173 +214,61 @@ fun CalendarItemEditScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Main info
+            // ── Основное: название · тип · важность ──
             SectionCard(stringResource(R.string.cie_basic)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it }, keyboardOptions = CapSentences,
                     label = { Text(stringResource(R.string.cie_title)) },
+                    placeholder = { Text(type.label(ctxLabel)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cie_description)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
+                // Тип — одна строка с цветной точкой → пикер
+                EventListRow(
+                    label = stringResource(R.string.cie_event_type),
+                    value = type.label(ctxLabel),
+                    leadingDot = eventTypeColor(type),
+                    onClick = { showTypeSheet = true }
                 )
-
-                // Type Dropdown
+                // Важность — компактная строка
                 Box {
-                    OutlinedTextField(
-                        value = type.label(ctxLabel),
-                        onValueChange = {},
-                        label = { Text(stringResource(R.string.cie_event_type)) },
-                        modifier = Modifier.fillMaxWidth().clickable { showTypeDropdown = true },
-                        enabled = false,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                            disabledBorderColor = MaterialTheme.colorScheme.outline,
-                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    EventListRow(
+                        label = stringResource(R.string.cie_importance),
+                        value = importance.label(ctxLabel),
+                        onClick = { showImportanceMenu = true }
                     )
-                    DropdownMenu(expanded = showTypeDropdown, onDismissRequest = { showTypeDropdown = false }) {
-                        CalendarItemType.values().forEach { t ->
-                            DropdownMenuItem(text = { Text(t.label(ctxLabel)) }, onClick = {
-                                type = t
-                                if (t == CalendarItemType.BIRTHDAY) {
-                                    isAllDay = true
-                                    recurrenceMode = RecurrenceMode.YEARLY
-                                }
-                                showTypeDropdown = false
-                            })
+                    DropdownMenu(expanded = showImportanceMenu, onDismissRequest = { showImportanceMenu = false }) {
+                        ImportanceLevel.values().forEach { imp ->
+                            DropdownMenuItem(text = { Text(imp.label(ctxLabel)) }, onClick = { importance = imp; showImportanceMenu = false })
                         }
                     }
                 }
-
-                Text(stringResource(R.string.cie_importance), style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ImportanceLevel.values().forEach { imp ->
-                        FilterChip(
-                            selected = importance == imp,
-                            onClick = { importance = imp },
-                            label = { Text(imp.label(ctxLabel), fontSize = 12.sp) }
-                        )
-                    }
-                }
-                
                 if (isEditMode) {
-                    Text(stringResource(R.string.cie_status), style = MaterialTheme.typography.labelMedium)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        CalendarItemStatus.values().forEach { stat ->
-                            FilterChip(
-                                selected = status == stat,
-                                onClick = { status = stat },
-                                label = { Text(stat.label(ctxLabel), fontSize = 12.sp) }
-                            )
-                        }
-                    }
-                }
-                
-                // Блок «Цвет (метка)» удалён: цвет события определяется его типом
-                // автоматически (см. CalendarScreen), ручной выбор не предусмотрен моделью.
-            }
-
-            // Linked To
-            SectionCard(stringResource(R.string.cie_linked_with)) {
-                // Контакты — можно несколько
-                Text(
-                    stringResource(R.string.cie_contact),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (linkedContacts.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        linkedContacts.forEach { c ->
-                            InputChip(
-                                selected = true,
-                                onClick = { linkedContacts = linkedContacts.filter { it.id != c.id } },
-                                label = { Text("${c.firstName} ${c.lastName}".trim()) },
-                                trailingIcon = {
-                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cie_clear), modifier = Modifier.size(16.dp))
-                                }
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                }
-                Box {
-                    OutlinedButton(
-                        onClick = { showContactDropdown = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.cie_add_person))
-                    }
-                    DropdownMenu(expanded = showContactDropdown, onDismissRequest = { showContactDropdown = false }) {
-                        AppStateStore.contacts
-                            .filter { c -> linkedContacts.none { it.id == c.id } }
-                            .forEach { c ->
-                                DropdownMenuItem(
-                                    text = { Text("${c.firstName} ${c.lastName}".trim()) },
-                                    onClick = {
-                                        linkedContacts = linkedContacts + c
-                                        showContactDropdown = false
-                                    }
-                                )
-                            }
-                    }
-                }
-
-                // Company
-                Box {
-                    OutlinedTextField(
-                        value = linkedCompany?.name ?: "",
-                        onValueChange = {},
-                        label = { Text(stringResource(R.string.cie_company)) },
-                        modifier = Modifier.fillMaxWidth().clickable { showCompanyDropdown = true },
-                        enabled = false,
-                        trailingIcon = {
-                            if (linkedCompany != null) {
-                                IconButton(onClick = { linkedCompany = null }) {
-                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cie_clear))
-                                }
-                            } else {
-                                Icon(Icons.Default.Business, contentDescription = null)
-                            }
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                            disabledBorderColor = MaterialTheme.colorScheme.outline,
-                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    Box {
+                        EventListRow(
+                            label = stringResource(R.string.cie_status),
+                            value = status.label(ctxLabel),
+                            onClick = { showStatusMenu = true }
                         )
-                    )
-                    DropdownMenu(expanded = showCompanyDropdown, onDismissRequest = { showCompanyDropdown = false }) {
-                        AppStateStore.companies.forEach { c ->
-                            DropdownMenuItem(
-                                text = { Text(c.name) },
-                                onClick = { linkedCompany = c; showCompanyDropdown = false }
-                            )
+                        DropdownMenu(expanded = showStatusMenu, onDismissRequest = { showStatusMenu = false }) {
+                            CalendarItemStatus.values().forEach { stat ->
+                                DropdownMenuItem(text = { Text(stat.label(ctxLabel)) }, onClick = { status = stat; showStatusMenu = false })
+                            }
                         }
                     }
                 }
             }
 
-            // Date and time
+            // ── Когда: весь день · начало · конец · повтор ──
             SectionCard(stringResource(R.string.cie_datetime)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isAllDay, onCheckedChange = { isAllDay = it })
-                    Text(stringResource(R.string.cie_all_day))
+                    Text(stringResource(R.string.cie_all_day), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = isAllDay, onCheckedChange = { isAllDay = it })
                 }
-                
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     DatePickerField(
                         value = startDate,
                         onValueChange = { startDate = it },
@@ -388,8 +284,7 @@ fun CalendarItemEditScreen(
                         )
                     }
                 }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     DatePickerField(
                         value = endDate,
                         onValueChange = { endDate = it },
@@ -405,42 +300,7 @@ fun CalendarItemEditScreen(
                         )
                     }
                 }
-            }
-
-            // Reminders
-            SectionCard(stringResource(R.string.cie_reminders)) {
-                Text(stringResource(R.string.cie_notifications_visual), style = MaterialTheme.typography.labelMedium)
-                val options = listOf(ReminderTime.NONE, ReminderTime.AT_EVENT, ReminderTime.MIN_10, ReminderTime.HOUR_1, ReminderTime.DAY_1, ReminderTime.WEEK_1)
-                
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    options.forEach { opt ->
-                        FilterChip(
-                            selected = selectedReminders.contains(opt),
-                            onClick = { 
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && opt != ReminderTime.NONE && !selectedReminders.contains(opt)) {
-                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                }
-                                val newReminders = selectedReminders.toMutableSet()
-                                if (opt == ReminderTime.NONE) {
-                                    newReminders.clear()
-                                    newReminders.add(ReminderTime.NONE)
-                                } else {
-                                    newReminders.remove(ReminderTime.NONE)
-                                    if (newReminders.contains(opt)) newReminders.remove(opt) else newReminders.add(opt)
-                                    if (newReminders.isEmpty()) newReminders.add(ReminderTime.NONE)
-                                }
-                                selectedReminders = newReminders
-                            },
-                            label = { Text(opt.label(ctxLabel), fontSize = 12.sp) }
-                        )
-                    }
-                }
-            }
-
-            // Recurrence
-            SectionCard(stringResource(R.string.cie_recur_display)) {
+                // Повтор — компактная строка
                 Box {
                     val recurLabel = when (recurrenceMode) {
                         RecurrenceMode.NONE -> stringResource(R.string.rec_none)
@@ -449,17 +309,10 @@ fun CalendarItemEditScreen(
                         RecurrenceMode.MONTHLY -> stringResource(R.string.rec_monthly)
                         RecurrenceMode.YEARLY -> stringResource(R.string.rec_yearly)
                     }
-                    OutlinedTextField(
+                    EventListRow(
+                        label = stringResource(R.string.cie_recurrence),
                         value = recurLabel,
-                        onValueChange = {},
-                        label = { Text(stringResource(R.string.cie_recurrence)) },
-                        modifier = Modifier.fillMaxWidth().clickable { showRecurrenceDropdown = true },
-                        enabled = false,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                            disabledBorderColor = MaterialTheme.colorScheme.outline,
-                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        onClick = { showRecurrenceDropdown = true }
                     )
                     DropdownMenu(expanded = showRecurrenceDropdown, onDismissRequest = { showRecurrenceDropdown = false }) {
                         RecurrenceMode.entries.forEach { mode ->
@@ -470,19 +323,270 @@ fun CalendarItemEditScreen(
                                 RecurrenceMode.MONTHLY -> stringResource(R.string.rec_monthly)
                                 RecurrenceMode.YEARLY -> stringResource(R.string.rec_yearly)
                             }
-                            DropdownMenuItem(text = { Text(lbl) }, onClick = {
-                                recurrenceMode = mode
-                                showRecurrenceDropdown = false
-                            })
+                            DropdownMenuItem(text = { Text(lbl) }, onClick = { recurrenceMode = mode; showRecurrenceDropdown = false })
                         }
                     }
                 }
-                
-                // Свитчи «Показывать на главной / в карточке» удалены:
-                // в модели CalendarItem нет таких полей — контролы ничего не делали
             }
-            
+
+            // ── С кем: человек · компания ──
+            SectionCard(stringResource(R.string.cie_linked_with)) {
+                if (linkedContacts.isNotEmpty()) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        linkedContacts.forEach { c ->
+                            InputChip(
+                                selected = true,
+                                onClick = { linkedContacts = linkedContacts.filter { it.id != c.id } },
+                                label = { Text("${c.firstName} ${c.lastName}".trim()) },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cie_clear), modifier = Modifier.size(16.dp))
+                                }
+                            )
+                        }
+                    }
+                }
+                Box {
+                    EventListRow(
+                        label = stringResource(R.string.cie_add_person),
+                        value = "",
+                        leadingIcon = Icons.Default.PersonAdd,
+                        onClick = { showContactDropdown = true }
+                    )
+                    DropdownMenu(
+                        expanded = showContactDropdown,
+                        onDismissRequest = { showContactDropdown = false; contactQuery = "" },
+                        modifier = Modifier.heightIn(max = 320.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = contactQuery,
+                            onValueChange = { contactQuery = it },
+                            placeholder = { Text(stringResource(R.string.ce_search_contact)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                        AppStateStore.contacts
+                            .filter { c -> linkedContacts.none { it.id == c.id } }
+                            .filter { c -> contactQuery.isBlank() || "${c.firstName} ${c.lastName}".contains(contactQuery, ignoreCase = true) }
+                            .take(30)
+                            .forEach { c ->
+                                DropdownMenuItem(
+                                    text = { Text("${c.firstName} ${c.lastName}".trim()) },
+                                    onClick = {
+                                        linkedContacts = linkedContacts + c
+                                        showContactDropdown = false; contactQuery = ""
+                                    }
+                                )
+                            }
+                    }
+                }
+                Box {
+                    EventListRow(
+                        label = stringResource(R.string.cie_company),
+                        value = linkedCompany?.name ?: "—",
+                        onClick = { showCompanyDropdown = true },
+                        trailing = {
+                            if (linkedCompany != null) {
+                                IconButton(onClick = { linkedCompany = null }, modifier = Modifier.size(20.dp)) {
+                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cie_clear), modifier = Modifier.size(16.dp))
+                                }
+                            } else {
+                                Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = showCompanyDropdown,
+                        onDismissRequest = { showCompanyDropdown = false },
+                        modifier = Modifier.heightIn(max = 320.dp)
+                    ) {
+                        AppStateStore.companies.forEach { c ->
+                            DropdownMenuItem(text = { Text(c.name) }, onClick = { linkedCompany = c; showCompanyDropdown = false })
+                        }
+                    }
+                }
+            }
+
+            // ── Детали: напоминание · заметка ──
+            SectionCard(stringResource(R.string.cie_reminders)) {
+                // Сводка выбранных напоминаний (можно несколько) — одной строкой,
+                // тап открывает лист с галочками. Раньше чипы выглядели как
+                // «выбери одно», хотя выбор множественный.
+                val reminderSummary = run {
+                    val active = selectedReminders.filter { it != ReminderTime.NONE }
+                    if (active.isEmpty()) ReminderTime.NONE.label(ctxLabel)
+                    else active.joinToString(", ") { it.label(ctxLabel) }
+                }
+                EventListRow(
+                    label = stringResource(R.string.cie_reminders),
+                    value = reminderSummary,
+                    onClick = { showReminderSheet = true }
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cie_description)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+            }
+
+            if (showTypeSheet) {
+                EventTypePickerSheet(
+                    current = type,
+                    onPick = { t ->
+                        type = t
+                        if (t == CalendarItemType.BIRTHDAY) { isAllDay = true; recurrenceMode = RecurrenceMode.YEARLY }
+                        showTypeSheet = false
+                    },
+                    onDismiss = { showTypeSheet = false }
+                )
+            }
+
+            if (showReminderSheet) {
+                ReminderPickerSheet(
+                    selected = selectedReminders,
+                    onToggle = { opt ->
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            opt != ReminderTime.NONE && !selectedReminders.contains(opt)) {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
+                        val next = selectedReminders.toMutableSet()
+                        if (opt == ReminderTime.NONE) {
+                            next.clear(); next.add(ReminderTime.NONE)
+                        } else {
+                            next.remove(ReminderTime.NONE)
+                            if (next.contains(opt)) next.remove(opt) else next.add(opt)
+                            if (next.isEmpty()) next.add(ReminderTime.NONE)
+                        }
+                        selectedReminders = next
+                    },
+                    onDismiss = { showReminderSheet = false }
+                )
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+// ── Apple-style: цвет типа события + компактная строка списка + пикер типа ──
+
+internal fun eventTypeColor(t: CalendarItemType): Color = when (t) {
+    CalendarItemType.BIRTHDAY -> Color(0xFFFF2D55)
+    CalendarItemType.CALL     -> Color(0xFF5B53D6)
+    CalendarItemType.MEETING  -> Color(0xFF34C759)
+    CalendarItemType.GIFT     -> Color(0xFFFF9500)
+    else                      -> Color(0xFF007AFF)
+}
+
+/**
+ * Компактная строка формы в стиле Apple: слева подпись (+опц. точка/иконка),
+ * справа значение серым и шеврон/кастомный trailing. Вся строка кликабельна.
+ */
+@Composable
+private fun EventListRow(
+    label: String,
+    value: String,
+    leadingDot: Color? = null,
+    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (leadingDot != null) {
+            Box(Modifier.size(11.dp).clip(CircleShape).background(leadingDot))
+            Spacer(Modifier.width(10.dp))
+        }
+        if (leadingIcon != null) {
+            Icon(leadingIcon, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        if (value.isNotEmpty()) {
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 180.dp)
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        if (trailing != null) trailing()
+        else Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EventTypePickerSheet(
+    current: CalendarItemType,
+    onPick: (CalendarItemType) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val ctx = LocalContext.current
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            CalendarItemType.values().forEach { t ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { onPick(t) }.padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(12.dp).clip(CircleShape).background(eventTypeColor(t)))
+                    Spacer(Modifier.width(14.dp))
+                    Text(t.label(ctx), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    if (t == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Лист выбора напоминаний — МНОЖЕСТВЕННЫЙ выбор с галочками и явной подписью
+ * «можно несколько». «Без напоминания» взаимоисключающее с остальными.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderPickerSheet(
+    selected: Set<ReminderTime>,
+    onToggle: (ReminderTime) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val ctx = LocalContext.current
+    val options = listOf(
+        ReminderTime.NONE, ReminderTime.AT_EVENT, ReminderTime.MIN_10,
+        ReminderTime.HOUR_1, ReminderTime.DAY_1, ReminderTime.WEEK_1
+    )
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                Text(stringResource(R.string.cie_reminders), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(R.string.cie_reminder_multi),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+            options.forEach { opt ->
+                val checked = selected.contains(opt)
+                Row(
+                    Modifier.fillMaxWidth().clickable { onToggle(opt) }.padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(opt.label(ctx), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    if (checked) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
         }
     }
 }

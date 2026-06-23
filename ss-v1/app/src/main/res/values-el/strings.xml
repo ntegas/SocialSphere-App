@@ -349,6 +349,12 @@
     <string name="settings_privacy">Απόρρητο</string>
     <string name="settings_privacy_sub">Ρυθμίσεις προστασίας εφαρμογής</string>
     <string name="settings_import_export">Εισαγωγή &amp; εξαγωγή</string>
+    <string name="settings_duplicates">Εύρεση διπλότυπων</string>
+    <string name="dup_title">Διπλότυπα</string>
+    <string name="dup_backup_hint">Συμβουλή: κάντε αντίγραφο πριν τη συγχώνευση (Ρυθμίσεις → Εισαγωγή &amp; εξαγωγή). Η συγχώνευση δεν αναιρείται.</string>
+    <string name="dup_none">Δεν βρέθηκαν πιθανά διπλότυπα</string>
+    <string name="dup_merge">Συγχώνευση</string>
+    <string name="dup_will_keep">Παραμένει: %1$s</string>
     <string name="settings_import_export_sub">Επαφές, αρχεία, αντίγραφα</string>
     <string name="appearance_theme">Θέμα εφαρμογής</string>
     <string name="appearance_light">φωτεινό</string>
@@ -428,6 +434,13 @@
     <string name="ie_export_data">Εξαγωγή δεδομένων</string>
     <string name="ie_contacts_csv">Επαφές → CSV</string>
     <string name="ie_contacts_vcard">Επαφές → vCard (.vcf)</string>
+    <string name="ie_to_phone_contacts">Εξαγωγή όλων στις Επαφές τηλεφώνου</string>
+    <string name="ie_to_phone_sub">Άνοιγμα εισαγωγής στην εφαρμογή Επαφές</string>
+    <string name="ie_to_calendar">Εξαγωγή συμβάντων στο Ημερολόγιο τηλεφώνου</string>
+    <string name="ie_to_calendar_sub">Γενέθλια, κλήσεις, συναντήσεις → ημερολόγιο συστήματος</string>
+    <string name="ie_calendar_done">Προστέθηκαν: %1$d, παραλείφθηκαν: %2$d</string>
+    <string name="ie_calendar_no_cal">Δεν βρέθηκε εγγράψιμο ημερολόγιο</string>
+    <string name="ie_calendar_no_perm">Δεν δόθηκε άδεια ημερολογίου</string>
     <string name="ie_companies_csv">Εταιρείες → CSV</string>
     <string name="ie_full_json">Πλήρες αντίγραφο → JSON</string>
     <string name="ie_full_zip">Πλήρες αρχείο → ZIP</string>
@@ -624,6 +637,7 @@
     <string name="cie_recurrence">Επανάληψη</string>
     <string name="cie_notifications_visual">Ειδοποιήσεις (οπτικά)</string>
     <string name="cie_reminders">Υπενθυμίσεις</string>
+    <string name="cie_reminder_multi">Μπορείτε να επιλέξετε πολλά</string>
     <string name="cie_importance">Σημασία</string>
     <string name="cie_status">Κατάσταση</string>
     <string name="rec_none">Χωρίς επανάληψη</string>

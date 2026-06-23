@@ -19,9 +19,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.utils.ExportManager
+import com.aistudio.socialsphere.crmlxb.utils.CalendarExporter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
 import com.aistudio.socialsphere.crmlxb.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,10 +42,12 @@ fun ImportExportSettingsScreen(
     var loadingCsv     by remember { mutableStateOf(false) }
     var loadingCompCsv by remember { mutableStateOf(false) }
     var loadingVcf     by remember { mutableStateOf(false) }
+    var loadingToPhone by remember { mutableStateOf(false) }
     var loadingJson    by remember { mutableStateOf(false) }
     var loadingZip     by remember { mutableStateOf(false) }
     var loadingRestore by remember { mutableStateOf(false) }
     var loadingSaveJson by remember { mutableStateOf(false) }
+    var loadingCal     by remember { mutableStateOf(false) }
 
     // Восстановление из полного JSON-бэкапа: upsert по id, ничего не удаляет.
     // Прямое сохранение JSON-бэкапа в файл: открывается выбор папки и имени,
@@ -104,6 +110,24 @@ fun ImportExportSettingsScreen(
                 setLoading(false)
             }
         }
+    }
+
+    // Экспорт событий в системный календарь (после выдачи разрешений)
+    fun doCalendarExport() {
+        runExport({ loadingCal = it }) {
+            val result = withContext(kotlinx.coroutines.Dispatchers.IO) { CalendarExporter.exportAll(context) }
+            if (result.noCalendar)
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_calendar_no_cal))
+            else
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_calendar_done, result.inserted, result.skipped))
+        }
+    }
+
+    val calendarPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        if (perms[Manifest.permission.WRITE_CALENDAR] == true) doCalendarExport()
+        else scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.ie_calendar_no_perm)) }
     }
 
     Scaffold(
@@ -184,6 +208,38 @@ fun ImportExportSettingsScreen(
                             val file = ExportManager.exportVCard(context)
                             ExportManager.shareFile(context, file, "text/vcard")
                         }
+                    }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                // Прямой импорт всех контактов в системные «Контакты» телефона
+                ExportRow(
+                    icon      = Icons.Default.ContactPhone,
+                    text      = stringResource(R.string.ie_to_phone_contacts),
+                    subtitle  = stringResource(R.string.ie_to_phone_sub),
+                    loading   = loadingToPhone,
+                    onClick   = {
+                        runExport({ loadingToPhone = it }) {
+                            val file = ExportManager.exportVCard(context)
+                            val ok = ExportManager.openVcfInContacts(context, file)
+                            if (!ok) ExportManager.shareFile(context, file, "text/vcard")
+                        }
+                    }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                // Экспорт событий (ДР/звонки/встречи) в системный календарь
+                ExportRow(
+                    icon      = Icons.Default.EventAvailable,
+                    text      = stringResource(R.string.ie_to_calendar),
+                    subtitle  = stringResource(R.string.ie_to_calendar_sub),
+                    loading   = loadingCal,
+                    onClick   = {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context, Manifest.permission.WRITE_CALENDAR
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) doCalendarExport()
+                        else calendarPermLauncher.launch(
+                            arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+                        )
                     }
                 )
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
