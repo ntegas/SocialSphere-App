@@ -362,7 +362,7 @@ fun MapScreen(
                     // FIX: show error state instead of crashing
                     if (mapLoadError != null) {
                         Box(
-                            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                            Modifier.fillMaxSize().background(AppleTheme.colors.card),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(
@@ -373,17 +373,17 @@ fun MapScreen(
                                     Icons.Default.Map,
                                     null,
                                     Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.outlineVariant
+                                    tint = AppleTheme.colors.separator
                                 )
                                 Text(
                                     stringResource(R.string.map_unavailable),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.secondary
+                                    color = AppleTheme.colors.secondaryLabel
                                 )
                                 Text(
                                     mapLoadError ?: "",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary
+                                    color = AppleTheme.colors.secondaryLabel
                                 )
                                 OutlinedButton(onClick = { mapLoadError = null }) {
                                     Text(stringResource(R.string.map_retry))
@@ -412,13 +412,13 @@ fun MapScreen(
                                 ) {
                                     Icon(Icons.Default.Map, null,
                                         Modifier.size(48.dp),
-                                        tint = MaterialTheme.colorScheme.outlineVariant)
+                                        tint = AppleTheme.colors.separator)
                                     Text(stringResource(R.string.map_unavailable),
                                         style = MaterialTheme.typography.titleMedium)
                                     Text(
                                         stringResource(R.string.map_gms_update),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.secondary
+                                        color = AppleTheme.colors.secondaryLabel
                                     )
                                 }
                             }
@@ -492,12 +492,12 @@ fun MapScreen(
                             modifier = Modifier
                                 .align(Alignment.TopStart)
                                 .padding(8.dp),
-                            containerColor = MaterialTheme.colorScheme.surface
+                            containerColor = AppleTheme.colors.card
                         ) {
                             Icon(
                                 Icons.Default.MyLocation,
                                 stringResource(R.string.map_grant_location),
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = AppleTheme.colors.brand
                             )
                         }
                     }
@@ -507,7 +507,7 @@ fun MapScreen(
                         modifier  = Modifier.align(Alignment.TopEnd).padding(8.dp),
                         shape     = RoundedCornerShape(12.dp),
                         colors    = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                            containerColor = AppleTheme.colors.card.copy(alpha = 0.92f)
                         ),
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
@@ -529,13 +529,13 @@ fun MapScreen(
                             modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
                             shape    = RoundedCornerShape(10.dp),
                             colors   = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
+                                containerColor = AppleTheme.colors.card.copy(alpha = 0.92f)
                             )
                         ) {
                             Text(
                                 stringResource(R.string.map_no_coords, noCoordCount),
                                 style    = MaterialTheme.typography.labelSmall,
-                                color    = MaterialTheme.colorScheme.secondary,
+                                color    = AppleTheme.colors.secondaryLabel,
                                 modifier = Modifier.padding(8.dp)
                             )
                         }
@@ -550,7 +550,7 @@ fun MapScreen(
                 ),
                 shape     = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                 colors    = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = AppleTheme.colors.card
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
@@ -568,11 +568,11 @@ fun MapScreen(
                                 stringResource(R.string.map_selected_object),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = AppleTheme.colors.brand
                             )
                             IconButton(onClick = { selectedItem = null }) {
                                 Icon(Icons.Default.Close, null,
-                                    tint = MaterialTheme.colorScheme.secondary)
+                                    tint = AppleTheme.colors.secondaryLabel)
                             }
                         }
                         Column(
@@ -602,24 +602,24 @@ fun MapScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(Icons.Default.LocationOn, null,
-                                    tint = MaterialTheme.colorScheme.primary)
+                                    tint = AppleTheme.colors.brand)
                                 Text(
                                     stringResource(R.string.map_in_this_area),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            Badge(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+                            Badge(containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f)) {
                                 Text(
                                     listItems.size.toString(),
                                     modifier = Modifier.padding(horizontal = 4.dp),
-                                    color    = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    color    = AppleTheme.colors.brand,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                         HorizontalDivider(
-                            color     = MaterialTheme.colorScheme.outlineVariant,
+                            color     = AppleTheme.colors.separator,
                             thickness = 0.5.dp
                         )
 
@@ -631,13 +631,13 @@ fun MapScreen(
                                 ) {
                                     Icon(Icons.Default.SearchOff, null,
                                         Modifier.size(48.dp),
-                                        tint = MaterialTheme.colorScheme.outlineVariant)
+                                        tint = AppleTheme.colors.separator)
                                     Text(stringResource(R.string.map_no_addresses),
-                                        color = MaterialTheme.colorScheme.secondary)
+                                        color = AppleTheme.colors.secondaryLabel)
                                     Text(
                                         stringResource(R.string.map_add_addresses_hint),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.secondary
+                                        color = AppleTheme.colors.secondaryLabel
                                     )
                                 }
                             }
@@ -670,7 +670,7 @@ private fun MapLegendDot(color: androidx.compose.ui.graphics.Color, label: Strin
     ) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(color))
         Text(label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.secondary)
+            color = AppleTheme.colors.secondaryLabel)
     }
 }
 
@@ -698,7 +698,7 @@ fun MapListRow(obj: MapLocationItem, onClick: () -> Unit) {
         modifier  = Modifier.fillMaxWidth(),
         shape     = RoundedCornerShape(12.dp),
         colors    = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            containerColor = AppleTheme.colors.card.copy(alpha = 0.4f)
         ),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
@@ -725,13 +725,13 @@ fun MapListRow(obj: MapLocationItem, onClick: () -> Unit) {
                     listOf(obj.city, obj.subtitle).filter { it.isNotEmpty() }
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = AppleTheme.colors.secondaryLabel,
                     maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
             if (obj.latLng != null) {
                 Box(Modifier.size(8.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.tertiary))
+                    .background(AppleTheme.colors.orange))
             }
             IconButton(
                 onClick = {
@@ -747,7 +747,7 @@ fun MapListRow(obj: MapLocationItem, onClick: () -> Unit) {
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(Icons.Default.Directions, stringResource(R.string.map_route),
-                    Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Modifier.size(20.dp), tint = AppleTheme.colors.brand)
             }
         }
     }
@@ -760,7 +760,7 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
         modifier  = Modifier.fillMaxWidth(),
         shape     = RoundedCornerShape(16.dp),
         colors    = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            containerColor = AppleTheme.colors.card.copy(alpha = 0.4f)
         ),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
@@ -773,13 +773,13 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
                     modifier = Modifier.size(48.dp).clip(
                         if (item.ownerType == AddressOwnerType.COMPANY)
                             RoundedCornerShape(12.dp) else CircleShape
-                    ).background(MaterialTheme.colorScheme.primaryContainer),
+                    ).background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         if (item.ownerType == AddressOwnerType.COMPANY)
                             Icons.Default.Business else Icons.Default.Person,
-                        null, tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        null, tint = AppleTheme.colors.brand
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -789,7 +789,7 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
                     if (item.subtitle.isNotEmpty())
                         Text(item.subtitle,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary)
+                            color = AppleTheme.colors.secondaryLabel)
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "${item.addressLine}, ${item.city}, ${item.country}",
@@ -805,12 +805,12 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.GpsFixed, null, Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.tertiary)
+                        tint = AppleTheme.colors.orange)
                     Text(
                         "${"%.5f".format(item.latLng.latitude)}, " +
                         "${"%.5f".format(item.latLng.longitude)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary
+                        color = AppleTheme.colors.orange
                     )
                 }
             } else {
@@ -819,10 +819,10 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.GpsOff, null, Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.outlineVariant)
+                        tint = AppleTheme.colors.separator)
                     Text(stringResource(R.string.map_no_gps_route),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary)
+                        color = AppleTheme.colors.secondaryLabel)
                 }
             }
 
