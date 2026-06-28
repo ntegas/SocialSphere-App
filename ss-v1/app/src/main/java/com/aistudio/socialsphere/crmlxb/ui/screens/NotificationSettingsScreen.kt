@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.model.ReminderTime
+import com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -34,6 +35,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
     var callTime               by remember { AppSettings.callReminderTime }
     var showOverdue            by remember { AppSettings.showOverdue }
     var repeatOverdue          by remember { AppSettings.repeatOverdueVisually }
+    var remindStale            by remember { AppSettings.remindStaleContacts }
 
     Scaffold(
         topBar = {
@@ -85,6 +87,18 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
             }
 
             if (notificationsEnabled) {
+                // ── Пора связаться (по ритму общения) ─────────
+                NotifCard(stringResource(R.string.notif_general)) {
+                    SwitchRow(
+                        label   = stringResource(R.string.set_remind_stale),
+                        checked = remindStale,
+                        onCheckedChange = {
+                            remindStale = it
+                            NotificationScheduler.scheduleStaleCheck(ctxLabel)
+                        }
+                    )
+                }
+
                 // ── Дни рождения ──────────────────────────────
                 NotifCard(stringResource(R.string.notif_birthdays)) {
                     Text(

@@ -48,6 +48,12 @@ object NotificationScheduler {
             putExtra("content", "Напоминание: ${calendarItem.title}")
             putExtra("notificationId", getNotificationId(calendarItem.id, reminderRule.id))
             if (!phone.isNullOrBlank()) putExtra("phone", phone)
+            // ДР — на свой канал, остальное — канал событий
+            putExtra(
+                "channel",
+                if (calendarItem.type == com.aistudio.socialsphere.crmlxb.model.CalendarItemType.BIRTHDAY)
+                    NotificationHelper.CHANNEL_BIRTHDAY else NotificationHelper.CHANNEL_ID
+            )
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -71,6 +77,33 @@ object NotificationScheduler {
                 notificationTimeMillis,
                 pendingIntent
             )
+        }
+    }
+
+    private const val STALE_REQUEST_CODE = 770001
+
+    /** Планирует ежедневную проверку «пора связаться» на ближайшие 10:00.
+     *  Receiver после показа переустанавливает себя на следующий день. */
+    fun scheduleStaleCheck(context: Context) {
+        AppSettings.init(context) // идемпотентно; нужно на «холодном» бутe
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, StaleContactsReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, STALE_REQUEST_CODE, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (!AppSettings.isNotificationsEnabled.value || !AppSettings.remindStaleContacts.value) {
+            alarmManager.cancel(pendingIntent)
+            return
+        }
+        val now = LocalDateTime.now()
+        var next = now.toLocalDate().atTime(LocalTime.of(10, 0))
+        if (!next.isAfter(now)) next = next.plusDays(1)
+        val fireAt = next.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        try {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pendingIntent)
+        } catch (e: SecurityException) {
+            alarmManager.set(AlarmManager.RTC_WAKEUP, fireAt, pendingIntent)
         }
     }
 

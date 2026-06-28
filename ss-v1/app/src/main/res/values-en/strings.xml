@@ -878,4 +878,5 @@
     <string name="comp_stat_contacts">contacts</string>
     <string name="comp_stat_key">key</string>
     <string name="comp_stat_important">important</string>
+    <string name="set_remind_stale">Remind me to reach out</string>
 </resources>

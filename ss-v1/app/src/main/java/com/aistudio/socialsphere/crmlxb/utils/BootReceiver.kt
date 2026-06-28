@@ -16,6 +16,7 @@ class BootReceiver : BroadcastReceiver() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     NotificationScheduler.rescheduleAll(context, db)
+                    NotificationScheduler.scheduleStaleCheck(context)
                 } finally {
                     pendingResult.finish()
                 }

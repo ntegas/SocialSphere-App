@@ -36,7 +36,8 @@ class NotificationReceiver : BroadcastReceiver() {
             title = title,
             content = content,
             targetCalendarItemId = calendarItemId,
-            phone = phone
+            phone = phone,
+            channelId = intent.getStringExtra("channel") ?: NotificationHelper.CHANNEL_ID
         )
     }
 }

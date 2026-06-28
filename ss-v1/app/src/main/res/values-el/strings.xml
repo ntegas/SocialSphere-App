@@ -878,4 +878,5 @@
     <string name="comp_stat_contacts">επαφές</string>
     <string name="comp_stat_key">βασικές</string>
     <string name="comp_stat_important">σημαντικές</string>
+    <string name="set_remind_stale">Υπενθύμιση επικοινωνίας</string>
 </resources>

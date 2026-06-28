@@ -11,19 +11,31 @@ import com.aistudio.socialsphere.crmlxb.MainActivity
 import com.aistudio.socialsphere.crmlxb.R // Important: adjust to project R package
 
 object NotificationHelper {
-    const val CHANNEL_ID = "socialsphere_reminders"
-    const val CHANNEL_NAME = "Socialsphere reminders"
-    const val CHANNEL_DESCRIPTION = "Напоминания Socialsphere"
+    // Раздельные каналы — чтобы пользователь управлял звуком/важностью каждого
+    // типа из системных настроек по отдельности.
+    const val CHANNEL_ID = "socialsphere_reminders"        // события календаря
+    const val CHANNEL_NAME = "Напоминания о событиях"
+    const val CHANNEL_DESCRIPTION = "Напоминания о событиях календаря"
+    const val CHANNEL_REACH_OUT = "socialsphere_reach_out" // «пора связаться»
+    const val CHANNEL_BIRTHDAY  = "socialsphere_birthday"  // дни рождения
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
-                description = CHANNEL_DESCRIPTION
-            }
-            val notificationManager: NotificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val high = NotificationManager.IMPORTANCE_HIGH
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, CHANNEL_NAME, high).apply { description = CHANNEL_DESCRIPTION }
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_REACH_OUT, "Пора связаться", high).apply {
+                    description = "Напоминания связаться по ритму общения"
+                }
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_BIRTHDAY, "Дни рождения", high).apply {
+                    description = "Напоминания о днях рождения"
+                }
+            )
         }
     }
 
@@ -33,7 +45,8 @@ object NotificationHelper {
         title: String,
         content: String,
         targetCalendarItemId: String?,
-        phone: String? = null
+        phone: String? = null,
+        channelId: String = CHANNEL_ID
     ) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -49,7 +62,7 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_popup_reminder) // better to use our icon but fallback is fine
             .setContentTitle(title)
             .setContentText(content)

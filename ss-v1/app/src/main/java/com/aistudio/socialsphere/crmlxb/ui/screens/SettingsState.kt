@@ -81,6 +81,17 @@ object AppSettings {
     val showOverdue            = mutableStateOf(true)
     val repeatOverdueVisually  = mutableStateOf(false)
 
+    /** Ежедневное напоминание «пора связаться» (по ритму общения). Персистентно. */
+    val remindStaleContacts: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "remind_stale_contacts",
+            default     = true,
+            serialize   = { it.toString() },
+            deserialize = { it == "true" }
+        )
+    }
+
     // ── Календарь (персистентно) ──
     val calendarDefaultMode: MutableState<CalendarViewMode> by lazy {
         PersistedMutableState(

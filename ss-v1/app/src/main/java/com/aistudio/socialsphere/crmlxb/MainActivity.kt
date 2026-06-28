@@ -29,12 +29,32 @@ import com.aistudio.socialsphere.crmlxb.data.local.SocialsphereDatabase
 import com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings
 
 class MainActivity : ComponentActivity() {
+    // Запрос разрешения на показ уведомлений (Android 13+). Результат не критичен:
+    // если откажут — уведомления просто не покажутся, логика планирования цела.
+    private val notifPermLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         AppSettings.init(applicationContext)
         val db = SocialsphereDatabase.getDatabase(applicationContext)
         AppStateStore.initialize(db)
+        // Ежедневное «пора связаться» (по ритму общения)
+        com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+            .scheduleStaleCheck(applicationContext)
+
+        // Android 13+: без POST_NOTIFICATIONS уведомления НЕ показываются. Раньше
+        // разрешение просили только при добавлении напоминания к событию — поэтому
+        // «пора связаться» и пр. могли молча не приходить. Просим при старте.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
 
         enableEdgeToEdge()
         setContent {
