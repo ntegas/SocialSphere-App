@@ -26,7 +26,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SizeInfoEntity::class,
         PersonalDetailEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class SocialsphereDatabase : RoomDatabase() {
@@ -121,6 +121,13 @@ abstract class SocialsphereDatabase : RoomDatabase() {
             }
         }
 
+        // v8: связь контакта с телефонной книгой для синхронизации «обновить из телефона»
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE contacts ADD COLUMN deviceContactId TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): SocialsphereDatabase {
             return INSTANCE ?: synchronized(this) {
                 val builder = Room.databaseBuilder(
@@ -128,7 +135,7 @@ abstract class SocialsphereDatabase : RoomDatabase() {
                     SocialsphereDatabase::class.java,
                     "socialsphere_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
 
                 // Destructive fallback — ТОЛЬКО в debug. В release недостающая
                 // миграция/несовпадение схемы должны падать с явной ошибкой Room,

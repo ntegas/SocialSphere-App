@@ -881,4 +881,9 @@
     <string name="set_remind_stale">Υπενθύμιση επικοινωνίας</string>
     <string name="set_remind_birthdays">Υπενθύμιση γενεθλίων</string>
     <string name="set_remind_no_next_step">Σύνοψη: χωρίς επόμενο βήμα</string>
+    <string name="sync_link_phone">Σύνδεση με επαφή τηλεφώνου</string>
+    <string name="sync_change_link">Αλλαγή σύνδεσης τηλεφώνου</string>
+    <string name="sync_update_from_phone">Ενημέρωση από τηλέφωνο</string>
+    <string name="sync_pick_contact">Επιλέξτε επαφή τηλεφώνου</string>
+    <string name="sync_linked">Συνδεδεμένο με τηλέφωνο</string>
 </resources>

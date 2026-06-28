@@ -25,6 +25,7 @@ data class ContactEntity(
     val talkingPoints: String? = null,
     val meetContext: String? = null,
     val meetDate: String? = null,
+    val deviceContactId: String? = null,
     val createdAt: String,
     val updatedAt: String
 )

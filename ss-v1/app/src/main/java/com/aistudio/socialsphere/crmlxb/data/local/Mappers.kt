@@ -28,6 +28,7 @@ fun Contact.toEntity(): ContactEntity = ContactEntity(
     talkingPoints     = talkingPoints,
     meetContext       = meetContext,
     meetDate          = meetDate,
+    deviceContactId   = deviceContactId,
     createdAt         = createdAt,
     updatedAt         = updatedAt
 )
@@ -230,6 +231,7 @@ fun ContactEntity.toDomain(): Contact = Contact(
     talkingPoints       = talkingPoints,
     meetContext         = meetContext,
     meetDate            = meetDate,
+    deviceContactId     = deviceContactId,
     createdAt           = createdAt,
     updatedAt           = updatedAt
 )

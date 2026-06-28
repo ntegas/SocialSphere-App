@@ -881,4 +881,9 @@
     <string name="set_remind_stale">Remind me to reach out</string>
     <string name="set_remind_birthdays">Remind me of birthdays</string>
     <string name="set_remind_no_next_step">Summary: no next step</string>
+    <string name="sync_link_phone">Link to phone contact</string>
+    <string name="sync_change_link">Change phone link</string>
+    <string name="sync_update_from_phone">Update from phone</string>
+    <string name="sync_pick_contact">Pick a phone contact</string>
+    <string name="sync_linked">Linked to phone</string>
 </resources>

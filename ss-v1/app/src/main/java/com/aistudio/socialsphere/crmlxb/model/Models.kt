@@ -20,6 +20,9 @@ data class Contact(
     val talkingPoints: String? = null,
     val meetContext: String? = null,
     val meetDate: String? = null,
+    /** Связь с контактом телефонной книги (id вида device_contact_<CONTACT_ID>)
+     *  для синхронизации «обновить из телефона». null — не связан. */
+    val deviceContactId: String? = null,
     val companyRelations: List<ContactCompanyRelation> = emptyList(),
     val phones: List<ContactPhone> = emptyList(),
     val emails: List<ContactEmail> = emptyList(),

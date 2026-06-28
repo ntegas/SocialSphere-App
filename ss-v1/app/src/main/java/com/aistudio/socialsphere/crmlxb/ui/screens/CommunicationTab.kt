@@ -438,4 +438,125 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
             Text(stringResource(R.string.cd_save_to_phone))
         }
     }
+
+    // Синхронизация с телефонной книгой (Фаза A: связать + тянуть, без записи в
+    // книгу телефона). «Обновить из телефона» аддитивно подтягивает имя/тел/почты/
+    // адреса связанного контакта, ничего не удаляя.
+    item {
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        val scope = rememberCoroutineScope()
+        var showLink by remember { mutableStateOf(false) }
+        var deviceList by remember { mutableStateOf<List<ImportContactCandidate>>(emptyList()) }
+        var search by remember { mutableStateOf("") }
+
+        fun loadDevices(thenShow: Boolean) {
+            scope.launch {
+                val list = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getDeviceContacts(ctx)
+                }
+                deviceList = list
+                if (thenShow) showLink = true
+            }
+        }
+        val permLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+        ) { granted -> if (granted) loadDevices(true) }
+        fun ensureThen(show: Boolean) {
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                ctx, android.Manifest.permission.READ_CONTACTS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (granted) loadDevices(show)
+            else permLauncher.launch(android.Manifest.permission.READ_CONTACTS)
+        }
+
+        fun pullFromPhone() {
+            val id = contact.deviceContactId ?: return
+            scope.launch {
+                val list = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getDeviceContacts(ctx)
+                }
+                val dev = list.firstOrNull { it.id == id } ?: return@launch
+                fun digits(s: String) = s.filter { it.isDigit() }
+                val mergedPhones = contact.phones + dev.phones
+                    .filter { d -> contact.phones.none { digits(it.number) == digits(d.number) } }
+                    .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = contact.id) }
+                val mergedEmails = contact.emails + dev.emails
+                    .filter { d -> contact.emails.none { it.email.equals(d.email, ignoreCase = true) } }
+                    .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = contact.id) }
+                val mergedAddrs = contact.addresses + dev.addresses
+                    .filter { d -> contact.addresses.none { it.addressLine == d.addressLine && it.city == d.city } }
+                    .map { it.copy(id = java.util.UUID.randomUUID().toString(), ownerId = contact.id, ownerType = AddressOwnerType.CONTACT) }
+                AppStateStore.updateContact(contact.copy(
+                    firstName = contact.firstName.ifBlank { dev.firstName },
+                    lastName  = contact.lastName.ifBlank { dev.lastName },
+                    phones    = mergedPhones,
+                    emails    = mergedEmails,
+                    addresses = mergedAddrs
+                ))
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(onClick = { ensureThen(true) }, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Default.Link, null, Modifier.size(16.dp).padding(end = 4.dp))
+                Text(
+                    stringResource(
+                        if (contact.deviceContactId == null) R.string.sync_link_phone
+                        else R.string.sync_change_link
+                    ),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (contact.deviceContactId != null) {
+                OutlinedButton(onClick = { pullFromPhone() }, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Sync, null, Modifier.size(16.dp).padding(end = 4.dp))
+                    Text(stringResource(R.string.sync_update_from_phone), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        if (contact.deviceContactId != null) {
+            Text(
+                stringResource(R.string.sync_linked),
+                style = MaterialTheme.typography.labelSmall,
+                color = AppleTheme.colors.secondaryLabel,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+
+        if (showLink) {
+            val filtered = deviceList.filter {
+                "${it.firstName} ${it.lastName}".contains(search, ignoreCase = true)
+            }
+            AlertDialog(
+                onDismissRequest = { showLink = false; search = "" },
+                title = { Text(stringResource(R.string.sync_pick_contact), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = search, onValueChange = { search = it },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true,
+                            placeholder = { Text(stringResource(R.string.ce_search_contact)) }
+                        )
+                        filtered.take(20).forEach { d ->
+                            Text(
+                                "${d.firstName} ${d.lastName}".trim().ifBlank { d.phones.firstOrNull()?.number ?: "—" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.fillMaxWidth()
+                                    .clickable {
+                                        AppStateStore.updateContact(contact.copy(deviceContactId = d.id))
+                                        showLink = false; search = ""
+                                    }
+                                    .padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = { TextButton(onClick = { showLink = false; search = "" }) { Text(stringResource(R.string.common_cancel)) } }
+            )
+        }
+    }
 }

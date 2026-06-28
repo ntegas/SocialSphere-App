@@ -881,4 +881,9 @@
     <string name="set_remind_stale">Напоминать: пора связаться</string>
     <string name="set_remind_birthdays">Напоминать о днях рождения</string>
     <string name="set_remind_no_next_step">Сводка: без следующего шага</string>
+    <string name="sync_link_phone">Связать с контактом телефона</string>
+    <string name="sync_change_link">Изменить связь с телефоном</string>
+    <string name="sync_update_from_phone">Обновить из телефона</string>
+    <string name="sync_pick_contact">Выберите контакт телефона</string>
+    <string name="sync_linked">Связан с телефоном</string>
 </resources>
