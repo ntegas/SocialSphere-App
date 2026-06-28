@@ -452,7 +452,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
         fun loadDevices(thenShow: Boolean) {
             scope.launch {
                 val list = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    getDeviceContacts(ctx)
+                    ContactImporter.getDeviceContacts(ctx)
                 }
                 deviceList = list
                 if (thenShow) showLink = true
@@ -473,7 +473,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
             val id = contact.deviceContactId ?: return
             scope.launch {
                 val list = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    getDeviceContacts(ctx)
+                    ContactImporter.getDeviceContacts(ctx)
                 }
                 val dev = list.firstOrNull { it.id == id } ?: return@launch
                 fun digits(s: String) = s.filter { it.isDigit() }
