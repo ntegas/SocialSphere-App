@@ -36,6 +36,8 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
     var showOverdue            by remember { AppSettings.showOverdue }
     var repeatOverdue          by remember { AppSettings.repeatOverdueVisually }
     var remindStale            by remember { AppSettings.remindStaleContacts }
+    var remindBday             by remember { AppSettings.remindBirthdays }
+    var remindNoStep           by remember { AppSettings.remindNoNextStep }
 
     Scaffold(
         topBar = {
@@ -94,6 +96,22 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                         checked = remindStale,
                         onCheckedChange = {
                             remindStale = it
+                            NotificationScheduler.scheduleStaleCheck(ctxLabel)
+                        }
+                    )
+                    SwitchRow(
+                        label   = stringResource(R.string.set_remind_birthdays),
+                        checked = remindBday,
+                        onCheckedChange = {
+                            remindBday = it
+                            NotificationScheduler.scheduleStaleCheck(ctxLabel)
+                        }
+                    )
+                    SwitchRow(
+                        label   = stringResource(R.string.set_remind_no_next_step),
+                        checked = remindNoStep,
+                        onCheckedChange = {
+                            remindNoStep = it
                             NotificationScheduler.scheduleStaleCheck(ctxLabel)
                         }
                     )

@@ -879,4 +879,6 @@
     <string name="comp_stat_key">ключевых</string>
     <string name="comp_stat_important">важных</string>
     <string name="set_remind_stale">Напоминать: пора связаться</string>
+    <string name="set_remind_birthdays">Напоминать о днях рождения</string>
+    <string name="set_remind_no_next_step">Сводка: без следующего шага</string>
 </resources>

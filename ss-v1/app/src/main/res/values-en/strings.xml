@@ -879,4 +879,6 @@
     <string name="comp_stat_key">key</string>
     <string name="comp_stat_important">important</string>
     <string name="set_remind_stale">Remind me to reach out</string>
+    <string name="set_remind_birthdays">Remind me of birthdays</string>
+    <string name="set_remind_no_next_step">Summary: no next step</string>
 </resources>

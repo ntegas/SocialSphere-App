@@ -92,6 +92,23 @@ object AppSettings {
         )
     }
 
+    /** Независимый ежедневный пуш «сегодня день рождения» (не зависит от того,
+     *  добавлено ли напоминание к событию). Персистентно. */
+    val remindBirthdays: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "remind_birthdays", default = true,
+            serialize = { it.toString() }, deserialize = { it == "true" }
+        )
+    }
+
+    /** Ежедневная сводка «контакты без следующего шага». По умолчанию выкл. */
+    val remindNoNextStep: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "remind_no_next_step", default = false,
+            serialize = { it.toString() }, deserialize = { it == "true" }
+        )
+    }
+
     // ── Календарь (персистентно) ──
     val calendarDefaultMode: MutableState<CalendarViewMode> by lazy {
         PersistedMutableState(

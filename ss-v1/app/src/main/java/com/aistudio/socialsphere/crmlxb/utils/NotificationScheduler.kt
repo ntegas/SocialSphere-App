@@ -92,7 +92,9 @@ object NotificationScheduler {
             context, STALE_REQUEST_CODE, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        if (!AppSettings.isNotificationsEnabled.value || !AppSettings.remindStaleContacts.value) {
+        val anyDaily = AppSettings.remindStaleContacts.value ||
+            AppSettings.remindBirthdays.value || AppSettings.remindNoNextStep.value
+        if (!AppSettings.isNotificationsEnabled.value || !anyDaily) {
             alarmManager.cancel(pendingIntent)
             return
         }
