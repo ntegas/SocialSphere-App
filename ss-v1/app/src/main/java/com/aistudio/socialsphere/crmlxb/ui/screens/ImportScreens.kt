@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import androidx.compose.ui.graphics.Color
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.ContactImporter
 import com.aistudio.socialsphere.crmlxb.utils.parseVCard
@@ -141,7 +143,7 @@ fun ImportContactsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -158,7 +160,7 @@ fun ImportContactsScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.Contacts, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Contacts, contentDescription = null, modifier = Modifier.size(64.dp), tint = AppleTheme.colors.red)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(stringResource(R.string.imp_need_permission), style = MaterialTheme.typography.bodyLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Spacer(modifier = Modifier.height(24.dp))
@@ -207,7 +209,7 @@ fun ImportContactsScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
+                            containerColor = AppleTheme.colors.red.copy(alpha = 0.12f)
                         )
                     ) {
                         Row(
@@ -216,11 +218,11 @@ fun ImportContactsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(Icons.Default.Error, null,
-                                tint = MaterialTheme.colorScheme.error)
+                                tint = AppleTheme.colors.red)
                             Text(
                                 fileError ?: "",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                                color = AppleTheme.colors.red
                             )
                         }
                     }
@@ -230,7 +232,7 @@ fun ImportContactsScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = AppleTheme.colors.card.copy(alpha = 0.5f)
                     )
                 ) {
                     Column(
@@ -242,14 +244,14 @@ fun ImportContactsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.ContactPhone, null,
-                                tint = MaterialTheme.colorScheme.primary)
+                                tint = AppleTheme.colors.brand)
                             Text(stringResource(R.string.imp_vcard_title),
                                 fontWeight = FontWeight.Bold)
                         }
                         Text(
                             stringResource(R.string.imp_vcard_desc),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = AppleTheme.colors.secondaryLabel
                         )
                         Button(
                             onClick = { vcfLauncher.launch("*/*") },
@@ -267,7 +269,7 @@ fun ImportContactsScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = AppleTheme.colors.card.copy(alpha = 0.5f)
                     )
                 ) {
                     Column(
@@ -279,14 +281,14 @@ fun ImportContactsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.TableChart, null,
-                                tint = MaterialTheme.colorScheme.primary)
+                                tint = AppleTheme.colors.brand)
                             Text(stringResource(R.string.imp_csv_title),
                                 fontWeight = FontWeight.Bold)
                         }
                         Text(
                             stringResource(R.string.imp_csv_desc),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = AppleTheme.colors.secondaryLabel
                         )
                         Button(
                             onClick = { csvLauncher.launch("*/*") },
@@ -363,7 +365,7 @@ fun ImportPreviewScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         },
         bottomBar = {
@@ -371,7 +373,7 @@ fun ImportPreviewScreen(
             val scope = rememberCoroutineScope()
             var isImporting by remember { mutableStateOf(false) }
 
-            BottomAppBar(containerColor = MaterialTheme.colorScheme.surface) {
+            BottomAppBar(containerColor = AppleTheme.colors.card) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -396,7 +398,7 @@ fun ImportPreviewScreen(
                             CircularProgressIndicator(
                                 Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color = Color.White
                             )
                         } else {
                             Text(stringResource(R.string.imp_import_btn))
@@ -414,7 +416,7 @@ fun ImportPreviewScreen(
             items(candidates, key = { it.id }) { candidate ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
                 ) {
                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
@@ -431,13 +433,13 @@ fun ImportPreviewScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(text = "${candidate.firstName} ${candidate.lastName}".trim().takeIf { it.isNotBlank() } ?: stringResource(R.string.imp_no_name), fontWeight = FontWeight.Bold)
                             if (candidate.companyName != null || candidate.jobTitle != null) {
-                                Text(text = listOfNotNull(candidate.jobTitle, candidate.companyName).joinToString(stringResource(R.string.imp_job_at)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                Text(text = listOfNotNull(candidate.jobTitle, candidate.companyName).joinToString(stringResource(R.string.imp_job_at)), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand)
                             }
                             if (candidate.phones.isNotEmpty()) {
-                                Text(text = candidate.phones.first().number, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                                Text(text = candidate.phones.first().number, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                             }
                             if (candidate.emails.isNotEmpty()) {
-                                Text(text = candidate.emails.first().email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                                Text(text = candidate.emails.first().email, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -447,7 +449,7 @@ fun ImportPreviewScreen(
                             DuplicateStatus.WILL_UPDATE -> stringResource(R.string.imp_status_update)
                             DuplicateStatus.SKIPPED -> stringResource(R.string.imp_status_skip)
                         }
-                        val statusColor = if (candidate.duplicateStatus == DuplicateStatus.NEW) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        val statusColor = if (candidate.duplicateStatus == DuplicateStatus.NEW) AppleTheme.colors.brand else AppleTheme.colors.red
                         Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(statusColor.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                             Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
                         }
@@ -623,13 +625,13 @@ fun ImportDuplicatesScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
         if (duplicateCandidates.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.imp_no_unresolved), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.secondary)
+                Text(stringResource(R.string.imp_no_unresolved), style = MaterialTheme.typography.bodyLarge, color = AppleTheme.colors.secondaryLabel)
             }
             return@Scaffold
         }
@@ -639,14 +641,14 @@ fun ImportDuplicatesScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-             Text(stringResource(R.string.imp_choose_dup_action), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+             Text(stringResource(R.string.imp_choose_dup_action), style = MaterialTheme.typography.bodyMedium, color = AppleTheme.colors.secondaryLabel)
             }
             items(duplicateCandidates, key = { it.id }) { candidate ->
                 val scope = rememberCoroutineScope()
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -799,7 +801,7 @@ fun ImportResultScreen(
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.imp_close))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -808,10 +810,10 @@ fun ImportResultScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.imp_success), modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.imp_success), modifier = Modifier.size(64.dp), tint = AppleTheme.colors.brand)
             Text(stringResource(R.string.imp_done), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.3f))) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ResultRow(stringResource(R.string.imp_contacts_imported), ImportResultStats.contactsImported)
                     ResultRow(stringResource(R.string.imp_companies_created), ImportResultStats.companiesCreated)
@@ -842,7 +844,7 @@ fun ImportResultScreen(
 @Composable
 fun ResultRow(label: String, value: Int) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = AppleTheme.colors.secondaryLabel)
         Text(value.toString(), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
     }
 }

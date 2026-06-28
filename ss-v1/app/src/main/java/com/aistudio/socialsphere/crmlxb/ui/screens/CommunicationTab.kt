@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -415,18 +416,21 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
         }
     }
 
-    // Способ A: записать контакт в телефонную книгу (системный экран, без прав)
+    // Запись в телефонную книгу: полный vCard (имя, ВСЕ телефоны/почты с главным,
+    // адреса с типом, день рождения, заметки + app-поля, компания/должность,
+    // мессенджеры) → системный импорт «Контакты». Раньше уходили только имя+
+    // телефоны+почты (Insert-интент), остальное терялось.
     item {
         val ctx = androidx.compose.ui.platform.LocalContext.current
+        val scope = rememberCoroutineScope()
         Button(
             onClick = {
-                com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.saveToPhoneContacts(
-                    context  = ctx,
-                    fullName = listOf(contact.firstName, contact.lastName)
-                        .filter { it.isNotBlank() }.joinToString(" "),
-                    phones   = contact.phones.map { it.number },
-                    emails   = contact.emails.map { it.email }
-                )
+                scope.launch {
+                    val file = com.aistudio.socialsphere.crmlxb.utils.ExportManager
+                        .exportContactVCard(ctx, contact)
+                    com.aistudio.socialsphere.crmlxb.utils.ExportManager
+                        .openVcfInContacts(ctx, file)
+                }
             },
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
         ) {

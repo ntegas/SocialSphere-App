@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -140,7 +141,7 @@ fun ImportExportSettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background)
+                    containerColor = AppleTheme.colors.groupedBackground)
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -303,7 +304,7 @@ fun ImportExportSettingsScreen(
                         Arrangement.SpaceBetween
                     ) {
                         Text(label, style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.secondary)
+                            color = AppleTheme.colors.secondaryLabel)
                         Text(count.toString(), style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold)
                     }
@@ -320,15 +321,15 @@ private fun ExportSectionCard(title: String, content: @Composable ColumnScope.()
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors   = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface),
+            containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary)
+                color = AppleTheme.colors.brand)
             Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
             Spacer(Modifier.height(8.dp))
             content()
         }
@@ -350,19 +351,19 @@ private fun ExportRow(
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+        Icon(icon, null, tint = AppleTheme.colors.brand)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(text, style = MaterialTheme.typography.bodyLarge)
             if (subtitle.isNotEmpty())
                 Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary)
+                    color = AppleTheme.colors.secondaryLabel)
         }
         if (loading) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         } else {
             Icon(Icons.Default.ChevronRight, null,
-                tint = MaterialTheme.colorScheme.secondary)
+                tint = AppleTheme.colors.secondaryLabel)
         }
     }
 }
@@ -383,19 +384,19 @@ fun ActionRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, null,
-            tint = if (enabled) MaterialTheme.colorScheme.primary
-                   else MaterialTheme.colorScheme.outlineVariant)
+            tint = if (enabled) AppleTheme.colors.brand
+                   else AppleTheme.colors.separator)
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(text,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface
-                        else MaterialTheme.colorScheme.outlineVariant)
+                color = if (enabled) AppleTheme.colors.label
+                        else AppleTheme.colors.separator)
             if (subtitle.isNotEmpty())
                 Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary)
+                    color = AppleTheme.colors.secondaryLabel)
         }
         Icon(Icons.Default.ChevronRight, null,
-            tint = MaterialTheme.colorScheme.secondary)
+            tint = AppleTheme.colors.secondaryLabel)
     }
 }

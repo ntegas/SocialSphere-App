@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
@@ -37,7 +38,7 @@ fun CalendarSettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -65,7 +66,7 @@ fun CalendarSettingsScreen(
                 Text(
                     stringResource(R.string.calset_mode_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = AppleTheme.colors.secondaryLabel
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(stringResource(R.string.calset_first_day), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
@@ -81,13 +82,13 @@ fun CalendarSettingsScreen(
 
             CardBlock(stringResource(R.string.calset_colors)) {
                 val colorMap = mapOf(
-                    stringResource(R.string.evt_birthday) to MaterialTheme.colorScheme.primaryContainer,
-                    stringResource(R.string.evt_meeting) to MaterialTheme.colorScheme.tertiaryContainer,
-                    stringResource(R.string.evt_call) to MaterialTheme.colorScheme.secondaryContainer,
-                    stringResource(R.string.evt_gift) to MaterialTheme.colorScheme.primaryContainer,
-                    stringResource(R.string.evt_task) to MaterialTheme.colorScheme.surfaceVariant,
-                    stringResource(R.string.evt_note) to MaterialTheme.colorScheme.surfaceVariant,
-                    stringResource(R.string.evt_company) to MaterialTheme.colorScheme.secondaryContainer
+                    stringResource(R.string.evt_birthday) to AppleTheme.colors.brand.copy(alpha = 0.10f),
+                    stringResource(R.string.evt_meeting) to AppleTheme.colors.orange.copy(alpha = 0.14f),
+                    stringResource(R.string.evt_call) to AppleTheme.colors.fill,
+                    stringResource(R.string.evt_gift) to AppleTheme.colors.brand.copy(alpha = 0.10f),
+                    stringResource(R.string.evt_task) to AppleTheme.colors.card,
+                    stringResource(R.string.evt_note) to AppleTheme.colors.card,
+                    stringResource(R.string.evt_company) to AppleTheme.colors.fill
                 )
                 colorMap.forEach { (name, color) ->
                     Row(
@@ -105,7 +106,7 @@ fun CalendarSettingsScreen(
                 Text(
                     stringResource(R.string.calset_visibility_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = AppleTheme.colors.secondaryLabel,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 val typeRows = listOf(

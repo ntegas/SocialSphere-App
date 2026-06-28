@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import androidx.compose.ui.graphics.Color
 
 import kotlinx.coroutines.launch
 
@@ -114,9 +115,17 @@ fun ContactEditScreen(
     var newMessengerType by remember { mutableStateOf(MessengerType.TELEGRAM) }
 
     fun buildAndSave() {
+        // Связи с ДРУГИМИ компаниями (например, добавленные со стороны карточки
+        // компании) сохраняем — раньше правка контакта затирала их одной основной,
+        // и человек пропадал из остальных компаний.
+        val otherCompRels = (originalContact?.companyRelations ?: emptyList())
+            .filter { it.companyId != selectedCompanyId }
+            .map { it.copy(isPrimary = false) }
         val compRelList = if (selectedCompanyId.isNotBlank()) listOf(
             ContactCompanyRelation(
-                id = originalContact?.companyRelations?.firstOrNull()?.id ?: UUID.randomUUID().toString(),
+                id = originalContact?.companyRelations?.firstOrNull { it.companyId == selectedCompanyId }?.id
+                    ?: originalContact?.companyRelations?.firstOrNull()?.id
+                    ?: UUID.randomUUID().toString(),
                 contactId  = editedContactId,
                 companyId  = selectedCompanyId,
                 position   = companyPosition.ifBlank { null },
@@ -129,7 +138,7 @@ fun ContactEditScreen(
                 officeAddressId = null,
                 isPrimary  = true
             )
-        ) else originalContact?.companyRelations ?: emptyList()
+        ) + otherCompRels else originalContact?.companyRelations ?: emptyList()
 
         val newContact = Contact(
             id               = editedContactId,
@@ -213,9 +222,9 @@ fun ContactEditScreen(
                             enabled = false, shape = SocialShape.Small,
                             trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
                             colors = OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                disabledTextColor = AppleTheme.colors.label,
+                                disabledBorderColor = AppleTheme.colors.tertiaryLabel,
+                                disabledLabelColor = AppleTheme.colors.secondaryLabel
                             )
                         )
                     }
@@ -249,7 +258,7 @@ fun ContactEditScreen(
                                             if (candidates.isEmpty()) stringResource(R.string.ce_no_contacts_avail)
                                             else stringResource(R.string.ce_no_picker_results, pickerQuery),
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.secondary,
+                                            color = AppleTheme.colors.secondaryLabel,
                                             modifier = Modifier.padding(vertical = 16.dp)
                                         )
                                     } else {
@@ -271,7 +280,7 @@ fun ContactEditScreen(
                                                         modifier = Modifier
                                                             .size(36.dp)
                                                             .clip(CircleShape)
-                                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                                            .background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Text(
@@ -279,7 +288,7 @@ fun ContactEditScreen(
                                                                 .mapNotNull { it.firstOrNull()?.uppercase() }
                                                                 .take(2).joinToString(""),
                                                             style = MaterialTheme.typography.labelMedium,
-                                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            color = AppleTheme.colors.brand,
                                                             fontWeight = FontWeight.Bold
                                                         )
                                                     }
@@ -289,12 +298,12 @@ fun ContactEditScreen(
                                                         if (!c.nickname.isNullOrBlank()) {
                                                             Text("«${c.nickname}»",
                                                                 style = MaterialTheme.typography.bodySmall,
-                                                                color = MaterialTheme.colorScheme.secondary)
+                                                                color = AppleTheme.colors.secondaryLabel)
                                                         }
                                                     }
                                                 }
                                                 HorizontalDivider(
-                                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                                    color = AppleTheme.colors.separator,
                                                     thickness = 0.5.dp
                                                 )
                                             }
@@ -387,7 +396,7 @@ fun ContactEditScreen(
             title = { Text(stringResource(R.string.ce_add_messenger), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.ce_platform), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.ce_platform), style = MaterialTheme.typography.labelMedium, color = AppleTheme.colors.secondaryLabel)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MessengerType.values().forEach { mt ->
                             FilterChip(
@@ -443,16 +452,16 @@ fun ContactEditScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Box(contentAlignment = Alignment.BottomEnd) {
                         Box(
-                            modifier = Modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                            modifier = Modifier.size(64.dp).clip(CircleShape).background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
                             contentAlignment = Alignment.Center
                         ) {
                             val initial = (firstName.firstOrNull() ?: lastName.firstOrNull() ?: '?').uppercaseChar()
-                            Text(initial.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text(initial.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand)
                         }
                         Box(
-                            modifier = Modifier.size(22.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.size(22.dp).clip(CircleShape).background(AppleTheme.colors.brand),
                             contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.CameraAlt, null, Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onPrimary) }
+                        ) { Icon(Icons.Default.CameraAlt, null, Modifier.size(12.dp), tint = Color.White) }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                         OutlinedTextField(value = firstName, onValueChange = { firstName = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_name_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
@@ -465,7 +474,7 @@ fun ContactEditScreen(
             // ── Phones ────────────────────────────────────────────────
             SectionCard(stringResource(R.string.ce_phones)) {
                 if (phones.isEmpty()) {
-                    Text(stringResource(R.string.ce_no_phones), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.ce_no_phones), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         phones.forEachIndexed { idx, phone ->
@@ -473,10 +482,22 @@ fun ContactEditScreen(
                                 OutlinedTextField(
                                     value = phone.number, onValueChange = { num -> phones = phones.toMutableList().also { it[idx] = phone.copy(number = num) } },
                                     label = { Text(phone.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small,
-                                    leadingIcon = { if (phone.isPrimary) Icon(Icons.Default.Star, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
+                                    leadingIcon = {
+                                        IconButton(
+                                            onClick = { phones = phones.mapIndexed { i, p -> p.copy(isPrimary = i == idx) } },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                if (phone.isPrimary) Icons.Default.Star else Icons.Default.StarBorder,
+                                                contentDescription = stringResource(R.string.ce_make_primary),
+                                                modifier = Modifier.size(18.dp),
+                                                tint = if (phone.isPrimary) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel
+                                            )
+                                        }
+                                    }
                                 )
                                 IconButton(onClick = { phones = phones.toMutableList().also { it.removeAt(idx) } }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = AppleTheme.colors.red)
                                 }
                             }
                         }
@@ -492,17 +513,30 @@ fun ContactEditScreen(
             // ── Emails ────────────────────────────────────────────────
             SectionCard("Email") {
                 if (emails.isEmpty()) {
-                    Text(stringResource(R.string.ce_no_email), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.ce_no_email), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         emails.forEachIndexed { idx, email ->
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedTextField(
                                     value = email.email, onValueChange = { v -> emails = emails.toMutableList().also { it[idx] = email.copy(email = v) } },
-                                    label = { Text(email.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small
+                                    label = { Text(email.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small,
+                                    leadingIcon = {
+                                        IconButton(
+                                            onClick = { emails = emails.mapIndexed { i, e -> e.copy(isPrimary = i == idx) } },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                if (email.isPrimary) Icons.Default.Star else Icons.Default.StarBorder,
+                                                contentDescription = stringResource(R.string.ce_make_primary),
+                                                modifier = Modifier.size(18.dp),
+                                                tint = if (email.isPrimary) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel
+                                            )
+                                        }
+                                    }
                                 )
                                 IconButton(onClick = { emails = emails.toMutableList().also { it.removeAt(idx) } }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = AppleTheme.colors.red)
                                 }
                             }
                         }
@@ -516,7 +550,7 @@ fun ContactEditScreen(
             // ── Messengers ────────────────────────────────────────────
             SectionCard(stringResource(R.string.ce_messengers)) {
                 if (messengers.isEmpty()) {
-                    Text(stringResource(R.string.ce_no_messengers), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.ce_no_messengers), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         messengers.forEachIndexed { idx, m ->
@@ -526,7 +560,7 @@ fun ContactEditScreen(
                                     label = { Text(m.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small
                                 )
                                 IconButton(onClick = { messengers = messengers.toMutableList().also { it.removeAt(idx) } }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = AppleTheme.colors.red)
                                 }
                             }
                         }
@@ -545,7 +579,7 @@ fun ContactEditScreen(
                     Text(
                         stringResource(R.string.ce_address_after_save),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = AppleTheme.colors.secondaryLabel
                     )
                 }
                 draftAddresses.forEach { addr ->
@@ -565,16 +599,16 @@ fun ContactEditScreen(
                                 listOf(addr.addressType.label(ctxLabel), addr.city, addr.postalCode.orEmpty(), addr.country)
                                     .filter { it.isNotBlank() }.joinToString(" · "),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = AppleTheme.colors.secondaryLabel
                             )
                         }
                         IconButton(onClick = { draftAddresses = draftAddresses - addr }) {
                             Icon(Icons.Default.Close, stringResource(R.string.ce_remove_address),
                                 Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.secondary)
+                                tint = AppleTheme.colors.secondaryLabel)
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 TextButton(onClick = { editingAddr = null; showAddrDialog = true }) {
                     Icon(Icons.Default.Add, null, Modifier.size(16.dp))
@@ -678,9 +712,9 @@ fun ContactEditScreen(
                     enabled = false, shape = SocialShape.Small,
                     trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        disabledTextColor = AppleTheme.colors.label,
+                        disabledBorderColor = AppleTheme.colors.tertiaryLabel,
+                        disabledLabelColor = AppleTheme.colors.secondaryLabel
                     )
                 )
                 // Поиск компании — как в выборе контакта (семья).
@@ -710,22 +744,22 @@ fun ContactEditScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(Icons.Default.Add, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                                    Text(stringResource(R.string.ce_new_company), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                                    Icon(Icons.Default.Add, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                                    Text(stringResource(R.string.ce_new_company), color = AppleTheme.colors.brand, fontWeight = FontWeight.Medium)
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth()
                                         .clickable { selectedCompanyId = ""; showCompanyDropdown = false }
                                         .padding(vertical = 8.dp)
                                 ) {
-                                    Text(stringResource(R.string.ce_no_company), color = MaterialTheme.colorScheme.secondary)
+                                    Text(stringResource(R.string.ce_no_company), color = AppleTheme.colors.secondaryLabel)
                                 }
                                 HorizontalDivider()
                                 if (shownCompanies.isEmpty()) {
                                     Text(
                                         stringResource(R.string.ce_no_picker_results, companyQuery),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.secondary,
+                                        color = AppleTheme.colors.secondaryLabel,
                                         modifier = Modifier.padding(vertical = 12.dp)
                                     )
                                 } else {
@@ -742,7 +776,7 @@ fun ContactEditScreen(
                                                 Text(company.name, style = MaterialTheme.typography.bodyMedium,
                                                     fontWeight = FontWeight.Medium)
                                             }
-                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                                            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                                         }
                                     }
                                 }
@@ -813,7 +847,7 @@ fun ContactEditScreen(
                 if (contactRelationsDraft.isEmpty()) {
                     Text(stringResource(R.string.ce_no_related),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary)
+                        color = AppleTheme.colors.secondaryLabel)
                 }
                 contactRelationsDraft.forEach { rel ->
                     val isFirst   = rel.firstContactId == editedContactId
@@ -830,13 +864,13 @@ fun ContactEditScreen(
                             Text(otherName, style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold)
                             Text(otherRole, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary)
+                                color = AppleTheme.colors.secondaryLabel)
                         }
                         IconButton(onClick = {
                             contactRelationsDraft = contactRelationsDraft.filter { it.id != rel.id }
                         }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.ce_remove_relation),
-                                tint = MaterialTheme.colorScheme.error,
+                                tint = AppleTheme.colors.red,
                                 modifier = Modifier.size(18.dp))
                         }
                     }
@@ -891,13 +925,13 @@ fun ContactEditScreen(
                         },
                         enabled = newTagText.isNotBlank()
                     ) {
-                        Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Add, null, tint = AppleTheme.colors.brand)
                     }
                 }
                 Text(
                     stringResource(R.string.ce_remove_tag_hint),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outlineVariant
+                    color = AppleTheme.colors.separator
                 )
             }
 
@@ -984,12 +1018,12 @@ fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
+            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
             content()
         }
     }
@@ -1005,9 +1039,9 @@ fun DropdownField(label: String, selectedValue: String, options: List<String>, o
             enabled = false, shape = SocialShape.Small,
             trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
             colors = OutlinedTextFieldDefaults.colors(
-                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                disabledTextColor = AppleTheme.colors.label,
+                disabledBorderColor = AppleTheme.colors.tertiaryLabel,
+                disabledLabelColor = AppleTheme.colors.secondaryLabel
             )
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {

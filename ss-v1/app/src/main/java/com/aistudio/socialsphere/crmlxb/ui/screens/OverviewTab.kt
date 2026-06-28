@@ -687,7 +687,28 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 famRole !in familyRoles
             }
         }
-        if (relations.isNotEmpty()) {
+        var showAddRelated by remember { mutableStateOf(false) }
+        var relSearch     by remember { mutableStateOf("") }
+        var relSelected   by remember { mutableStateOf<Contact?>(null) }
+        val relRoles = listOf("Друг", "Подруга", "Коллега", "Знакомый", "Сосед",
+            "Одноклассник", "Однокурсник", "Партнёр по бизнесу", "Наставник", "Клиент")
+        var relOtherRole by remember { mutableStateOf("Друг") }
+        var relMyRole    by remember { mutableStateOf("Друг") }
+        var pendingRemoveRelated by remember { mutableStateOf<ContactRelation?>(null) }
+        pendingRemoveRelated?.let { rel ->
+            AlertDialog(
+                onDismissRequest = { pendingRemoveRelated = null },
+                title = { Text(stringResource(R.string.cd_related_people), fontWeight = FontWeight.Bold) },
+                confirmButton = {
+                    Button(onClick = {
+                        AppStateStore.removeContactRelation(rel.id)
+                        pendingRemoveRelated = null
+                    }) { Text(stringResource(R.string.cd_remove)) }
+                },
+                dismissButton = { TextButton(onClick = { pendingRemoveRelated = null }) { Text(stringResource(R.string.common_cancel)) } }
+            )
+        }
+        if (relations.isNotEmpty() || editing) {
             CardBlock(title = stringResource(R.string.cd_related_people)) {
 
                 relations.forEach { rel ->
@@ -700,7 +721,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onNavigateToContact(otherId) }
+                            .clickable(enabled = other != null) { onNavigateToContact(otherId) }
                             .padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment     = Alignment.CenterVertically
@@ -728,11 +749,87 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                     Text(theirRole, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand)
                             }
                         }
-                        Icon(Icons.Default.ChevronRight, null, tint = AppleTheme.colors.separator)
+                        if (editing) {
+                            IconButton(onClick = { pendingRemoveRelated = rel }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Close, stringResource(R.string.cd_remove),
+                                    Modifier.size(16.dp), tint = AppleTheme.colors.secondaryLabel)
+                            }
+                        } else {
+                            Icon(Icons.Default.ChevronRight, null, tint = AppleTheme.colors.separator)
+                        }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
+                if (editing) {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = { showAddRelated = true }) {
+                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.common_add))
+                    }
+                }
             }
+        }
+        if (showAddRelated) {
+            val candidates = AppStateStore.contacts.filter {
+                it.id != contact.id &&
+                "${it.firstName} ${it.lastName}".contains(relSearch, ignoreCase = true)
+            }
+            AlertDialog(
+                onDismissRequest = { showAddRelated = false; relSelected = null; relSearch = "" },
+                title = { Text(stringResource(R.string.cd_related_people), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        val sel = relSelected
+                        if (sel == null) {
+                            OutlinedTextField(
+                                value = relSearch, onValueChange = { relSearch = it },
+                                label = { Text(stringResource(R.string.ce_search_contact)) },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true
+                            )
+                            candidates.take(8).forEach { c ->
+                                Text(
+                                    "${c.firstName} ${c.lastName}".trim(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { relSelected = c }
+                                        .padding(vertical = 8.dp)
+                                )
+                            }
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    "${sel.firstName} ${sel.lastName}".trim(),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(onClick = { relSelected = null }) { Text(stringResource(R.string.ce_change)) }
+                            }
+                            DropdownField(stringResource(R.string.ce_who_relation), relOtherRole, relRoles) { v -> relOtherRole = v }
+                            DropdownField(stringResource(R.string.ce_who_am_i), relMyRole, relRoles) { v -> relMyRole = v }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(enabled = relSelected != null, onClick = {
+                        relSelected?.let { other ->
+                            AppStateStore.addContactRelation(ContactRelation(
+                                id = java.util.UUID.randomUUID().toString(),
+                                firstContactId = contact.id,
+                                secondContactId = other.id,
+                                firstRole = relMyRole,
+                                secondRole = relOtherRole
+                            ))
+                        }
+                        relSelected = null; relSearch = ""; showAddRelated = false
+                    }) { Text(stringResource(R.string.common_add)) }
+                },
+                dismissButton = { TextButton(onClick = { showAddRelated = false; relSelected = null; relSearch = "" }) { Text(stringResource(R.string.common_cancel)) } }
+            )
         }
     }
 

@@ -441,7 +441,7 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.titleLarge)
                             Text(dateLabel,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary)
+                                color = AppleTheme.colors.secondaryLabel)
                         }
                     } else {
                         TextField(
@@ -720,9 +720,9 @@ private fun HomeSearchResults(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp),
-                    tint = MaterialTheme.colorScheme.outlineVariant)
+                    tint = AppleTheme.colors.separator)
                 Text(stringResource(R.string.home_nothing_found, query),
-                    color = MaterialTheme.colorScheme.secondary)
+                    color = AppleTheme.colors.secondaryLabel)
             }
         }
         return
@@ -741,7 +741,7 @@ private fun HomeSearchResults(
                 Text(stringResource(R.string.common_contacts),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = AppleTheme.colors.brand,
                     modifier = Modifier.padding(vertical = 4.dp))
             }
             items(contacts, key = { it.contact.id }) { r ->
@@ -784,13 +784,13 @@ private fun HomeSearchResults(
                                 .filter { !it.isNullOrEmpty() }.joinToString(" · ")
                             if (sub.isNotEmpty())
                                 Text(sub, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary)
+                                    color = AppleTheme.colors.secondaryLabel)
                         }
                         Surface(shape = SocialShape.Full,
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(0.6f)) {
+                            color = AppleTheme.colors.brand.copy(alpha = 0.10f).copy(0.6f)) {
                             Text(r.matchField,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = AppleTheme.colors.brand,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                         }
                     }
@@ -803,7 +803,7 @@ private fun HomeSearchResults(
                 Text(stringResource(R.string.common_companies),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = AppleTheme.colors.brand,
                     modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
             }
             items(companies, key = { it.company.id }) { r ->
@@ -835,13 +835,13 @@ private fun HomeSearchResults(
                                 style = MaterialTheme.typography.bodyMedium)
                             Text(c.industry.label(LocalContext.current),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary)
+                                color = AppleTheme.colors.secondaryLabel)
                         }
                         Surface(shape = SocialShape.Full,
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(0.6f)) {
+                            color = AppleTheme.colors.fill.copy(0.6f)) {
                             Text(r.matchField,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary,
+                                color = AppleTheme.colors.secondaryLabel,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                         }
                     }
@@ -858,7 +858,7 @@ private fun HomeSectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(text,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
+        color = AppleTheme.colors.brand,
         modifier = modifier)
 }
 
@@ -1111,7 +1111,7 @@ private fun SmartListCard(
             // Expanded contacts list
             if (expanded) {
                 HorizontalDivider(
-                    color     = MaterialTheme.colorScheme.outlineVariant,
+                    color     = AppleTheme.colors.separator,
                     thickness = 0.5.dp
                 )
                 Column(
@@ -1151,7 +1151,7 @@ private fun SmartListCard(
                                     Text(
                                         contact.company,
                                         style    = MaterialTheme.typography.labelSmall,
-                                        color    = MaterialTheme.colorScheme.secondary,
+                                        color    = AppleTheme.colors.secondaryLabel,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -1167,7 +1167,7 @@ private fun SmartListCard(
                                 Icons.Default.ChevronRight,
                                 null,
                                 Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.outlineVariant
+                                tint = AppleTheme.colors.separator
                             )
                         }
                     }

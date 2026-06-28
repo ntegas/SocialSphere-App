@@ -93,9 +93,9 @@ fun CompaniesScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(label, style = MaterialTheme.typography.bodyLarge)
-                        if (sortOrder == order) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                        if (sortOrder == order) Icon(Icons.Default.Check, null, tint = AppleTheme.colors.brand)
                     }
-                    if (order != CompanySortOrder.values().last()) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    if (order != CompanySortOrder.values().last()) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 Spacer(Modifier.height(32.dp))
             }
@@ -116,7 +116,7 @@ fun CompaniesScreen(
 
                 // Industry multi-select
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.comp_industry), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.comp_industry), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Industry.values().forEach { ind ->
                             FilterChip(
@@ -131,7 +131,7 @@ fun CompaniesScreen(
 
                 // City
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.filter_city), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.filter_city), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
                     OutlinedTextField(
                         value = cityFilter, onValueChange = { cityFilter = it },
                         modifier = Modifier.fillMaxWidth(),
@@ -190,7 +190,7 @@ fun CompaniesScreen(
                     }
                     IconButton(onClick = { showFilterSheet = true }) {
                         BadgedBox(badge = {
-                            if (hasActiveFilters) Badge(containerColor = MaterialTheme.colorScheme.error) {}
+                            if (hasActiveFilters) Badge(containerColor = AppleTheme.colors.red) {}
                         }) { Icon(Icons.Default.FilterList, stringResource(R.string.contacts_filters)) }
                     }
                     IconButton(onClick = { showSortSheet = true }) {
@@ -204,20 +204,24 @@ fun CompaniesScreen(
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
 
-            // Header по макету: заголовок + круглая «+»
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(stringResource(R.string.comp_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label)
-                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { onNavigateToCreateCompany() }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Add, stringResource(R.string.comp_add), tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp))
+            // Header + капсула поиска показываются только когда поиск НЕ активен —
+            // в активном режиме поле ввода живёт в TopAppBar, иначе было два поля.
+            if (!searchActive) {
+                // Header по макету: заголовок + круглая «+»
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(stringResource(R.string.comp_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label)
+                    Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { onNavigateToCreateCompany() }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Add, stringResource(R.string.comp_add), tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp))
+                    }
                 }
-            }
-            Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
-                Row(Modifier.fillMaxWidth().height(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(Color(0x1F767680)).clickable { searchActive = true }.padding(horizontal = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Icon(Icons.Default.Search, null, tint = Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
-                    Text(stringResource(R.string.comp_search_hint), fontSize = 17.sp, color = Color(0xFF8E8E93), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
+                    Row(Modifier.fillMaxWidth().height(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(Color(0x1F767680)).clickable { searchActive = true }.padding(horizontal = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Icon(Icons.Default.Search, null, tint = Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
+                        Text(stringResource(R.string.comp_search_hint), fontSize = 17.sp, color = Color(0xFF8E8E93), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
 
@@ -266,11 +270,11 @@ fun CompaniesScreen(
             if (filteredCompanies.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outlineVariant)
+                        Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp), tint = AppleTheme.colors.separator)
                         Text(
                             if (searchQuery.isNotBlank()) stringResource(R.string.home_nothing_found, searchQuery)
                             else stringResource(R.string.comp_no_filtered),
-                            color = MaterialTheme.colorScheme.secondary
+                            color = AppleTheme.colors.secondaryLabel
                         )
                         if (hasActiveFilters) TextButton(onClick = { filterIndustries = emptySet(); cityFilter = "" }) { Text(stringResource(R.string.contacts_reset_filters)) }
                     }

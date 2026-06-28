@@ -32,7 +32,8 @@ object NotificationHelper {
         notificationId: Int,
         title: String,
         content: String,
-        targetCalendarItemId: String?
+        targetCalendarItemId: String?,
+        phone: String? = null
     ) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -55,6 +56,46 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+
+        // Кнопки прямо в уведомлении: «Позвонить» (системный набор, без прав) и
+        // «Написать» (SMS). Появляются, если у связанного контакта есть телефон.
+        if (!phone.isNullOrBlank()) {
+            val callIntent = Intent(Intent.ACTION_DIAL, android.net.Uri.parse("tel:$phone"))
+                .apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            val callPi = PendingIntent.getActivity(
+                context, notificationId * 31 + 1, callIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(android.R.drawable.ic_menu_call, "Позвонить", callPi)
+
+            val smsIntent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:$phone"))
+                .apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            val smsPi = PendingIntent.getActivity(
+                context, notificationId * 31 + 2, smsIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(android.R.drawable.ic_dialog_email, "Написать", smsPi)
+        }
+
+        // «Отложить» (через сутки) и «Готово» (закрыть) — обрабатывает NotificationReceiver.
+        fun actionIntent(action: String) = Intent(context, NotificationReceiver::class.java).apply {
+            putExtra("action", action)
+            putExtra("notificationId", notificationId)
+            putExtra("calendarItemId", targetCalendarItemId)
+            putExtra("title", title)
+            putExtra("content", content)
+            if (!phone.isNullOrBlank()) putExtra("phone", phone)
+        }
+        val snoozePi = PendingIntent.getBroadcast(
+            context, notificationId * 31 + 3, actionIntent("snooze"),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        builder.addAction(android.R.drawable.ic_menu_recent_history, "Отложить", snoozePi)
+        val donePi = PendingIntent.getBroadcast(
+            context, notificationId * 31 + 4, actionIntent("done"),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        builder.addAction(android.R.drawable.checkbox_on_background, "Готово", donePi)
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, builder.build())

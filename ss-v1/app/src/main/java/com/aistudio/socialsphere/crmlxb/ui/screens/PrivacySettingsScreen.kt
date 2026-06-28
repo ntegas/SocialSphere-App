@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -36,7 +37,7 @@ fun PrivacySettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -67,7 +68,7 @@ fun PrivacySettingsScreen(
                 Text(
                     stringResource(R.string.priv_local_desc),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = AppleTheme.colors.secondaryLabel
                 )
             }
 
@@ -82,7 +83,7 @@ fun PrivacySettingsScreen(
                     Text(
                         stringResource(R.string.priv_deleted),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = AppleTheme.colors.brand,
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
@@ -102,7 +103,7 @@ fun PrivacySettingsScreen(
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
+                        containerColor = AppleTheme.colors.red
                     ),
                     onClick = {
                         showWipeConfirm = false

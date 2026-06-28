@@ -2,14 +2,49 @@
 # -*- coding: utf-8 -*-
 """
 QA v2 для SocialSphere — статический ловец ошибок компиляции.
-Кодирует уроки 31–43 из SOCIALSPHERE_RULES.md (Раздел 8).
-Запуск: python3 qa_check.py  (из корня репо, рядом с ss-v1/)
+Кодирует уроки 31–54 (см. SOCIALSPHERE_KNOWLEDGE.md, разделы 5 и 17).
+Запуск: PYTHONIOENCODING=utf-8 python qa_check.py  (из корня репо, рядом с ss-v1/)
 Выход: код 0 = все проверки зелёные; 1 = есть нарушения.
 """
 import os, re, sys
 
 SRC = 'ss-v1/app/src/main/java'
 errors = []
+
+# У57: не-иконочный символ используется без импорта (обобщение У32).
+# Класс ошибки «token-swap без импорта»: Apple-миграция меняла colorScheme→AppleTheme
+# и вставляла Color(...) без import — qa был зелёным, а compileDebugKotlin падал на
+# Unresolved reference. Исключения: полное имя (a.b.Color), wildcard-импорт,
+# само-определение символа в файле.
+def symbol_needs_import(s, use_re, imp, wilds, defmark):
+    if defmark and re.search(defmark, s):
+        return False
+    if not re.search(use_re, s):
+        return False           # либо не используется, либо только как полное имя
+    if imp in s:
+        return False
+    return not any(w in s for w in wilds)
+
+SYMBOL_IMPORTS = [
+    ('AppleTheme', r'(?<![\w.])AppleTheme\.',
+     'import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme',
+     ['import com.aistudio.socialsphere.crmlxb.ui.theme.*'],
+     r'object AppleTheme\b'),
+    ('Color', r'(?<![\w.])Color[(.]',
+     'import androidx.compose.ui.graphics.Color',
+     ['import androidx.compose.ui.graphics.*'],
+     r'(?:class|object|typealias) Color\b'),
+]
+# self-tests У57
+_at = SYMBOL_IMPORTS[0][1:]
+assert symbol_needs_import('val x = AppleTheme.colors.brand', *_at) is True, 'У57 neg'
+assert symbol_needs_import('import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme\nAppleTheme.colors', *_at) is False, 'У57 import'
+assert symbol_needs_import('object AppleTheme {}\nAppleTheme.colors', *_at) is False, 'У57 self-def'
+assert symbol_needs_import('NavigationBar(x = com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.card)', *_at) is False, 'У57 fqcn'
+_co = SYMBOL_IMPORTS[1][1:]
+assert symbol_needs_import('Box(Modifier.background(Color(0xFF112233)))', *_co) is True, 'У57 color neg'
+assert symbol_needs_import('val c = androidx.compose.ui.graphics.Color.Transparent', *_co) is False, 'У57 color fqcn'
+assert symbol_needs_import('NavigationBar(containerColor = AppleTheme.colors.card)', *_co) is False, 'У57 color suffix'
 
 def kt_files():
     for root, _, files in os.walk(SRC):
@@ -89,6 +124,11 @@ for path in kt_files():
     for m in re.finditer(r'([\w)\]}])!!(?!=)', s):
         line = s[:m.start()].count('\n') + 1
         errors.append(f'{rel}:{line}: force unwrap !! запрещён')
+
+    # У57: не-иконочный символ без импорта (AppleTheme/Color и т.п.)
+    for name, use_re, imp, wilds, defmark in SYMBOL_IMPORTS:
+        if symbol_needs_import(s, use_re, imp, wilds, defmark):
+            errors.append(f'{rel}: {name} используется без импорта ({imp})')
 
     # У38: дубли импортов
     imports = [l for l in s.splitlines() if l.startswith('import ')]

@@ -205,7 +205,7 @@ fun CalendarScreen(
                 )
             } else if (groupedEvents.isEmpty() || groupedEvents.all { it.value.isEmpty() }) {
                 Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.cal_no_events_found), color = MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.cal_no_events_found), color = AppleTheme.colors.secondaryLabel)
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize().weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -323,7 +323,7 @@ fun MonthGridView(
                     modifier = Modifier.weight(1f),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = AppleTheme.colors.secondaryLabel
                 )
             }
         }

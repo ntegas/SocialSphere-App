@@ -390,7 +390,7 @@ fun CalendarItemEditScreen(
                                     Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cie_clear), modifier = Modifier.size(16.dp))
                                 }
                             } else {
-                                Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+                                Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
                             }
                         }
                     )
@@ -514,7 +514,7 @@ private fun EventListRow(
             Text(
                 value,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AppleTheme.colors.secondaryLabel,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 180.dp)
@@ -522,7 +522,7 @@ private fun EventListRow(
         }
         Spacer(Modifier.width(6.dp))
         if (trailing != null) trailing()
-        else Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+        else Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
     }
 }
 
@@ -544,7 +544,7 @@ private fun EventTypePickerSheet(
                     Box(Modifier.size(12.dp).clip(CircleShape).background(eventTypeColor(t)))
                     Spacer(Modifier.width(14.dp))
                     Text(t.label(ctx), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    if (t == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                    if (t == current) Icon(Icons.Default.Check, null, tint = AppleTheme.colors.brand)
                 }
             }
         }
@@ -574,7 +574,7 @@ private fun ReminderPickerSheet(
                 Text(
                     stringResource(R.string.cie_reminder_multi),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = AppleTheme.colors.secondaryLabel
                 )
             }
             options.forEach { opt ->
@@ -584,7 +584,7 @@ private fun ReminderPickerSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(opt.label(ctx), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    if (checked) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                    if (checked) Icon(Icons.Default.Check, null, tint = AppleTheme.colors.brand)
                 }
             }
         }

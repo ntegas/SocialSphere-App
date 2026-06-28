@@ -485,6 +485,7 @@
     <string name="ce_phones">Τηλέφωνα</string>
     <string name="ce_no_phones">Χωρίς τηλέφωνα</string>
     <string name="ce_add_phone">Προσθήκη τηλεφώνου</string>
+    <string name="ce_make_primary">Ορισμός ως κύριο</string>
     <string name="ce_number">Αριθμός</string>
     <string name="ce_no_email">Χωρίς email</string>
     <string name="ce_add_email">Προσθήκη email</string>

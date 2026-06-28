@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,7 +31,7 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_appearance), fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -46,10 +47,10 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.4f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(stringResource(R.string.appearance_theme), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.appearance_theme), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
                     Spacer(Modifier.height(12.dp))
                     listOf(stringResource(R.string.appearance_light) to false, stringResource(R.string.appearance_dark) to true).forEach { (label, isDark) ->
                         Row(
@@ -62,10 +63,10 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
                         ) {
                             Text(label.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyLarge)
                             if (themeChoice == isDark) {
-                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Default.Check, null, tint = AppleTheme.colors.brand)
                             }
                         }
-                        if (!isDark) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                        if (!isDark) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                     }
                 }
             }
@@ -74,12 +75,12 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f).copy(alpha = 0.4f))
             ) {
                 Text(
                     stringResource(R.string.appearance_note),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = AppleTheme.colors.brand,
                     modifier = Modifier.padding(14.dp)
                 )
             }

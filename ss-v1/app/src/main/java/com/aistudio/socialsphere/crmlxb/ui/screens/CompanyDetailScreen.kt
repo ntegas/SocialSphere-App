@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 import androidx.compose.ui.res.stringResource
@@ -54,13 +55,13 @@ fun CompanyDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
             title = { Text(stringResource(R.string.compd_delete_q), fontWeight = FontWeight.Bold) },
             text  = { Text(stringResource(R.string.compd_delete_warning, company.name)) },
             confirmButton = {
                 Button(
                     onClick = { showDeleteDialog = false; AppStateStore.deleteCompany(companyId); onNavigateBack() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red)
                 ) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
@@ -194,7 +195,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyOverviewTab(company: C
                     ) {
                         val context = androidx.compose.ui.platform.LocalContext.current
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(address.addressType.label(ctxLabel), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                            Text(address.addressType.label(ctxLabel), color = AppleTheme.colors.brand, style = MaterialTheme.typography.bodySmall)
                             Text("${address.addressLine}, ${address.city}${address.postalCode?.let { " $it" } ?: ""}, ${address.country}", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -204,12 +205,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyOverviewTab(company: C
                             } else {
                                 com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
                             }
-                        }, modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)) {
-                            Icon(Icons.Default.Directions, contentDescription = stringResource(R.string.map_route), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                        }, modifier = Modifier.size(36.dp).background(AppleTheme.colors.card, CircleShape)) {
+                            Icon(Icons.Default.Directions, contentDescription = stringResource(R.string.map_route), modifier = Modifier.size(18.dp), tint = AppleTheme.colors.brand)
                         }
                     }
                     if (index < addresses.size - 1) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = AppleTheme.colors.card)
                     }
                 }
             }
@@ -230,12 +231,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyOverviewTab(company: C
             if (events.isNotEmpty()) {
                 events.forEach { InfoRow(it.startDate, it.title) }
             } else {
-                Text(stringResource(R.string.cd_no_events), color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.cd_no_events), color = AppleTheme.colors.secondaryLabel, style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = onNavigateToCreateCalendarItem,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.card, contentColor = AppleTheme.colors.secondaryLabel),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(stringResource(R.string.cal_add_event))
@@ -249,7 +250,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyOverviewTab(company: C
             if (notes.isNotEmpty()) {
                 notes.forEach { Text("• ${it.text}", style = MaterialTheme.typography.bodyMedium) }
             } else {
-                Text(stringResource(R.string.cd_no_notes_yet), color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.cd_no_notes_yet), color = AppleTheme.colors.secondaryLabel, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -297,7 +298,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
                                 Text(
                                     stringResource(R.string.compd_no_candidates),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary
+                                    color = AppleTheme.colors.secondaryLabel
                                 )
                             }
                         } else {
@@ -338,7 +339,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
     if (relations.isEmpty()) {
         item {
             Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.compd_no_people), color = MaterialTheme.colorScheme.secondary)
+                Text(stringResource(R.string.compd_no_people), color = AppleTheme.colors.secondaryLabel)
             }
         }
     } else {
@@ -349,17 +350,17 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
                     onClick = { onNavigateToContact(contact.id) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
-                                modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier.size(48.dp).clip(CircleShape).background(AppleTheme.colors.brand),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = contact.firstName.take(1) + contact.lastName.take(1),
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -367,12 +368,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                     Text(text = "${contact.firstName} ${contact.lastName}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(text = rel.employmentStatus.label(ctxLabel), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                    Text(text = rel.employmentStatus.label(ctxLabel), style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel)
                                 }
                                 
                                 val posRoles = listOfNotNull(rel.position, rel.department, rel.role).filter { it.isNotBlank() }
                                 if (posRoles.isNotEmpty()) {
-                                    Text(text = posRoles.joinToString(" • "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(text = posRoles.joinToString(" • "), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
@@ -386,7 +387,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
                         if (workContext.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(12.dp))
                             workContext.forEach { ctx ->
-                                Text("• $ctx", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("• $ctx", style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                             }
                         }
                         

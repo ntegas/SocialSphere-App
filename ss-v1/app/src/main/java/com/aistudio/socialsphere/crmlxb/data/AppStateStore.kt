@@ -522,6 +522,17 @@ object AppStateStore {
         scope.launch { db()?.contactDao()?.insertSizeInfo(sizeInfo.toEntity()) }
     }
 
+    /** Сохраняет вычисленные геокодером координаты адреса в память и БД, чтобы
+     *  точка на карте не пропадала и не геокодилась заново при каждом открытии. */
+    fun setAddressCoords(addressId: String, lat: Double, lng: Double) {
+        val i = addresses.indexOfFirst { it.id == addressId }
+        if (i < 0) return
+        if (addresses[i].latitude != null && addresses[i].longitude != null) return
+        val updated = addresses[i].copy(latitude = lat, longitude = lng)
+        addresses[i] = updated
+        scope.launch { db()?.addressDao()?.insertAddresses(listOf(updated.toEntity())) }
+    }
+
     // ── Связи между контактами (семья и др.) ─────────────────
     fun addContactRelation(relation: ContactRelation) {
         if (contactRelations.any { it.id == relation.id }) return

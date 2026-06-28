@@ -81,7 +81,7 @@ fun ContactDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
             title = { Text(stringResource(R.string.cd_delete_q), fontWeight = FontWeight.Bold) },
             text  = { Text(stringResource(R.string.cd_delete_warning, "${contact.firstName} ${contact.lastName}")) },
             confirmButton = {
@@ -91,7 +91,7 @@ fun ContactDetailScreen(
                         AppStateStore.deleteContact(contactId)
                         onNavigateBack()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red)
                 ) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
@@ -172,8 +172,11 @@ fun ContactDetailScreen(
             LaunchedEffect(selectedTab) { editingOverview = false; editingComm = false; editingWork = false }
 
             // Tab Content
+            // ВАЖНО: weight(1f), НЕ fillMaxSize() — внутри Column fillMaxSize даёт
+            // списку всю высоту экрана, он встаёт под шапкой/табами и низ уходит
+            // за край, скролл схлопывается до «полэкрана» (повторяющийся баг).
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                 contentPadding = PaddingValues(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -259,7 +262,7 @@ fun ContactDetailScreen(
             title = { Text(stringResource(R.string.cd_gift_delete_q), fontWeight = FontWeight.Bold) },
             text = { Text(gift.title) },
             confirmButton = {
-                Button(colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                Button(colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red),
                     onClick = { AppStateStore.deleteGift(gift.id); deletingGift = null }
                 ) { Text(stringResource(R.string.common_delete)) }
             },
@@ -400,7 +403,7 @@ fun ContactDetailScreen(
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
+                        containerColor = AppleTheme.colors.red
                     ),
                     onClick = {
                         AppStateStore.deleteNote(note.id)
@@ -502,7 +505,7 @@ fun ContactDetailScreen(
                                 PersonalDetailCategory.DISLIKES    -> stringResource(R.string.cd_late_hint)
                                 else                               -> stringResource(R.string.cd_enter_value)
                             }
-                            Text(hint, color = MaterialTheme.colorScheme.outlineVariant)
+                            Text(hint, color = AppleTheme.colors.separator)
                         },
                         modifier  = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -520,7 +523,7 @@ fun ContactDetailScreen(
                                     sizeInfo.ringSize?.let     { stringResource(R.string.cd_ring).lowercase() + " $it" }
                                 ).joinToString(", "),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = AppleTheme.colors.secondaryLabel
                             )
                         }
                     }
@@ -532,7 +535,7 @@ fun ContactDetailScreen(
                         Text(
                             stringResource(R.string.cd_already_added),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = AppleTheme.colors.secondaryLabel
                         )
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(
@@ -542,12 +545,12 @@ fun ContactDetailScreen(
                             existing.forEach { pd ->
                                 Surface(
                                     shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                    color = AppleTheme.colors.fill
                                 ) {
                                     Text(
                                         pd.value,
                                         style    = MaterialTheme.typography.labelSmall,
-                                        color    = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        color    = AppleTheme.colors.label,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
                                 }
@@ -796,10 +799,10 @@ private fun androidx.compose.foundation.layout.RowScope.ActionTile(
 @Composable
 fun QuickActionIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, cd: String, onClick: () -> Unit = {}) {
     Box(
-        modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant).clickable { onClick() },
+        modifier = Modifier.size(48.dp).clip(CircleShape).background(AppleTheme.colors.card).clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = cd, tint = MaterialTheme.colorScheme.primary)
+        Icon(icon, contentDescription = cd, tint = AppleTheme.colors.brand)
     }
 }
 
@@ -817,12 +820,12 @@ private fun androidx.compose.foundation.layout.RowScope.HeaderAction(
     ) {
         Box(
             modifier = Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(13.dp))
-                .background(if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
+                .background(if (accent) AppleTheme.colors.brand else AppleTheme.colors.card),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = label, tint = if (accent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary, modifier = Modifier.size(21.dp))
+            Icon(icon, contentDescription = label, tint = if (accent) Color.White else AppleTheme.colors.brand, modifier = Modifier.size(21.dp))
         }
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel, maxLines = 1)
     }
 }
 
@@ -848,10 +851,10 @@ private fun ContextPill(
 @Composable
 internal fun ActionSquare(icon: androidx.compose.ui.graphics.vector.ImageVector, cd: String, onClick: () -> Unit) {
     Box(
-        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { onClick() },
+        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(AppleTheme.colors.card).clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = cd, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = cd, tint = AppleTheme.colors.brand, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -880,7 +883,7 @@ fun CardBlock(title: String? = null, content: @Composable ColumnScope.() -> Unit
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.3f))
+        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha=0.3f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             if (title != null) {
@@ -898,15 +901,15 @@ internal fun GiftMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.size(24.dp)) {
             Icon(Icons.Default.MoreVert, stringResource(R.string.cd_actions), Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.secondary)
+                tint = AppleTheme.colors.secondaryLabel)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.cd_edit_short)) },
                 leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)) },
                 onClick = { open = false; onEdit() })
-            DropdownMenuItem(text = { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) },
+            DropdownMenuItem(text = { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) },
                 leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.error) },
+                    tint = AppleTheme.colors.red) },
                 onClick = { open = false; onDelete() })
         }
     }
@@ -926,19 +929,19 @@ private fun EditableChip(
             onClick = { open = true },
             label = { Text(current, fontSize = 10.sp) },
             colors = if (container != null)
-                androidx.compose.material3.AssistChipDefaults.assistChipColors(containerColor = container, labelColor = labelColor ?: MaterialTheme.colorScheme.onSurface, trailingIconContentColor = labelColor ?: MaterialTheme.colorScheme.onSurface)
+                androidx.compose.material3.AssistChipDefaults.assistChipColors(containerColor = container, labelColor = labelColor ?: AppleTheme.colors.label, trailingIconContentColor = labelColor ?: AppleTheme.colors.label)
             else androidx.compose.material3.AssistChipDefaults.assistChipColors()
         )
         DropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
-            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            modifier = Modifier.background(AppleTheme.colors.card)
         ) {
             options.forEach { opt ->
                 val selected = opt == current
                 DropdownMenuItem(
-                    text = { Text(opt, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal) },
-                    trailingIcon = if (selected) { { Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary) } } else null,
+                    text = { Text(opt, color = if (selected) AppleTheme.colors.brand else AppleTheme.colors.label, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal) },
+                    trailingIcon = if (selected) { { Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand) } } else null,
                     onClick = { open = false; onPick(opt) }
                 )
             }
@@ -952,7 +955,7 @@ fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {
         if (onClick != null) it.clickable { onClick() } else it 
     }
     Row(modifier = modifier, horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodyMedium)
+        Text(label, color = AppleTheme.colors.secondaryLabel, style = MaterialTheme.typography.bodyMedium)
         Text(value, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
     }
 }
@@ -961,11 +964,11 @@ fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {
 fun SizeChip(label: String, value: String) {
     Card(
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel)
             Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
         }
     }

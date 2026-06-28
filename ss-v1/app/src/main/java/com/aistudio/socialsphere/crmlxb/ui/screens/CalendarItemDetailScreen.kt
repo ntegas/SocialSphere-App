@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import androidx.compose.ui.graphics.Color
 
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 import androidx.compose.ui.res.stringResource
@@ -50,13 +52,13 @@ fun CalendarItemDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
             title = { Text(stringResource(R.string.cid_delete_event_q), fontWeight = FontWeight.Bold) },
             text  = { Text(stringResource(R.string.cid_delete_warning, event.title)) },
             confirmButton = {
                 Button(
                     onClick = { showDeleteDialog = false; AppStateStore.deleteCalendarItem(calendarItemId); onNavigateBack() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red)
                 ) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
@@ -73,7 +75,7 @@ fun CalendarItemDetailScreen(
                     Text(
                         stringResource(R.string.cid_current_date, event.startDate),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = AppleTheme.colors.secondaryLabel
                     )
                     OutlinedTextField(
                         value       = postponeDate,
@@ -91,7 +93,7 @@ fun CalendarItemDetailScreen(
                             } catch (e: Exception) {
                                 java.time.LocalDate.now().plusWeeks(1).toString()
                             }
-                            Text(next, color = MaterialTheme.colorScheme.outlineVariant)
+                            Text(next, color = AppleTheme.colors.separator)
                         },
                         modifier    = Modifier.fillMaxWidth(),
                         singleLine  = true,
@@ -99,13 +101,13 @@ fun CalendarItemDetailScreen(
                         supportingText = {
                             if (postponeDate.isNotBlank() && !isValidDate(postponeDate))
                                 Text(stringResource(R.string.cid_date_format),
-                                    color = MaterialTheme.colorScheme.error)
+                                    color = AppleTheme.colors.red)
                         }
                     )
                     // Quick-pick buttons
                     Text(stringResource(R.string.cid_quick_pick),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary)
+                        color = AppleTheme.colors.secondaryLabel)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(stringResource(R.string.cid_plus_1week) to 7L, stringResource(R.string.cid_plus_2weeks) to 14L, stringResource(R.string.cid_plus_1month) to 30L)
                             .forEach { (label, days) ->
@@ -165,10 +167,10 @@ fun CalendarItemDetailScreen(
                         Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cid_edit))
                     }
                     IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete), tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete), tint = AppleTheme.colors.red)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -210,7 +212,7 @@ fun CalendarItemDetailScreen(
                                 if (gift != null) {
                                     CardBlock(title = stringResource(R.string.evt_gift)) {
                                         Text(gift.title, fontWeight = FontWeight.Bold)
-                                        gift.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+                                        gift.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel) }
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
@@ -261,7 +263,7 @@ fun CalendarItemDetailScreen(
                             Text("• $text$statusStr", style = MaterialTheme.typography.bodyMedium)
                         }
                     } else {
-                        Text(stringResource(R.string.cid_no_reminders), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                        Text(stringResource(R.string.cid_no_reminders), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                     }
                 }
             }
@@ -299,10 +301,10 @@ fun CalendarItemDetailScreen(
                         modifier = Modifier.weight(1f),
                         enabled = event.status != CalendarItemStatus.COMPLETED,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor   = MaterialTheme.colorScheme.onPrimaryContainer,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContentColor   = MaterialTheme.colorScheme.outlineVariant
+                            containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f),
+                            contentColor   = AppleTheme.colors.brand,
+                            disabledContainerColor = AppleTheme.colors.card,
+                            disabledContentColor   = AppleTheme.colors.separator
                         )
                     ) {
                         Icon(Icons.Default.CheckCircle, null, Modifier.size(16.dp))
@@ -317,8 +319,8 @@ fun CalendarItemDetailScreen(
                         onClick = { showPostponeDialog = true },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor   = MaterialTheme.colorScheme.onSurfaceVariant
+                            containerColor = AppleTheme.colors.card,
+                            contentColor   = AppleTheme.colors.secondaryLabel
                         )
                     ) {
                         Icon(Icons.Default.Schedule, null, Modifier.size(16.dp))
@@ -335,11 +337,11 @@ fun CalendarItemDetailScreen(
 fun EventHeader(event: CalendarItem) {
     val ctxLabel = LocalContext.current
     val iconInfo = when (event.type) {
-        CalendarItemType.BIRTHDAY -> Pair(Icons.Default.Cake, MaterialTheme.colorScheme.primaryContainer)
-        CalendarItemType.CALL -> Pair(Icons.Default.Phone, MaterialTheme.colorScheme.secondaryContainer)
-        CalendarItemType.MEETING -> Pair(Icons.Default.Group, MaterialTheme.colorScheme.tertiaryContainer)
-        CalendarItemType.GIFT -> Pair(Icons.Default.CardGiftcard, MaterialTheme.colorScheme.primaryContainer)
-        else -> Pair(Icons.Default.Event, MaterialTheme.colorScheme.surfaceVariant)
+        CalendarItemType.BIRTHDAY -> Pair(Icons.Default.Cake, AppleTheme.colors.brand.copy(alpha = 0.10f))
+        CalendarItemType.CALL -> Pair(Icons.Default.Phone, AppleTheme.colors.fill)
+        CalendarItemType.MEETING -> Pair(Icons.Default.Group, AppleTheme.colors.orange.copy(alpha = 0.14f))
+        CalendarItemType.GIFT -> Pair(Icons.Default.CardGiftcard, AppleTheme.colors.brand.copy(alpha = 0.10f))
+        else -> Pair(Icons.Default.Event, AppleTheme.colors.card)
     }
 
     Column(
@@ -350,22 +352,22 @@ fun EventHeader(event: CalendarItem) {
             modifier = Modifier.size(64.dp).clip(CircleShape).background(iconInfo.second),
             contentAlignment = Alignment.Center
         ) {
-            Icon(iconInfo.first, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurface)
+            Icon(iconInfo.first, contentDescription = null, modifier = Modifier.size(32.dp), tint = AppleTheme.colors.label)
         }
         Spacer(modifier = Modifier.height(16.dp))
-        Text(text = com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+        Text(text = com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
         
         Spacer(modifier = Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = AppleTheme.colors.brand)
             Text(text = event.startDate, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
         }
 
         if (!event.startTime.isNullOrEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
-                Text(text = "${event.startTime}" + (if (!event.endTime.isNullOrEmpty()) " - ${event.endTime}" else ""), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = AppleTheme.colors.secondaryLabel)
+                Text(text = "${event.startTime}" + (if (!event.endTime.isNullOrEmpty()) " - ${event.endTime}" else ""), style = MaterialTheme.typography.bodyMedium, color = AppleTheme.colors.secondaryLabel)
             }
         }
 
@@ -377,7 +379,7 @@ fun EventHeader(event: CalendarItem) {
                  AssistChip(
                      onClick = {},
                      label = { Text(event.importance.label(ctxLabel), fontSize = 12.sp) },
-                     leadingIcon = { Box(modifier = Modifier.clip(CircleShape).size(8.dp).background(MaterialTheme.colorScheme.error)) }
+                     leadingIcon = { Box(modifier = Modifier.clip(CircleShape).size(8.dp).background(AppleTheme.colors.red)) }
                  )
             }
         }
@@ -391,23 +393,23 @@ fun RelatedContactCard(contact: Contact, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(AppleTheme.colors.brand),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = contact.firstName.take(1) + contact.lastName.take(1),
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "${contact.firstName} ${contact.lastName}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                Text(text = contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
             }
         }
     }
@@ -422,19 +424,19 @@ fun RelatedCompanyCard(company: Company, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(AppleTheme.colors.fill),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Business, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                Icon(Icons.Default.Business, contentDescription = null, tint = AppleTheme.colors.label)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = company.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = company.industry.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                Text(text = company.industry.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
             }
             if (addresses.isNotEmpty()) {
                 Spacer(modifier = Modifier.width(8.dp))
@@ -447,8 +449,8 @@ fun RelatedCompanyCard(company: Company, onClick: () -> Unit) {
                             com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
                         }
                     }
-                }, modifier = Modifier.size(32.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)) {
-                    Icon(Icons.Default.Directions, contentDescription = stringResource(R.string.cid_route), modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                }, modifier = Modifier.size(32.dp).background(AppleTheme.colors.card, CircleShape)) {
+                    Icon(Icons.Default.Directions, contentDescription = stringResource(R.string.cid_route), modifier = Modifier.size(16.dp), tint = AppleTheme.colors.brand)
                 }
             }
         }

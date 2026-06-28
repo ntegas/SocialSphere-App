@@ -124,11 +124,17 @@ object ExternalActionHandler {
             return
         }
 
-        // Use explicit link if provided
+        // Use explicit link if provided — но только с безопасной схемой
+        // (skill: insecure-storage / deeplink): поле link могло прийти из чужого
+        // бэкапа; не пускаем file:/content:/intent:/javascript: в ACTION_VIEW.
         if (!messenger.link.isNullOrBlank()) {
-            safelyStartIntent(context, Intent(Intent.ACTION_VIEW).apply {
-                data = Uri.parse(messenger.link)
-            })
+            if (isSafeMessengerScheme(messenger.link)) {
+                safelyStartIntent(context, Intent(Intent.ACTION_VIEW).apply {
+                    data = Uri.parse(messenger.link)
+                })
+            } else {
+                Toast.makeText(context, "Недопустимая ссылка", Toast.LENGTH_SHORT).show()
+            }
             return
         }
 
@@ -226,6 +232,13 @@ object ExternalActionHandler {
         if (!startIntentSafely(context, insertIntent)) {
             Toast.makeText(context, "Нет приложения Контакты", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /** Белый список схем для ссылок мессенджеров. Блокирует
+     *  file:/content:/intent:/javascript:/data: из произвольного поля link. */
+    private fun isSafeMessengerScheme(link: String): Boolean {
+        val scheme = Uri.parse(link.trim()).scheme?.lowercase() ?: return false
+        return scheme in setOf("http", "https", "tg", "viber", "whatsapp", "sgnl", "mailto", "tel")
     }
 
     private fun safelyStartIntent(context: Context, intent: Intent) {

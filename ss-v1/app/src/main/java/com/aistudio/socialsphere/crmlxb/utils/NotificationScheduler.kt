@@ -32,11 +32,22 @@ object NotificationScheduler {
             return // Date is in the past or invalid
         }
 
+        // Телефон связанного контакта — для кнопок «Позвонить»/«Написать» в самом
+        // уведомлении. Берём здесь (приложение живо), т.к. на «холодном» будильнике
+        // память AppStateStore может быть пустой.
+        val linkedContact = calendarItem.links
+            .mapNotNull { com.aistudio.socialsphere.crmlxb.data.AppStateStore.getContact(it.targetId) }
+            .firstOrNull()
+        val phone = linkedContact?.let { c ->
+            (c.phones.firstOrNull { it.isPrimary } ?: c.phones.firstOrNull())?.number
+        }
+
         val intent = Intent(context, NotificationReceiver::class.java).apply {
             putExtra("calendarItemId", calendarItem.id)
             putExtra("title", calendarItem.title)
             putExtra("content", "Напоминание: ${calendarItem.title}")
             putExtra("notificationId", getNotificationId(calendarItem.id, reminderRule.id))
+            if (!phone.isNullOrBlank()) putExtra("phone", phone)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -60,6 +71,30 @@ object NotificationScheduler {
                 notificationTimeMillis,
                 pendingIntent
             )
+        }
+    }
+
+    /** «Отложить»: переустановить то же уведомление на сутки вперёд. Переносим все
+     *  extra из исходного интента (без action), чтобы кнопки звонка/SMS остались. */
+    fun scheduleSnooze(context: Context, src: Intent) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val nid = src.getIntExtra("notificationId", 0)
+        val fireAt = System.currentTimeMillis() + 24L * 60 * 60 * 1000
+        val intent = Intent(context, NotificationReceiver::class.java).apply {
+            putExtra("calendarItemId", src.getStringExtra("calendarItemId"))
+            putExtra("title", src.getStringExtra("title"))
+            putExtra("content", src.getStringExtra("content"))
+            putExtra("notificationId", nid)
+            src.getStringExtra("phone")?.let { putExtra("phone", it) }
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, nid, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pendingIntent)
+        } catch (e: SecurityException) {
+            alarmManager.set(AlarmManager.RTC_WAKEUP, fireAt, pendingIntent)
         }
     }
 

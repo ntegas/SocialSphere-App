@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -32,7 +33,7 @@ import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.*
 
 @Composable
-fun ContactAvatar(name: String, size: Int = 48, color: Color = MaterialTheme.colorScheme.primaryContainer) {
+fun ContactAvatar(name: String, size: Int = 48, color: Color = AppleTheme.colors.brand.copy(alpha = 0.10f)) {
     val initial = name.firstOrNull()?.uppercase() ?: "?"
     Box(
         modifier = Modifier.size(size.dp).clip(CircleShape).background(color),
@@ -40,7 +41,7 @@ fun ContactAvatar(name: String, size: Int = 48, color: Color = MaterialTheme.col
     ) {
         Text(
             text = initial, fontWeight = FontWeight.Bold, fontSize = (size / 2.8).sp,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
+            color = AppleTheme.colors.brand
         )
     }
 }
@@ -49,11 +50,11 @@ fun ContactAvatar(name: String, size: Int = 48, color: Color = MaterialTheme.col
 fun ConfirmDeleteDialog(title: String, body: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+        icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text  = { Text(body) },
         confirmButton = {
-            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Удалить") }
+            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red)) { Text("Удалить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
@@ -68,7 +69,7 @@ fun SocialTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composab
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") }
         },
         actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
     )
 }
 
@@ -79,9 +80,9 @@ fun EmptyState(icon: ImageVector, title: String, subtitle: String, modifier: Mod
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(icon, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outlineVariant)
+        Icon(icon, null, Modifier.size(56.dp), tint = AppleTheme.colors.separator)
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
     }
 }
 
@@ -90,14 +91,14 @@ fun DetailCard(title: String? = null, modifier: Modifier = Modifier, content: @C
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = SocialShape.Card,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             if (title != null) {
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
                 Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 Spacer(Modifier.height(10.dp))
             }
             content()
@@ -127,10 +128,10 @@ fun DatePickerField(
         trailingIcon = { Icon(Icons.Filled.CalendarMonth, null) },
         modifier = modifier.clickable { show = true },
         colors = OutlinedTextFieldDefaults.colors(
-            disabledTextColor = MaterialTheme.colorScheme.onSurface,
-            disabledBorderColor = MaterialTheme.colorScheme.outline,
-            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+            disabledTextColor = AppleTheme.colors.label,
+            disabledBorderColor = AppleTheme.colors.tertiaryLabel,
+            disabledLabelColor = AppleTheme.colors.secondaryLabel,
+            disabledTrailingIconColor = AppleTheme.colors.secondaryLabel
         )
     )
     if (show) {
@@ -163,10 +164,10 @@ fun TimePickerField(
         trailingIcon = { Icon(Icons.Filled.Schedule, null) },
         modifier = modifier.clickable { show = true },
         colors = OutlinedTextFieldDefaults.colors(
-            disabledTextColor = MaterialTheme.colorScheme.onSurface,
-            disabledBorderColor = MaterialTheme.colorScheme.outline,
-            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+            disabledTextColor = AppleTheme.colors.label,
+            disabledBorderColor = AppleTheme.colors.tertiaryLabel,
+            disabledLabelColor = AppleTheme.colors.secondaryLabel,
+            disabledTrailingIconColor = AppleTheme.colors.secondaryLabel
         )
     )
     if (show) {
@@ -236,7 +237,7 @@ private fun <T> WheelPicker(
         Box(
             Modifier.fillMaxWidth().height(itemHeight)
                 .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
         )
         LazyColumn(
             state = listState,
@@ -256,8 +257,8 @@ private fun <T> WheelPicker(
                             label(items[realIndex]),
                             fontSize = if (isCenter) 19.sp else 15.sp,
                             fontWeight = if (isCenter) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isCenter) MaterialTheme.colorScheme.onSurface
-                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                            color = if (isCenter) AppleTheme.colors.label
+                                    else AppleTheme.colors.secondaryLabel.copy(alpha = 0.55f)
                         )
                     }
                 }

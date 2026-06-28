@@ -485,6 +485,7 @@
     <string name="ce_phones">Phones</string>
     <string name="ce_no_phones">No phones</string>
     <string name="ce_add_phone">Add phone</string>
+    <string name="ce_make_primary">Make primary</string>
     <string name="ce_number">Number</string>
     <string name="ce_no_email">No email</string>
     <string name="ce_add_email">Add email</string>

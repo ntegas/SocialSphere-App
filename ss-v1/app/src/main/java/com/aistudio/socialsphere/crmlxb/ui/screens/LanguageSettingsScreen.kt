@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +33,7 @@ fun LanguageSettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -46,7 +47,7 @@ fun LanguageSettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f))
+                        .background(if (isSelected) AppleTheme.colors.brand.copy(alpha = 0.10f) else AppleTheme.colors.card.copy(alpha=0.5f))
                         .clickable { AppSettings.currentLanguage.value = lang }
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -60,14 +61,14 @@ fun LanguageSettingsScreen(
                             text = lang.displayName,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isSelected) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel
                         )
                     }
                     if (isSelected) {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = AppleTheme.colors.brand
                         )
                     }
                 }

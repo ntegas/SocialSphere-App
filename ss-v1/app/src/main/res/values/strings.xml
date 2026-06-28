@@ -485,6 +485,7 @@
     <string name="ce_phones">Телефоны</string>
     <string name="ce_no_phones">Нет телефонов</string>
     <string name="ce_add_phone">Добавить телефон</string>
+    <string name="ce_make_primary">Сделать главным</string>
     <string name="ce_number">Номер</string>
     <string name="ce_no_email">Нет email</string>
     <string name="ce_add_email">Добавить email</string>

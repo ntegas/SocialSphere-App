@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import androidx.compose.ui.graphics.Color
 
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
@@ -225,19 +226,19 @@ fun CompanyEditScreen(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                            .background(AppleTheme.colors.card),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(36.dp), tint = AppleTheme.colors.secondaryLabel)
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
+                                .background(AppleTheme.colors.brand),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                         }
                     }
                     OutlinedTextField(
@@ -271,13 +272,13 @@ fun CompanyEditScreen(
             // Contact Data
             SectionCard(stringResource(R.string.cce_contacts)) {
                 Text(stringResource(R.string.cce_phones), style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary)
+                    color = AppleTheme.colors.brand)
                 Spacer(Modifier.height(6.dp))
 
                 if (phones.isEmpty()) {
                     Text(stringResource(R.string.cce_no_phones),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary)
+                        color = AppleTheme.colors.secondaryLabel)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         phones.forEachIndexed { idx, phone ->
@@ -300,7 +301,7 @@ fun CompanyEditScreen(
                                         if (phone.isPrimary)
                                             Icon(Icons.Default.Star, null,
                                                 Modifier.size(16.dp),
-                                                tint = MaterialTheme.colorScheme.primary)
+                                                tint = AppleTheme.colors.brand)
                                     }
                                 )
                                 IconButton(
@@ -311,7 +312,7 @@ fun CompanyEditScreen(
                                 ) {
                                     Icon(Icons.Default.Close, stringResource(R.string.common_delete),
                                         Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.error)
+                                        tint = AppleTheme.colors.red)
                                 }
                             }
                         }
@@ -330,13 +331,13 @@ fun CompanyEditScreen(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 Text("Email", style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary)
+                    color = AppleTheme.colors.brand)
                 Spacer(Modifier.height(6.dp))
 
                 if (emails.isEmpty()) {
                     Text(stringResource(R.string.cce_no_email),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary)
+                        color = AppleTheme.colors.secondaryLabel)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         emails.forEachIndexed { idx, email ->
@@ -359,7 +360,7 @@ fun CompanyEditScreen(
                                         if (email.isPrimary)
                                             Icon(Icons.Default.Star, null,
                                                 Modifier.size(16.dp),
-                                                tint = MaterialTheme.colorScheme.primary)
+                                                tint = AppleTheme.colors.brand)
                                     }
                                 )
                                 IconButton(
@@ -370,7 +371,7 @@ fun CompanyEditScreen(
                                 ) {
                                     Icon(Icons.Default.Close, stringResource(R.string.common_delete),
                                         Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.error)
+                                        tint = AppleTheme.colors.red)
                                 }
                             }
                         }
@@ -422,14 +423,14 @@ fun CompanyEditScreen(
             // People
             SectionCard(stringResource(R.string.cce_people)) {
                 if (relatedRelations.isEmpty()) {
-                    Text(stringResource(R.string.cce_no_related), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.cce_no_related), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         relatedRelations.forEach { relation ->
                             val contact = AppStateStore.getContact(relation.contactId)
                             if (contact != null) {
                                 Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f)),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
@@ -440,10 +441,10 @@ fun CompanyEditScreen(
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Box(
-                                                    modifier = Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                                                    modifier = Modifier.size(32.dp).clip(CircleShape).background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp), tint = AppleTheme.colors.brand)
                                                 }
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(contact.firstName + " " + contact.lastName, style = MaterialTheme.typography.titleSmall)
@@ -470,7 +471,7 @@ fun CompanyEditScreen(
                     Button(
                         onClick = { showSelectContactDropdown = true },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                        colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.card, contentColor = AppleTheme.colors.secondaryLabel)
                     ) {
                         Text(stringResource(R.string.cce_add_person))
                     }

@@ -127,9 +127,9 @@ fun ContactsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(label, style = MaterialTheme.typography.bodyLarge)
-                        if (sortOrder == order) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                        if (sortOrder == order) Icon(Icons.Default.Check, null, tint = AppleTheme.colors.brand)
                     }
-                    if (order != ContactSortOrder.values().last()) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    if (order != ContactSortOrder.values().last()) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
                 Spacer(Modifier.height(32.dp))
             }
@@ -209,7 +209,7 @@ fun ContactsScreen(
                     }
                     IconButton(onClick = { showFilterSheet = true }) {
                         BadgedBox(badge = {
-                            if (hasActiveFilters) Badge(containerColor = MaterialTheme.colorScheme.error) {}
+                            if (hasActiveFilters) Badge(containerColor = AppleTheme.colors.red) {}
                         }) {
                             Icon(Icons.Default.FilterList, stringResource(R.string.contacts_filters))
                         }
@@ -336,11 +336,11 @@ fun ContactsScreen(
             } else if (filteredContacts.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outlineVariant)
+                        Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp), tint = AppleTheme.colors.separator)
                         Text(
                             if (searchQuery.isNotBlank()) stringResource(R.string.home_nothing_found, searchQuery)
                             else stringResource(R.string.contacts_no_filtered),
-                            color = MaterialTheme.colorScheme.secondary
+                            color = AppleTheme.colors.secondaryLabel
                         )
                         if (hasActiveFilters) {
                             TextButton(onClick = {
@@ -564,7 +564,7 @@ private fun ContactFilterSheet(
 @Composable
 private fun FilterSection(title: String, content: @Composable FlowRowScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+        Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             content()
@@ -683,9 +683,9 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
     val (company, position, _) = getContactVisuals(contact)
     val name = "${contact.firstName} ${contact.lastName}".trim()
     val importanceTint = when (contact.importanceLevel) {
-        ImportanceLevel.KEY       -> MaterialTheme.colorScheme.error
-        ImportanceLevel.IMPORTANT -> MaterialTheme.colorScheme.tertiary
-        else                      -> MaterialTheme.colorScheme.primaryContainer
+        ImportanceLevel.KEY       -> AppleTheme.colors.red
+        ImportanceLevel.IMPORTANT -> AppleTheme.colors.orange
+        else                      -> AppleTheme.colors.brand.copy(alpha = 0.10f)
     }
 
     Card(
@@ -709,12 +709,12 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
                 }
                 Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                 if (company.isNotEmpty())
-                    Text(company, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
+                    Text(company, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel, maxLines = 1)
                 if (position.isNotEmpty())
-                    Text(position, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
+                    Text(position, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel, maxLines = 1)
             }
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text(contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.brand)
                 if (contact.importanceLevel != ImportanceLevel.NORMAL)
                     Box(Modifier.size(7.dp).clip(CircleShape).background(importanceTint))
             }

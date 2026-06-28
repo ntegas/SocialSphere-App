@@ -205,11 +205,14 @@ fun MapScreen(
         derivedStateOf { filteredList.filter { coordsOf(it) != null } }
     }
 
-    // Фоновый геокодинг адресов без координат (Android Geocoder, без API-ключа)
+    // Фоновый геокодинг адресов без координат (Android Geocoder, без API-ключа).
+    // Берём ВСЕ адреса без координат (раньше только 15 → дальние точки пропадали
+    // и появлялись лишь по тапу). Результат пишем в БД (setAddressCoords) — точка
+    // больше не теряется и карта не геокодит заново при следующих открытиях.
     LaunchedEffect(filteredList) {
         val pending = filteredList
             .filter { it.latLng == null && !geoCache.containsKey(it.addressId) }
-            .take(15)
+            .take(200)
         if (pending.isEmpty()) return@LaunchedEffect
         val resolved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
@@ -226,6 +229,8 @@ fun MapScreen(
             }
         }
         geoCache.putAll(resolved)
+        // Персистим координаты в БД, чтобы не геокодить заново и точки не пропадали
+        resolved.forEach { (id, ll) -> AppStateStore.setAddressCoords(id, ll.latitude, ll.longitude) }
     }
 
     // Геокодим выбранный контакт по требованию: если у его адреса нет координат
@@ -246,7 +251,10 @@ fun MapScreen(
                     ?.let { LatLng(it.latitude, it.longitude) }
             } catch (e: Exception) { null }
         }
-        if (resolved != null) geoCache[sel.addressId] = resolved
+        if (resolved != null) {
+            geoCache[sel.addressId] = resolved
+            AppStateStore.setAddressCoords(sel.addressId, resolved.latitude, resolved.longitude)
+        }
     }
     val listItems = filteredList
 
@@ -294,71 +302,12 @@ fun MapScreen(
         containerColor = AppleTheme.colors.groupedBackground,
         topBar = {}
     ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
 
-            // Вкладки → Apple-чипы
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                tabs.forEachIndexed { idx, title ->
-                    val active = selectedTab == idx
-                    Row(
-                        Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
-                            .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
-                            .clickable { selectedTab = idx; selectedItem = null }.padding(horizontal = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(title, fontSize = 14.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (active) Color.White else AppleTheme.colors.label)
-                    }
-                }
-            }
-
-            // ── Search ────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
-            ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.map_search_hint)) },
-                leadingIcon  = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty())
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, null)
-                        }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = AppleTheme.colors.card,
-                    unfocusedContainerColor = AppleTheme.colors.card,
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent
-                )
-            )
-                Box(
-                    Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(AppleTheme.colors.card).clickable { showMapView = !showMapView },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(if (showMapView) Icons.AutoMirrored.Filled.FormatListBulleted else Icons.Default.Map,
-                        contentDescription = if (showMapView) stringResource(R.string.map_list) else stringResource(R.string.map_title),
-                        tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp))
-                }
-            }
-
-            // MAP VIEW
+            // -- Base layer: full-screen map --
             if (showMapView) {
-                Box(
-                    modifier = Modifier
-                        .weight(1.6f)
-                        .fillMaxWidth()
-                ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+
                     // FIX: show error state instead of crashing
                     if (mapLoadError != null) {
                         Box(
@@ -540,120 +489,114 @@ fun MapScreen(
                             )
                         }
                     }
+                
                 }
             }
 
-            // Bottom list panel
-            Card(
-                modifier  = Modifier.fillMaxWidth().then(
-                    if (showMapView) Modifier.weight(1f) else Modifier.fillMaxHeight()
-                ),
-                shape     = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                colors    = CardDefaults.cardColors(
-                    containerColor = AppleTheme.colors.card
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            // -- Bottom panel: selected (floating) or full list --
+            if (!showMapView || selectedItem != null) {
+                val panelMod = if (showMapView)
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)
+                else
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.82f)
+                Card(
+                    modifier  = panelMod,
+                    shape     = if (showMapView) RoundedCornerShape(20.dp) else RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = if (showMapView) 12.dp else 8.dp)
                 ) {
-                    if (selectedItem != null) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                stringResource(R.string.map_selected_object),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppleTheme.colors.brand
+                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Box(Modifier.width(36.dp).height(5.dp).clip(RoundedCornerShape(3.dp)).background(AppleTheme.colors.separator))
+                        }
+                        if (selectedItem != null) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.map_selected_object), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
+                                IconButton(onClick = { selectedItem = null }) { Icon(Icons.Default.Close, null, tint = AppleTheme.colors.secondaryLabel) }
+                            }
+                            MapItemDetailCard(
+                                item   = selectedItem ?: return@Column,
+                                onOpen = {
+                                    val item = selectedItem ?: return@MapItemDetailCard
+                                    if (item.ownerType == AddressOwnerType.CONTACT) onNavigateToContact(item.ownerId)
+                                    else onNavigateToCompany(item.ownerId)
+                                }
                             )
-                            IconButton(onClick = { selectedItem = null }) {
-                                Icon(Icons.Default.Close, null,
-                                    tint = AppleTheme.colors.secondaryLabel)
-                            }
-                        }
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                        MapItemDetailCard(
-                            item   = selectedItem ?: return@Column,
-                            onOpen = {
-                                val item = selectedItem ?: return@MapItemDetailCard
-                                if (item.ownerType == AddressOwnerType.CONTACT)
-                                    onNavigateToContact(item.ownerId)
-                                else
-                                    onNavigateToCompany(item.ownerId)
-                            }
-                        )
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.LocationOn, null,
-                                    tint = AppleTheme.colors.brand)
-                                Text(
-                                    stringResource(R.string.map_in_this_area),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            Badge(containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f)) {
-                                Text(
-                                    listItems.size.toString(),
-                                    modifier = Modifier.padding(horizontal = 4.dp),
-                                    color    = AppleTheme.colors.brand,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        HorizontalDivider(
-                            color     = AppleTheme.colors.separator,
-                            thickness = 0.5.dp
-                        )
-
-                        if (listItems.isEmpty()) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(Icons.Default.SearchOff, null,
-                                        Modifier.size(48.dp),
-                                        tint = AppleTheme.colors.separator)
-                                    Text(stringResource(R.string.map_no_addresses),
-                                        color = AppleTheme.colors.secondaryLabel)
-                                    Text(
-                                        stringResource(R.string.map_add_addresses_hint),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppleTheme.colors.secondaryLabel
-                                    )
-                                }
-                            }
                         } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(bottom = 16.dp)
-                            ) {
-                                items(listItems, key = { it.id }) { obj ->
-                                    MapListRow(
-                                        obj     = obj,
-                                        onClick = { selectedItem = obj; showMapView = true }
-                                    )
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.LocationOn, null, tint = AppleTheme.colors.brand)
+                                    Text(stringResource(R.string.map_in_this_area), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                }
+                                Badge(containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f)) {
+                                    Text(listItems.size.toString(), modifier = Modifier.padding(horizontal = 4.dp), color = AppleTheme.colors.brand, fontWeight = FontWeight.Bold)
                                 }
                             }
+                            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                            if (listItems.isEmpty()) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(Icons.Default.SearchOff, null, Modifier.size(48.dp), tint = AppleTheme.colors.separator)
+                                        Text(stringResource(R.string.map_no_addresses), color = AppleTheme.colors.secondaryLabel)
+                                        Text(stringResource(R.string.map_add_addresses_hint), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+                                    }
+                                }
+                            } else {
+                                LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
+                                    items(listItems, key = { it.id }) { obj ->
+                                        MapListRow(obj = obj, onClick = { selectedItem = obj; showMapView = true })
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // -- Floating search + chips over the map (HTML spec) --
+            Column(
+                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(horizontal = 18.dp).padding(top = 12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        placeholder = { Text(stringResource(R.string.map_search_hint), color = Color(0xFF8E8E93)) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF8E8E93), modifier = Modifier.size(18.dp)) },
+                        trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) } },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White.copy(alpha = 0.92f),
+                            unfocusedContainerColor = Color.White.copy(alpha = 0.85f),
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent
+                        )
+                    )
+                    Box(
+                        Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.85f)).clickable { showMapView = !showMapView },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (showMapView) Icons.AutoMirrored.Filled.FormatListBulleted else Icons.Default.Map,
+                            contentDescription = if (showMapView) stringResource(R.string.map_list) else stringResource(R.string.map_title),
+                            tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tabs.forEachIndexed { idx, title ->
+                        val active = selectedTab == idx
+                        Box(
+                            Modifier.height(30.dp).clip(RoundedCornerShape(15.dp))
+                                .background(if (active) AppleTheme.colors.brand else Color.White.copy(alpha = 0.9f))
+                                .clickable { selectedTab = idx; selectedItem = null }
+                                .padding(horizontal = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(title, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, color = if (active) Color.White else Color(0xFF1C1C1E))
                         }
                     }
                 }

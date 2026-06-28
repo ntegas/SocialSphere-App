@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.foundation.layout.*
@@ -44,7 +45,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = AppleTheme.colors.groupedBackground
                 )
             )
         }
@@ -71,7 +72,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                     Text(
                         stringResource(R.string.notif_default_reminder),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = AppleTheme.colors.brand
                     )
                     Spacer(Modifier.height(6.dp))
                     // FIX: single-select, saves to AppSettings
@@ -89,7 +90,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                     Text(
                         stringResource(R.string.notif_multi_hint),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = AppleTheme.colors.secondaryLabel
                     )
                     Spacer(Modifier.height(6.dp))
                     // FIX: multi-select, saves to AppSettings
@@ -155,7 +156,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                        containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f).copy(alpha = 0.4f)
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -163,7 +164,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                             stringResource(R.string.notif_current),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppleTheme.colors.brand
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(stringResource(R.string.notif_cur_birthdays, birthdayTimes.joinToString(", ") { it.label(ctxLabel) }),
@@ -186,13 +187,13 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
 private fun NotifCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier  = Modifier.fillMaxWidth(),
-        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
+            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
             content()
         }
     }

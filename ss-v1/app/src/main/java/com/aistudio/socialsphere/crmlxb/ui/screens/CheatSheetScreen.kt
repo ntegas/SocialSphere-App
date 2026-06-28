@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import androidx.compose.ui.graphics.Color
 
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
@@ -96,7 +97,7 @@ fun CheatSheetScreen(
                         Text(stringResource(R.string.cs_title), fontWeight = FontWeight.Bold)
                         Text(name,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary)
+                            color = AppleTheme.colors.secondaryLabel)
                     }
                 },
                 navigationIcon = {
@@ -147,8 +148,8 @@ fun CheatSheetScreen(
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(12.dp),
                         colors   = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor   = MaterialTheme.colorScheme.onSecondaryContainer
+                            containerColor = AppleTheme.colors.fill,
+                            contentColor   = AppleTheme.colors.label
                         )
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, null, Modifier.size(18.dp))
@@ -173,7 +174,7 @@ fun CheatSheetScreen(
                 Card(
                     shape  = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f)
                     ),
                     elevation = CardDefaults.cardElevation(0.dp)
                 ) {
@@ -184,12 +185,12 @@ fun CheatSheetScreen(
                     ) {
                         Box(
                             Modifier.size(56.dp).clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
+                                .background(AppleTheme.colors.brand),
                             Alignment.Center
                         ) {
                             Text(
                                 contact.firstName.take(1) + contact.lastName.take(1),
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 20.sp
                             )
@@ -197,16 +198,16 @@ fun CheatSheetScreen(
                         Column {
                             Text(name, fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                color = AppleTheme.colors.brand)
                             if (company.isNotEmpty())
                                 Text(
                                     listOf(position, company).filter { it.isNotBlank() }.joinToString(" • "),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+                                    color = AppleTheme.colors.brand.copy(alpha = 0.75f)
                                 )
                             if (city.isNotEmpty())
                                 Text(city, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f))
+                                    color = AppleTheme.colors.brand.copy(alpha = 0.6f))
                         }
                     }
                 }
@@ -231,7 +232,7 @@ fun CheatSheetScreen(
                     SheetBlock(stringResource(R.string.cs_last_note)) {
                         Text(lastNote.createdAt.take(10),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.secondary)
+                            color = AppleTheme.colors.secondaryLabel)
                         Spacer(Modifier.height(4.dp))
                         Text(lastNote.text,
                             style = MaterialTheme.typography.bodyMedium)
@@ -253,7 +254,7 @@ fun CheatSheetScreen(
                                     modifier = Modifier.weight(1f))
                                 Text(event.startDate,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = AppleTheme.colors.brand,
                                     fontWeight = FontWeight.Medium)
                             }
                         }
@@ -278,7 +279,7 @@ fun CheatSheetScreen(
                                 Arrangement.SpaceBetween
                             ) {
                                 Text(role, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary,
+                                    color = AppleTheme.colors.secondaryLabel,
                                     modifier = Modifier.weight(0.4f))
                                 Text(otherName, style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
@@ -299,7 +300,7 @@ fun CheatSheetScreen(
                                 Modifier.fillMaxWidth().padding(vertical = 2.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("•", color = MaterialTheme.colorScheme.primary,
+                                Text("•", color = AppleTheme.colors.brand,
                                     fontWeight = FontWeight.Bold)
                                 Text("${detail.category.label(ctxLabel)}: ${detail.value}",
                                     style = MaterialTheme.typography.bodyMedium)
@@ -318,7 +319,7 @@ fun CheatSheetScreen(
                                 Modifier.fillMaxWidth().padding(vertical = 2.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("→", color = MaterialTheme.colorScheme.primary,
+                                Text("→", color = AppleTheme.colors.brand,
                                     fontWeight = FontWeight.Bold)
                                 Text(note.text, style = MaterialTheme.typography.bodyMedium)
                             }
@@ -366,7 +367,7 @@ fun CheatSheetScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.padding(vertical = 2.dp)
                                 ) {
-                                    Text("→", color = MaterialTheme.colorScheme.primary,
+                                    Text("→", color = AppleTheme.colors.brand,
                                         fontWeight = FontWeight.Bold)
                                     Text(point, style = MaterialTheme.typography.bodyMedium)
                                 }
@@ -388,11 +389,11 @@ fun CheatSheetScreen(
                                 Modifier.fillMaxWidth().padding(vertical = 2.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("!", color = MaterialTheme.colorScheme.error,
+                                Text("!", color = AppleTheme.colors.red,
                                     fontWeight = FontWeight.Bold)
                                 Text("${r.category.label(ctxLabel)}: ${r.value}",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.error)
+                                    color = AppleTheme.colors.red)
                             }
                         }
                     }
@@ -408,7 +409,7 @@ fun CheatSheetScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Phone, null, Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.primary)
+                                    tint = AppleTheme.colors.brand)
                                 Text(primaryPhone, style = MaterialTheme.typography.bodyMedium)
                             }
                         }
@@ -417,7 +418,7 @@ fun CheatSheetScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.AutoMirrored.Filled.Chat, null, Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.primary)
+                                    tint = AppleTheme.colors.brand)
                                 Text("${primaryMessenger.type.label(ctxLabel)}: ${primaryMessenger.value}",
                                     style = MaterialTheme.typography.bodyMedium)
                             }
@@ -438,12 +439,12 @@ fun CheatSheetScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.EditNote, null, Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.outlineVariant)
+                                tint = AppleTheme.colors.separator)
                             Text(stringResource(R.string.cs_fill_profile),
-                                color = MaterialTheme.colorScheme.secondary)
+                                color = AppleTheme.colors.secondaryLabel)
                             Text(stringResource(R.string.cs_fill_hint),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outlineVariant)
+                                color = AppleTheme.colors.separator)
                         }
                     }
                 }
@@ -470,11 +471,11 @@ private fun SheetBlock(
                 title,
                 style      = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color      = MaterialTheme.colorScheme.onSurface
+                color      = AppleTheme.colors.label
             )
             Spacer(Modifier.height(8.dp))
             HorizontalDivider(
-                color     = MaterialTheme.colorScheme.outlineVariant,
+                color     = AppleTheme.colors.separator,
                 thickness = 0.5.dp
             )
             Spacer(Modifier.height(8.dp))

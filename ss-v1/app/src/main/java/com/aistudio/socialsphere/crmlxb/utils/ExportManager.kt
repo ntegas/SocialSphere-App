@@ -37,6 +37,20 @@ object ExportManager {
     private val ts get() = LocalDateTime.now()
         .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm"))
 
+    // Безопасность (skill: insecure-data-storage): экспорт = вся PII в ОТКРЫТОМ
+    // виде в cacheDir. Чтобы она там не оставалась навсегда — перед каждым новым
+    // экспортом удаляем прошлые наши temp-файлы старше часа (только что созданный
+    // не трогаем, он ещё нужен для шаринга).
+    private val exportPrefixes = listOf("contacts_", "companies_", "backup_", "socialsphere_backup_")
+    private fun cleanOldExports(context: Context) {
+        val cutoff = System.currentTimeMillis() - 60L * 60 * 1000
+        try {
+            context.cacheDir.listFiles()?.forEach { f ->
+                if (exportPrefixes.any { f.name.startsWith(it) } && f.lastModified() < cutoff) f.delete()
+            }
+        } catch (e: Exception) { /* best-effort */ }
+    }
+
     // ─── Share file via system sheet ───────────────────────────
     fun shareFile(context: Context, file: File, mimeType: String) {
         val uri = FileProvider.getUriForFile(
@@ -58,6 +72,7 @@ object ExportManager {
 
     // ─── CSV Contacts ──────────────────────────────────────────
     suspend fun exportContactsCsv(context: Context): File = withContext(Dispatchers.IO) {
+        cleanOldExports(context)
         val file = File(context.cacheDir, "contacts_$ts.csv")
         PrintWriter(FileWriter(file)).use { pw ->
             pw.println("Имя,Фамилия,Телефон,Email,Компания,Должность,Город,Тип,Важность")
@@ -86,6 +101,7 @@ object ExportManager {
 
     // ─── CSV Companies ─────────────────────────────────────────
     suspend fun exportCompaniesCsv(context: Context): File = withContext(Dispatchers.IO) {
+        cleanOldExports(context)
         val file = File(context.cacheDir, "companies_$ts.csv")
         PrintWriter(FileWriter(file)).use { pw ->
             pw.println("Название,Индустрия,Город,Сайт,Описание,Количество контактов")
@@ -116,70 +132,105 @@ object ExportManager {
         .replace("\n", "\\n")
         .replace("\r", "\\n")
 
+    private fun adrType(t: AddressType): String = when (t) {
+        AddressType.HOME -> "HOME"
+        AddressType.WORK, AddressType.OFFICE -> "WORK"
+        else -> "OTHER"
+    }
+
+    /**
+     * Один контакт → vCard 3.0 со ВСЕМИ полями. Стандартные поля (N/FN/NICKNAME/
+     * ORG/TITLE/TEL/EMAIL/ADR с типом/BDAY/NOTE) читаются телефонной книгой;
+     * мессенджеры — X-поля; app-поля (следующий шаг, темы, теги…), которых нет
+     * в стандарте, складываем в NOTE читаемым текстом — иначе они бы терялись.
+     */
+    private fun writeVCard(pw: PrintWriter, c: Contact) {
+        pw.println("BEGIN:VCARD")
+        pw.println("VERSION:3.0")
+        pw.println("N:${vEsc(c.lastName)};${vEsc(c.firstName)};;;")
+        pw.println("FN:${vEsc("${c.firstName} ${c.lastName}".trim())}")
+        if (!c.nickname.isNullOrBlank()) pw.println("NICKNAME:${vEsc(c.nickname)}")
+
+        val compRel = c.companyRelations.firstOrNull { it.isPrimary }
+            ?: c.companyRelations.firstOrNull()
+        val company = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
+        if (company.isNotBlank() || !compRel?.position.isNullOrBlank()) {
+            pw.println("ORG:${vEsc(company)}")
+            if (!compRel?.position.isNullOrBlank())
+                pw.println("TITLE:${vEsc(compRel?.position)}")
+        }
+
+        c.phones.forEach { p ->
+            val type = when (p.type) {
+                PhoneType.WORK -> "WORK"
+                PhoneType.HOME -> "HOME"
+                else           -> "CELL"
+            }
+            val pref = if (p.isPrimary) ",PREF" else ""
+            pw.println("TEL;TYPE=$type$pref:${p.number}")
+        }
+
+        c.emails.forEach { e ->
+            val type = when (e.type) {
+                EmailType.WORK -> "WORK"
+                else           -> "HOME"
+            }
+            val pref = if (e.isPrimary) ",PREF" else ""
+            pw.println("EMAIL;TYPE=$type$pref:${e.email}")
+        }
+
+        c.messengers.forEach { m -> pw.println("X-${m.type.name}:${vEsc(m.value)}") }
+
+        // ВСЕ адреса контакта с типом (раньше уходил только первый и без типа)
+        AppStateStore.addresses
+            .filter { it.ownerId == c.id && it.ownerType == AddressOwnerType.CONTACT }
+            .forEach { a ->
+                pw.println("ADR;TYPE=${adrType(a.addressType)}:;;${vEsc(a.addressLine)};" +
+                    "${vEsc(a.city)};;${vEsc(a.postalCode)};${vEsc(a.country)}")
+            }
+
+        val birthday = AppStateStore.calendarItems.find {
+            it.type == CalendarItemType.BIRTHDAY &&
+            it.links.any { l -> l.targetId == c.id }
+        }?.startDate
+        if (!birthday.isNullOrBlank())
+            pw.println("BDAY:${birthday.replace("-", "")}")
+
+        // NOTE: все заметки + app-поля (нет в стандарте vCard — кладём текстом)
+        val noteParts = mutableListOf<String>()
+        c.notes.forEach { noteParts.add(it.text) }
+        if (!c.nextStep.isNullOrBlank())      noteParts.add("Следующий шаг: ${c.nextStep}")
+        if (!c.talkingPoints.isNullOrBlank()) noteParts.add("Темы для разговора: ${c.talkingPoints}")
+        if (!c.canHelpWith.isNullOrBlank())   noteParts.add("Может помочь: ${c.canHelpWith}")
+        if (!c.iCanHelpWith.isNullOrBlank())  noteParts.add("Я могу помочь: ${c.iCanHelpWith}")
+        if (!c.meetContext.isNullOrBlank())   noteParts.add("Где познакомились: ${c.meetContext}")
+        if (c.tags.isNotEmpty())              noteParts.add("Теги: ${c.tags.joinToString(", ")}")
+        if (noteParts.isNotEmpty())
+            pw.println("NOTE:${vEsc(noteParts.joinToString("\n"))}")
+
+        pw.println("END:VCARD")
+        pw.println()
+    }
+
     suspend fun exportVCard(context: Context): File = withContext(Dispatchers.IO) {
+        cleanOldExports(context)
         val file = File(context.cacheDir, "contacts_$ts.vcf")
         PrintWriter(FileWriter(file)).use { pw ->
-            AppStateStore.contacts.forEach { c ->
-                pw.println("BEGIN:VCARD")
-                pw.println("VERSION:3.0")
-                pw.println("N:${vEsc(c.lastName)};${vEsc(c.firstName)};;;")
-                pw.println("FN:${vEsc("${c.firstName} ${c.lastName}".trim())}")
-
-                val compRel = c.companyRelations.firstOrNull { it.isPrimary }
-                    ?: c.companyRelations.firstOrNull()
-                val company = compRel?.companyId
-                    ?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                if (company.isNotBlank() || !compRel?.position.isNullOrBlank()) {
-                    pw.println("ORG:${vEsc(company)}")
-                    if (!compRel?.position.isNullOrBlank())
-                        pw.println("TITLE:${vEsc(compRel?.position)}")
-                }
-
-                c.phones.forEach { p ->
-                    val type = when (p.type) {
-                        PhoneType.WORK   -> "WORK"
-                        PhoneType.HOME   -> "HOME"
-                        else             -> "CELL"
-                    }
-                    pw.println("TEL;TYPE=$type:${p.number}")
-                }
-
-                c.emails.forEach { e ->
-                    val type = when (e.type) {
-                        EmailType.WORK -> "WORK"
-                        else           -> "HOME"
-                    }
-                    pw.println("EMAIL;TYPE=$type:${e.email}")
-                }
-
-                c.messengers.forEach { m ->
-                    pw.println("X-${m.type.name}:${vEsc(m.value)}")
-                }
-
-                val addr = AppStateStore.addresses.find {
-                    it.ownerId == c.id && it.ownerType == AddressOwnerType.CONTACT
-                }
-                if (addr != null) {
-                    pw.println("ADR:;;${vEsc(addr.addressLine)};${vEsc(addr.city)};;;${vEsc(addr.country)}")
-                }
-
-                val birthday = AppStateStore.calendarItems.find {
-                    it.type == CalendarItemType.BIRTHDAY &&
-                    it.links.any { l -> l.targetId == c.id }
-                }?.startDate
-                if (!birthday.isNullOrBlank())
-                    pw.println("BDAY:${birthday.replace("-", "")}")
-
-                val notes = c.notes.take(3).joinToString(" | ") { it.text }
-                if (notes.isNotBlank())
-                    pw.println("NOTE:${vEsc(notes)}")
-
-                pw.println("END:VCARD")
-                pw.println()
-            }
+            AppStateStore.contacts.forEach { writeVCard(pw, it) }
         }
         file
     }
+
+    /** Один контакт → .vcf (кнопка «Сохранить в телефон» на карточке). */
+    suspend fun exportContactVCard(context: Context, contact: Contact): File =
+        withContext(Dispatchers.IO) {
+            cleanOldExports(context)
+            val safe = "${contact.firstName}_${contact.lastName}"
+                .replace(Regex("[^A-Za-z0-9_]"), "")
+            val file = File(context.cacheDir, "contact_${safe.ifBlank { "card" }}_$ts.vcf")
+            PrintWriter(FileWriter(file)).use { pw -> writeVCard(pw, contact) }
+            file
+        }
 
     /** Открывает .vcf системным импортом в «Контакты» (ACTION_VIEW). В отличие
      *  от shareFile, ведёт прямо в приложение Контакты с предпросмотром импорта. */
@@ -222,6 +273,7 @@ object ExportManager {
     }
 
     suspend fun exportJsonBackup(context: Context): File = withContext(Dispatchers.IO) {
+        cleanOldExports(context)
         val file = File(context.cacheDir, "backup_$ts.json")
         val data = buildBackup()
         file.writeText(backupAdapter.toJson(data))
@@ -262,6 +314,7 @@ object ExportManager {
 
     // ─── Full ZIP backup ───────────────────────────────────────
     suspend fun exportFullZip(context: Context): File = withContext(Dispatchers.IO) {
+        cleanOldExports(context)
         val zip  = File(context.cacheDir, "socialsphere_backup_$ts.zip")
         val csv  = exportContactsCsv(context)
         val comp = exportCompaniesCsv(context)

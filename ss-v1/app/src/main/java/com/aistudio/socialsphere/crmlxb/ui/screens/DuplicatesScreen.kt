@@ -64,12 +64,12 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
             Text(
                 stringResource(R.string.dup_backup_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary
+                color = AppleTheme.colors.secondaryLabel
             )
 
             if (pairs.isEmpty()) {
                 Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.dup_none), color = MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.dup_none), color = AppleTheme.colors.secondaryLabel)
                 }
             } else {
                 pairs.forEach { (a, b) ->
@@ -83,12 +83,12 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                     ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             DuplicateContactLine(a)
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                             DuplicateContactLine(b)
                             Text(
                                 stringResource(R.string.dup_will_keep, "${keep.firstName} ${keep.lastName}".trim()),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
+                                color = AppleTheme.colors.brand
                             )
                             Button(
                                 onClick = { pendingMerge = keep to drop },
@@ -136,6 +136,6 @@ private fun DuplicateContactLine(c: Contact) {
         Text("${c.firstName} ${c.lastName}".trim(), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
         val sub = contactSubtitle(c)
         if (sub.isNotEmpty())
-            Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            Text(sub, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
     }
 }
