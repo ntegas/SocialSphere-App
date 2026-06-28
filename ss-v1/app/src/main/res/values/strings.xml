@@ -886,4 +886,6 @@
     <string name="sync_update_from_phone">Обновить из телефона</string>
     <string name="sync_pick_contact">Выберите контакт телефона</string>
     <string name="sync_linked">Связан с телефоном</string>
+    <string name="set_exact_alarms">Разрешить точные напоминания</string>
+    <string name="set_exact_alarms_hint">Чтобы напоминания приходили точно в срок</string>
 </resources>

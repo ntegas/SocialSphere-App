@@ -1,9 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
+}
+
+// Релизная подпись: значения из keystore.properties в корне модуля (НЕ в репозитории).
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+  if (keystorePropsFile.exists()) FileInputStream(keystorePropsFile).use { load(it) }
 }
 
 android {
@@ -20,11 +29,24 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  signingConfigs {
+    create("release") {
+      if (keystorePropsFile.exists()) {
+        storeFile = file(keystoreProps.getProperty("storeFile"))
+        storePassword = keystoreProps.getProperty("storePassword")
+        keyAlias = keystoreProps.getProperty("keyAlias")
+        keyPassword = keystoreProps.getProperty("keyPassword")
+      }
+    }
+  }
+
   buildTypes {
     release {
       isCrunchPngs = false
       isMinifyEnabled = true
       isShrinkResources = true
+      // Подпись только при наличии keystore.properties — иначе debug/CI не ломаются
+      if (keystorePropsFile.exists()) signingConfig = signingConfigs.getByName("release")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     debug {

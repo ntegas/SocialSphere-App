@@ -886,4 +886,6 @@
     <string name="sync_update_from_phone">Ενημέρωση από τηλέφωνο</string>
     <string name="sync_pick_contact">Επιλέξτε επαφή τηλεφώνου</string>
     <string name="sync_linked">Συνδεδεμένο με τηλέφωνο</string>
+    <string name="set_exact_alarms">Επιτρέψτε ακριβείς υπενθυμίσεις</string>
+    <string name="set_exact_alarms_hint">Ώστε οι υπενθυμίσεις να φτάνουν ακριβώς στην ώρα τους</string>
 </resources>

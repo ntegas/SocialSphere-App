@@ -1,0 +1,6 @@
+
+# Release signing (никогда не коммитим)
+keystore.properties
+*.jks
+*.keystore
+!debug.keystore

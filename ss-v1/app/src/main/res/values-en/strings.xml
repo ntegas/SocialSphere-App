@@ -886,4 +886,6 @@
     <string name="sync_update_from_phone">Update from phone</string>
     <string name="sync_pick_contact">Pick a phone contact</string>
     <string name="sync_linked">Linked to phone</string>
+    <string name="set_exact_alarms">Allow exact alarms</string>
+    <string name="set_exact_alarms_hint">So reminders arrive exactly on time</string>
 </resources>

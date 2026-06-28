@@ -60,3 +60,11 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# Метаданные Kotlin + дженерики/аннотации — нужны Moshi (рефлексия) и Retrofit,
+# иначе на release-сборке падает (де)сериализация JSON-бэкапа.
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod, RuntimeVisibleAnnotations, AnnotationDefault
+-keep class kotlin.Metadata { *; }
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+-dontwarn org.codehaus.mojo.**

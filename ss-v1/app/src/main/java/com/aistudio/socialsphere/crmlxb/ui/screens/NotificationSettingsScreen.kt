@@ -117,6 +117,32 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                     )
                 }
 
+                // ── Точные напоминания (Android 12+) ──────────
+                // USE_EXACT_ALARM убран (политика Play). На 12+ при отсутствии
+                // разрешения показываем кнопку перехода в системные настройки.
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    val am = ctxLabel.getSystemService(android.content.Context.ALARM_SERVICE)
+                        as android.app.AlarmManager
+                    if (!am.canScheduleExactAlarms()) {
+                        NotifCard(stringResource(R.string.notif_general)) {
+                            Text(
+                                stringResource(R.string.set_exact_alarms_hint),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleTheme.colors.secondaryLabel
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            OutlinedButton(onClick = {
+                                ctxLabel.startActivity(
+                                    android.content.Intent(
+                                        android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                        android.net.Uri.parse("package:" + ctxLabel.packageName)
+                                    )
+                                )
+                            }) { Text(stringResource(R.string.set_exact_alarms)) }
+                        }
+                    }
+                }
+
                 // ── Дни рождения ──────────────────────────────
                 NotifCard(stringResource(R.string.notif_birthdays)) {
                     Text(
