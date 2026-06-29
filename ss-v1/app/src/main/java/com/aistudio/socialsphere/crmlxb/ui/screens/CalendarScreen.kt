@@ -102,9 +102,9 @@ fun CalendarScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(stringResource(R.string.cal_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label)
-                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { onNavigateToCreateCalendarItem() }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Add, stringResource(R.string.cal_add_event), tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp))
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(stringResource(R.string.cal_title))
+                Box(Modifier.size(38.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.brand).clickable { onNavigateToCreateCalendarItem() }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Add, stringResource(R.string.cal_add_event), tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
             // Сегмент-контрол видов (равные сегменты)

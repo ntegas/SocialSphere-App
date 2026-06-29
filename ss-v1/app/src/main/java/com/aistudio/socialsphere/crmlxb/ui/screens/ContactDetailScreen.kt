@@ -700,7 +700,8 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
             }
         }
         Spacer(Modifier.height(14.dp))
-        Text(name, color = AppleTheme.colors.label, fontSize = 26.sp, fontWeight = FontWeight.Bold,
+        Text(name, color = AppleTheme.colors.label, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         if (subtitle.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))

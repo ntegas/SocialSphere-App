@@ -212,15 +212,15 @@ fun CompaniesScreen(
                     modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(stringResource(R.string.comp_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label)
-                    Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { onNavigateToCreateCompany() }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Add, stringResource(R.string.comp_add), tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp))
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(stringResource(R.string.comp_title))
+                    Box(Modifier.size(38.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.brand).clickable { onNavigateToCreateCompany() }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Add, stringResource(R.string.comp_add), tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
                 Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
-                    Row(Modifier.fillMaxWidth().height(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(Color(0x1F767680)).clickable { searchActive = true }.padding(horizontal = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Icon(Icons.Default.Search, null, tint = Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
-                        Text(stringResource(R.string.comp_search_hint), fontSize = 17.sp, color = Color(0xFF8E8E93), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(Modifier.fillMaxWidth().height(40.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(13.dp)).background(Color(0x17787880)).clickable { searchActive = true }.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Search, null, tint = AppleTheme.colors.tertiaryLabel, modifier = Modifier.size(17.dp))
+                        Text(stringResource(R.string.comp_search_hint), fontSize = 16.sp, color = AppleTheme.colors.tertiaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -330,7 +330,7 @@ fun CompanyCardItem(company: Company, onClick: () -> Unit) {
     Card(
         onClick   = onClick,
         modifier  = Modifier.fillMaxWidth(),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        shape     = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
         colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {

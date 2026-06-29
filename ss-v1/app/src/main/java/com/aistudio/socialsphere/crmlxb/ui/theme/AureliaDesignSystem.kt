@@ -116,6 +116,27 @@ object AureliaTheme {
     val shapes get() = AureliaShapes
 }
 
+/**
+ * Крупный заголовок экрана как в макете: Playfair (serif) 34sp, уголь.
+ * Используется в шапках списков (Контакты, Компании, Календарь, Настройки…).
+ */
+@Composable
+fun AureliaScreenTitle(
+    text: String,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    color: Color = AureliaTheme.colors.label,
+) {
+    androidx.compose.material3.Text(
+        text = text,
+        fontFamily = AureliaSerif,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 34.sp,
+        letterSpacing = (-0.3).sp,
+        color = color,
+        modifier = modifier,
+    )
+}
+
 @Composable
 fun AureliaAppTheme(
     darkTheme: Boolean = false,

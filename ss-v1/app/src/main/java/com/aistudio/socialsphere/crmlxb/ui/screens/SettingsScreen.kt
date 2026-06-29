@@ -75,11 +75,8 @@ fun SettingsScreen(
                 .verticalScroll(scrollState)
                 .padding(bottom = 28.dp)
         ) {
-            Text(
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(
                 text = stringResource(R.string.settings_title),
-                fontSize = 34.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = AppleTheme.colors.label,
                 modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 18.dp)
             )
 

@@ -521,7 +521,7 @@ fun HomeScreen(
                     ) {
                         Column {
                             Text(dateLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.secondaryLabel)
-                            Text(stringResource(R.string.home_today), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label, modifier = Modifier.padding(top = 3.dp))
+                            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(stringResource(R.string.home_today), modifier = Modifier.padding(top = 3.dp))
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.padding(top = 6.dp)) {
                             // Сканер визитки (по макету: акцент-заливка)

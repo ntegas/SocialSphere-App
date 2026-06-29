@@ -165,12 +165,13 @@ fun AppleAppTheme(
 // 4. SHAPES  (радиусы из HTML)
 // ============================================================================
 
+// Радиусы из макета Aurelia: inset-группы r20, иконка-плитка r9, поиск r13.
 object AppleShapes {
-    val card    = RoundedCornerShape(18.dp) // сгруппированные inset-карточки
+    val card    = RoundedCornerShape(20.dp) // сгруппированные inset-карточки
     val tile    = RoundedCornerShape(16.dp) // плитки quick-action
-    val iconBox = RoundedCornerShape(8.dp)  // цветная иконка-плитка 30dp
-    val chip    = RoundedCornerShape(17.dp) // фильтр-чипы
-    val field   = RoundedCornerShape(11.dp) // поле поиска
+    val iconBox = RoundedCornerShape(9.dp)  // цветная иконка-плитка 30dp
+    val chip    = RoundedCornerShape(16.dp) // фильтр-чипы
+    val field   = RoundedCornerShape(13.dp) // поле поиска
     val segment = RoundedCornerShape(9.dp)  // segmented control
     val sheet   = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 }
