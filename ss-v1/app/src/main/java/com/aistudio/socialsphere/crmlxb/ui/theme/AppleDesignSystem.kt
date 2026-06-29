@@ -110,18 +110,24 @@ val AppleLightColors = AppleColors(
     isDark = false,
 )
 
+// Тёмная палитра переотображена на Aurelia-dark (тёплый уголь + осветлённый
+// малахит/золото). Поля AppleColors сохранены — экраны меняются автоматически.
 val AppleDarkColors = AppleColors(
-    groupedBackground = Color(0xFF000000),
-    card              = Color(0xFF1C1C1E),
-    cardElevated      = Color(0xFF2C2C2E),
-    label             = Color(0xFFF5F5F7),
-    secondaryLabel    = Color(0x99EBEBF5), // rgba(235,235,245,0.6)
-    tertiaryLabel     = Color(0x4DEBEBF5), // rgba(235,235,245,0.3)
-    separator         = Color(0x8C545458), // rgba(84,84,88,0.55)
-    fill              = Color(0x47787880), // rgba(118,118,128,0.28)
-    barBlur           = Color(0xD11C1C1E), // rgba(28,28,30,0.82)
-    brand = BrandIndigo, red = SystemRed, orange = SystemOrange,
-    green = SystemGreen, blue = SystemBlue, pink = SystemPink,
+    groupedBackground = Color(0xFF0E0D0A), // тёплый уголь
+    card              = Color(0xFF1A1813),
+    cardElevated      = Color(0xFF26221A),
+    label             = Color(0xFFF3EFE8),
+    secondaryLabel    = Color(0xFF8E877A),
+    tertiaryLabel     = Color(0xFF6B655A),
+    separator         = Color(0x14FFFFFF), // rgba(255,255,255,.08)
+    fill              = Color(0x0DFFFFFF), // rgba(255,255,255,.05)
+    barBlur           = Color(0xDB14120E), // rgba(20,18,14,.86)
+    brand  = Color(0xFF5FB894),            // осветлённый малахит
+    red    = Color(0xFFE0846E),            // терракот (тревога)
+    orange = Color(0xFFD7B468),            // золото
+    green  = Color(0xFF5FB894),
+    blue   = Color(0xFF7FBDB2),
+    pink   = Color(0xFFE0846E),
     isDark = true,
 )
 
@@ -149,12 +155,16 @@ fun AppleAppTheme(
     // Акцент-цвет (бренд) выбирается в Настройках → Внешний вид. Один источник
     // правды: переопределяем brand здесь, и все экраны через AppleTheme.colors.brand
     // и AureliaTheme.colors.brand получают выбранный цвет.
-    val accent = Color(com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings.accentColorSafe().rgb)
-    val base = if (darkTheme) AppleDarkColors else AppleLightColors
-    val colors = base.copy(brand = accent)
+    // Дефолтный малахит оставляем как в палитре (в тёмной он осветлён до #5FB894);
+    // выбранный нестандартный акцент применяем как есть в обеих темах.
+    val accentChoice = com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings.accentColorSafe()
+    val base        = if (darkTheme) AppleDarkColors else AppleLightColors
+    val aureliaBase = if (darkTheme) AureliaDarkColors else AureliaLightColors
+    val isDefaultAccent = accentChoice == com.aistudio.socialsphere.crmlxb.ui.screens.AccentColor.MALACHITE
+    val colors = if (isDefaultAccent) base else base.copy(brand = Color(accentChoice.rgb))
     CompositionLocalProvider(
         LocalAppleColors provides colors,
-        LocalAureliaColors provides AureliaLightColors.copy(brand = accent),
+        LocalAureliaColors provides (if (isDefaultAccent) aureliaBase else aureliaBase.copy(brand = Color(accentChoice.rgb))),
     ) {
         // Типографика «Aurelia»: Playfair (serif) для заголовков/имён/чисел, Manrope для UI
         MaterialTheme(typography = AureliaTypography, content = content)

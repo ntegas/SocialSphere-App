@@ -74,6 +74,25 @@ val AureliaLightColors = AureliaColors(
     isDark = false,
 )
 
+// Тёмная палитра Aurelia (из тёмных экранов макета): тёплый уголь-фон,
+// осветлённые малахит/золото для контраста на тёмном.
+val AureliaDarkColors = AureliaColors(
+    brand = Color(0xFF5FB894),            // осветлённый малахит
+    gold = Color(0xFFD7B468),
+    background = Color(0xFF0E0D0A),
+    card = Color(0xFF1A1813),
+    label = Color(0xFFF3EFE8),
+    secondaryLabel = Color(0xFF8E877A),
+    tertiaryLabel = Color(0xFF6B655A),
+    charcoal = Color(0xFF26221A),
+    divider = Color(0x14FFFFFF),          // rgba(255,255,255,.08)
+    fill = Color(0x0DFFFFFF),             // rgba(255,255,255,.05)
+    onBrand = Color(0xFF12100C),          // тёмный текст на светлом малахите
+    avatarTerracotta = Brush.linearGradient(listOf(Color(0xFFE59A6B), Color(0xFFC45D34))),
+    avatarSage = Brush.linearGradient(listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A))),
+    isDark = true,
+)
+
 val LocalAureliaColors = staticCompositionLocalOf { AureliaLightColors }
 
 // ── Формы (радиусы из макета) ────────────────────────────────────────────
