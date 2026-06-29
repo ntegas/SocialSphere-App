@@ -181,18 +181,19 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                 )
                             }
                         }
-                        // Карточка заметки
+                        // Карточка заметки (Aurelia: сплошная карточка r16, важные/
+                        // рабочие — с лёгким цветным тоном вместо мутной полупрозрачности)
                         Card(
                             modifier = Modifier.weight(1f).padding(bottom = 8.dp),
-                            shape    = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                            shape    = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                             colors   = CardDefaults.cardColors(
                                 containerColor = when {
                                     note.isImportant ->
-                                        AppleTheme.colors.red.copy(alpha = 0.12f).copy(alpha = 0.2f)
+                                        AppleTheme.colors.red.copy(alpha = 0.10f)
                                     note.type == NoteType.WORK ->
-                                        AppleTheme.colors.orange.copy(alpha = 0.14f).copy(alpha = 0.2f)
+                                        AppleTheme.colors.orange.copy(alpha = 0.10f)
                                     else ->
-                                        AppleTheme.colors.card.copy(alpha = 0.4f)
+                                        AppleTheme.colors.card
                                 }
                             ),
                             elevation = CardDefaults.cardElevation(0.dp)
