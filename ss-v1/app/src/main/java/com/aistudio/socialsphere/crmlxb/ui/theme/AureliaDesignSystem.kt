@@ -105,19 +105,27 @@ object AureliaShapes {
 }
 
 // ── Типографика: настоящие Playfair Display (serif) и Manrope (sans).
-// Вариативные TTF в res/font; вес применяется через ось wght (API 26+,
-// на 24/25 — дефолтное начертание, без краша). ──
+// ВАЖНО: это ВАРИАТИВНЫЕ шрифты — вес нужно задавать через ось wght
+// (FontVariation.Settings), иначе все начертания рисуются дефолтным весом
+// и заголовки выходят тоньше макета. Ось применяется на API 26+; на 24/25 —
+// дефолтное начертание (без краша). ──
+private fun variableFont(resId: Int, w: Int) = androidx.compose.ui.text.font.Font(
+    resId,
+    weight = FontWeight(w),
+    variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(
+        androidx.compose.ui.text.font.FontVariation.weight(w)
+    ),
+)
+
+private val PF = com.aistudio.socialsphere.crmlxb.R.font.playfair_display
+private val MR = com.aistudio.socialsphere.crmlxb.R.font.manrope
+
 val AureliaSerif: FontFamily = FontFamily(
-    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.playfair_display, weight = FontWeight.W500),
-    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.playfair_display, weight = FontWeight.W700),
-    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.playfair_display, weight = FontWeight.W800),
+    variableFont(PF, 500), variableFont(PF, 700), variableFont(PF, 800), variableFont(PF, 900),
 )
 val AureliaSans: FontFamily = FontFamily(
-    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W400),
-    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W500),
-    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W600),
-    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W700),
-    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W800),
+    variableFont(MR, 400), variableFont(MR, 500), variableFont(MR, 600),
+    variableFont(MR, 700), variableFont(MR, 800),
 )
 
 val AureliaTypography = Typography(
