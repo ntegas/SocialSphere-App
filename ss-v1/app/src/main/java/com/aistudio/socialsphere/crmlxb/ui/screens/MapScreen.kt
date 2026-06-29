@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import androidx.core.content.ContextCompat
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
@@ -712,18 +713,27 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(48.dp).clip(
-                        if (item.ownerType == AddressOwnerType.COMPANY)
-                            RoundedCornerShape(12.dp) else CircleShape
-                    ).background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        if (item.ownerType == AddressOwnerType.COMPANY)
-                            Icons.Default.Business else Icons.Default.Person,
-                        null, tint = AppleTheme.colors.brand
-                    )
+                if (item.ownerType == AddressOwnerType.COMPANY) {
+                    Box(
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+                            .background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Business, null, tint = AppleTheme.colors.brand)
+                    }
+                } else {
+                    // Аватар-пин в стиле Aurelia: терракотовый градиент + инициалы
+                    val initials = item.title.split(" ")
+                        .mapNotNull { it.firstOrNull()?.toString() }
+                        .take(2).joinToString("")
+                    Box(
+                        modifier = Modifier.size(48.dp).clip(CircleShape)
+                            .background(AureliaTheme.colors.avatarTerracotta),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(initials, color = Color.White,
+                            fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(item.title,
