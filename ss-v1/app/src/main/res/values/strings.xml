@@ -122,6 +122,8 @@
     <string name="contacts_count">%1$d контактов</string>
     <string name="contacts_count_of">%1$d из %2$d</string>
     <string name="contacts_no_filtered">Нет контактов по выбранным фильтрам</string>
+    <string name="contacts_empty_title">Пока никого нет</string>
+    <string name="contacts_empty_sub">Добавьте первого человека вручную, отсканируйте визитку или импортируйте из телефона.</string>
     <string name="contacts_reset_filters">Сбросить фильтры</string>
     <string name="contacts_reset_all">Сбросить всё</string>
     <string name="filter_status">Статус контакта</string>

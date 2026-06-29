@@ -122,6 +122,8 @@
     <string name="contacts_count">%1$d επαφές</string>
     <string name="contacts_count_of">%1$d από %2$d</string>
     <string name="contacts_no_filtered">Καμία επαφή με τα φίλτρα</string>
+    <string name="contacts_empty_title">Κανείς ακόμη</string>
+    <string name="contacts_empty_sub">Προσθέστε το πρώτο άτομο χειροκίνητα, σαρώστε μια κάρτα ή εισαγάγετε από το τηλέφωνο.</string>
     <string name="contacts_reset_filters">Επαναφορά φίλτρων</string>
     <string name="contacts_reset_all">Επαναφορά όλων</string>
     <string name="filter_status">Κατάσταση επαφής</string>

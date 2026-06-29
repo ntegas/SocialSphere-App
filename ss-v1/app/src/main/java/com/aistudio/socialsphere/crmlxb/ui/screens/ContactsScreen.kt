@@ -334,13 +334,39 @@ fun ContactsScreen(
                     CircularProgressIndicator()
                 }
             } else if (filteredContacts.isEmpty()) {
+                // Пустое состояние Aurelia: круг 100dp (бренд .08) + бренд-иконка.
+                // Разделяем «совсем нет контактов» и «ничего не нашлось по фильтру».
+                val noContactsAtAll = AppStateStore.contacts.isEmpty() && searchQuery.isBlank()
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp), tint = AppleTheme.colors.separator)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 40.dp)
+                    ) {
+                        Box(
+                            Modifier.size(100.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(AppleTheme.colors.brand.copy(alpha = 0.08f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (noContactsAtAll) Icons.Outlined.PersonAddAlt else Icons.Outlined.SearchOff,
+                                null, Modifier.size(44.dp), tint = AppleTheme.colors.brand
+                            )
+                        }
                         Text(
-                            if (searchQuery.isNotBlank()) stringResource(R.string.home_nothing_found, searchQuery)
+                            if (noContactsAtAll) stringResource(R.string.contacts_empty_title)
+                            else stringResource(R.string.home_nothing_found, searchQuery),
+                            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                            fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
+                            color = AppleTheme.colors.label,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(top = 16.dp)
+                        )
+                        Text(
+                            if (noContactsAtAll) stringResource(R.string.contacts_empty_sub)
                             else stringResource(R.string.contacts_no_filtered),
-                            color = AppleTheme.colors.secondaryLabel
+                            color = AppleTheme.colors.secondaryLabel,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                         if (hasActiveFilters) {
                             TextButton(onClick = {
