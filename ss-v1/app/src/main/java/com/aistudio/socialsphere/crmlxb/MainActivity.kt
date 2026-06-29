@@ -146,7 +146,17 @@ fun SocialsphereApp() {
                     onNavigateToCompany      = { id -> navController.navigate("company_detail/$id") },
                     onNavigateToCalendarItem = { id -> navController.navigate("calendar_item_detail/$id") },
                     onNavigateToCalendar     = { navController.navigate("calendar") },
-                    onNavigateToContacts     = { navController.navigate("contacts") }
+                    onNavigateToContacts     = { navController.navigate("contacts") },
+                    onNavigateToScan         = { navController.navigate("scan_card") }
+                )
+            }
+            composable("scan_card") {
+                ScanCardScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onCreated = { id ->
+                        navController.popBackStack()
+                        navController.navigate("contact_detail/$id")
+                    }
                 )
             }
             composable("contacts") {
