@@ -4,16 +4,22 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -97,38 +103,52 @@ fun SocialsphereApp() {
             val showBottomBar = navigationItems.any { it.first == currentDestination?.route }
             
             if (showBottomBar) {
-                NavigationBar(containerColor = com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.card) {
-                    navigationItems.forEach { item ->
-                        NavigationBarItem(
-                            colors = androidx.compose.material3.NavigationBarItemDefaults.colors(selectedIconColor = com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.brand, selectedTextColor = com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.brand, unselectedIconColor = com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.secondaryLabel, unselectedTextColor = com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.secondaryLabel, indicatorColor = androidx.compose.ui.graphics.Color.Transparent),
-                            icon = { Icon(item.third, contentDescription = stringResource(item.second)) },
-                            label = { Text(stringResource(item.second), maxLines = 1) },
-                            selected = currentDestination?.hierarchy?.any { it.route == item.first } == true,
-                            onClick = {
-                                val alreadyHere = currentDestination?.hierarchy
-                                    ?.any { it.route == item.first } == true
-                                if (!alreadyHere) {
-                                    // Возврат на вкладку, уже лежащую в стеке («Главный» всегда
-                                    // на дне), — через popBackStack: restoreState при навигации
-                                    // на стартовую вкладку давал no-op («Главный не нажимается»).
-                                    // saveState = true сохраняет состояние покидаемой вкладки.
-                                    val popped = navController.popBackStack(
-                                        route = item.first,
-                                        inclusive = false,
-                                        saveState = true
-                                    )
-                                    if (!popped) {
-                                        navController.navigate(item.first) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    }
-                                }
+                // Навигация по вкладке — логика сохранена дословно (popBackStack/saveState).
+                val onNavClick: (String) -> Unit = { route ->
+                    val alreadyHere = currentDestination?.hierarchy?.any { it.route == route } == true
+                    if (!alreadyHere) {
+                        val popped = navController.popBackStack(route = route, inclusive = false, saveState = true)
+                        if (!popped) {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                        )
+                        }
+                    }
+                }
+                // Кастомный таб-бар по макету Aurelia: матовый бумажный фон, верхняя
+                // волосяная линия, иконки 23 + подписи 10sp, активный — малахит,
+                // неактивный — приглушённый. Без «пилюли»-индикатора Material.
+                Column(Modifier.fillMaxWidth().background(com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.barBlur)) {
+                    androidx.compose.material3.HorizontalDivider(thickness = 1.dp, color = com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.separator)
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .navigationBarsPadding()
+                            .height(64.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        navigationItems.forEach { item ->
+                            val selected = currentDestination?.hierarchy?.any { it.route == item.first } == true
+                            val tint = if (selected) com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.brand
+                                       else com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.tertiaryLabel
+                            Column(
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = null
+                                    ) { onNavClick(item.first) },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(item.third, contentDescription = stringResource(item.second),
+                                    tint = tint, modifier = Modifier.size(23.dp))
+                                Spacer(Modifier.height(4.dp))
+                                Text(stringResource(item.second), fontSize = 10.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = tint, maxLines = 1)
+                            }
+                        }
                     }
                 }
             }
