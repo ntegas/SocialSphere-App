@@ -104,9 +104,21 @@ object AureliaShapes {
     val iconBox = RoundedCornerShape(9.dp)
 }
 
-// ── Типографика (роль Playfair — serif, Manrope — sans; пока системные) ──
-val AureliaSerif: FontFamily = FontFamily.Serif      // TODO: FontFamily(Font(R.font.playfair_display))
-val AureliaSans: FontFamily  = FontFamily.SansSerif  // TODO: FontFamily(Font(R.font.manrope))
+// ── Типографика: настоящие Playfair Display (serif) и Manrope (sans).
+// Вариативные TTF в res/font; вес применяется через ось wght (API 26+,
+// на 24/25 — дефолтное начертание, без краша). ──
+val AureliaSerif: FontFamily = FontFamily(
+    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.playfair_display, weight = FontWeight.W500),
+    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.playfair_display, weight = FontWeight.W700),
+    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.playfair_display, weight = FontWeight.W800),
+)
+val AureliaSans: FontFamily = FontFamily(
+    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W400),
+    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W500),
+    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W600),
+    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W700),
+    androidx.compose.ui.text.font.Font(com.aistudio.socialsphere.crmlxb.R.font.manrope, weight = FontWeight.W800),
+)
 
 val AureliaTypography = Typography(
     // Заголовки/имена/числа — Playfair (serif)
