@@ -42,7 +42,7 @@ abstract class SocialsphereDatabase : RoomDatabase() {
         private var INSTANCE: SocialsphereDatabase? = null
 
         // Migration v1 → v2: add new Contact fields
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE contacts ADD COLUMN nickname TEXT")
                 database.execSQL("ALTER TABLE contacts ADD COLUMN contactStatus TEXT NOT NULL DEFAULT 'ACTIVE'")
@@ -56,7 +56,7 @@ abstract class SocialsphereDatabase : RoomDatabase() {
         }
 
         // Migration v2 → v3: add meetContext and meetDate
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE contacts ADD COLUMN meetContext TEXT")
                 database.execSQL("ALTER TABLE contacts ADD COLUMN meetDate TEXT")
@@ -89,13 +89,13 @@ abstract class SocialsphereDatabase : RoomDatabase() {
         // TEXT NOT NULL DEFAULT 'ACTIVE' из MIGRATION_1_2) — поэтому миграция
         // пустая. Её наличие позволяет обновиться с v3 на v4 БЕЗ потери данных,
         // вместо destructive fallback.
-        private val MIGRATION_3_4 = object : Migration(3, 4) {
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 // no-op
             }
         }
 
-        private val MIGRATION_4_5 = object : Migration(4, 5) {
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE addresses ADD COLUMN postalCode TEXT")
             }
@@ -105,7 +105,7 @@ abstract class SocialsphereDatabase : RoomDatabase() {
         // SQLite-схема идентична v5 (identity-hash совпадает) — поэтому no-op.
         // Регистрация перехода нужна, чтобы апдейт с v5 НЕ срабатывал на
         // destructive fallback (потеря боевых данных). Аналог MIGRATION_3_4.
-        private val MIGRATION_5_6 = object : Migration(5, 6) {
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 // no-op
             }
@@ -115,14 +115,14 @@ abstract class SocialsphereDatabase : RoomDatabase() {
         // на устройстве (e9f08...) не совпадал с хэшем, который Room ожидал от
         // текущего кода (ac5b2...) — результат двух изменений Entity при version=6.
         // Поднимаем версию, миграция пустая — SQLite-таблицы остаются те же.
-        private val MIGRATION_6_7 = object : Migration(6, 7) {
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 // no-op: таблицы не изменились, правится только version tracking
             }
         }
 
         // v8: связь контакта с телефонной книгой для синхронизации «обновить из телефона»
-        private val MIGRATION_7_8 = object : Migration(7, 8) {
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE contacts ADD COLUMN deviceContactId TEXT")
             }
