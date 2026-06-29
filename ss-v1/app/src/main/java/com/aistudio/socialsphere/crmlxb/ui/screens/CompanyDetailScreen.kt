@@ -85,7 +85,7 @@ fun CompanyDetailScreen(
                         Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color(0xFF7B73E8), navigationIconContentColor = androidx.compose.ui.graphics.Color.White, actionIconContentColor = androidx.compose.ui.graphics.Color.White, titleContentColor = androidx.compose.ui.graphics.Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color(0xFF2E8B6B), navigationIconContentColor = androidx.compose.ui.graphics.Color.White, actionIconContentColor = androidx.compose.ui.graphics.Color.White, titleContentColor = androidx.compose.ui.graphics.Color.White)
             )
         }
     ) { paddingValues ->
@@ -120,10 +120,11 @@ fun CompanyHeader(company: Company, onShowPeople: () -> Unit = {}) {
 
     Box(
         modifier = Modifier.fillMaxWidth()
+            // Малахитовый градиент Aurelia (был старый индиго #5B53D6 — не из палитры).
             .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
-                androidx.compose.ui.graphics.Color(0xFF7B73E8),
-                androidx.compose.ui.graphics.Color(0xFF5B53D6),
-                androidx.compose.ui.graphics.Color(0xFF4A40B8))))
+                androidx.compose.ui.graphics.Color(0xFF2E8B6B),
+                androidx.compose.ui.graphics.Color(0xFF1C6B4C),
+                androidx.compose.ui.graphics.Color(0xFF155539))))
             .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 18.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
