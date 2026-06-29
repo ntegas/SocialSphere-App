@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import com.aistudio.socialsphere.crmlxb.data.local.SocialsphereDatabase
 import com.aistudio.socialsphere.crmlxb.model.CalendarItem
@@ -20,7 +21,26 @@ import com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings
 import com.aistudio.socialsphere.crmlxb.data.local.toDomain
 
 object NotificationScheduler {
-    
+
+    /**
+     * Ставит будильник: точный, если есть разрешение (Android <12 — всегда;
+     * 12+ — по canScheduleExactAlarms()), иначе неточный, но переживающий doze
+     * (setAndAllowWhileIdle). Проверяем разрешение ЗАРАНЕЕ, чтобы не ловить
+     * SecurityException на каждом будильнике (он спамил лог).
+     */
+    private fun scheduleAlarm(am: AlarmManager, triggerAtMillis: Long, pi: PendingIntent) {
+        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+        if (canExact) {
+            try {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
+                return
+            } catch (e: SecurityException) {
+                Log.w("NotificationScheduler", "Exact alarm denied at runtime, falling back to inexact")
+            }
+        }
+        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
+    }
+
     fun scheduleReminder(context: Context, calendarItem: CalendarItem, reminderRule: ReminderRule) {
         if (!AppSettings.isNotificationsEnabled.value) return
         
@@ -63,21 +83,7 @@ object NotificationScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        try {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                notificationTimeMillis,
-                pendingIntent
-            )
-        } catch (e: SecurityException) {
-            Log.e("NotificationScheduler", "Exact alarm permission missing", e)
-            // Fallback to inexact
-             alarmManager.set(
-                AlarmManager.RTC_WAKEUP,
-                notificationTimeMillis,
-                pendingIntent
-            )
-        }
+        scheduleAlarm(alarmManager, notificationTimeMillis, pendingIntent)
     }
 
     private const val STALE_REQUEST_CODE = 770001
@@ -102,11 +108,7 @@ object NotificationScheduler {
         var next = now.toLocalDate().atTime(LocalTime.of(10, 0))
         if (!next.isAfter(now)) next = next.plusDays(1)
         val fireAt = next.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        try {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pendingIntent)
-        } catch (e: SecurityException) {
-            alarmManager.set(AlarmManager.RTC_WAKEUP, fireAt, pendingIntent)
-        }
+        scheduleAlarm(alarmManager, fireAt, pendingIntent)
     }
 
     /** «Отложить»: переустановить то же уведомление на сутки вперёд. Переносим все
@@ -126,11 +128,7 @@ object NotificationScheduler {
             context, nid, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        try {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pendingIntent)
-        } catch (e: SecurityException) {
-            alarmManager.set(AlarmManager.RTC_WAKEUP, fireAt, pendingIntent)
-        }
+        scheduleAlarm(alarmManager, fireAt, pendingIntent)
     }
 
     fun cancelReminder(context: Context, calendarItemId: String, reminderRuleId: String) {
