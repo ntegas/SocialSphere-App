@@ -90,11 +90,11 @@ fun SettingsScreen(
                 AppleDivider()
                 SettingsNavRow(AppleTheme.colors.green, Icons.Default.SwapVert, stringResource(R.string.settings_import_export), null, "setting_import_export", onNavigateToImportExport)
                 AppleDivider()
-                SettingsNavRow(Color(0xFF34C759), Icons.Default.Merge, stringResource(R.string.settings_duplicates), null, "setting_duplicates", onNavigateToDuplicates)
+                SettingsNavRow(AppleTheme.colors.brand, Icons.Default.Merge, stringResource(R.string.settings_duplicates), null, "setting_duplicates", onNavigateToDuplicates)
                 AppleDivider()
                 InsetRow(
                     title = stringResource(R.string.settings_dark_theme),
-                    leading = { IconTile(Color(0xFF5856D6)) { Icon(Icons.Default.Palette, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp)) } },
+                    leading = { IconTile(AppleTheme.colors.orange) { Icon(Icons.Default.Palette, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp)) } },
                     trailing = {
                         Switch(
                             checked = isDark,
@@ -105,7 +105,7 @@ fun SettingsScreen(
                     }
                 )
                 AppleDivider()
-                SettingsNavRow(Color(0xFF8E8E93), Icons.Default.Lock, stringResource(R.string.settings_privacy), null, "setting_privacy", onNavigateToPrivacy)
+                SettingsNavRow(AppleTheme.colors.secondaryLabel, Icons.Default.Lock, stringResource(R.string.settings_privacy), null, "setting_privacy", onNavigateToPrivacy)
             }
 
             Spacer(modifier = Modifier.height(22.dp))
