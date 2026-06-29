@@ -473,12 +473,13 @@ fun CalendarItemEditScreen(
 
 // ── Apple-style: цвет типа события + компактная строка списка + пикер типа ──
 
+// Палитра типов событий Aurelia (терракот/тил/малахит/золото) вместо iOS-цветов.
 internal fun eventTypeColor(t: CalendarItemType): Color = when (t) {
-    CalendarItemType.BIRTHDAY -> Color(0xFFFF2D55)
-    CalendarItemType.CALL     -> Color(0xFF5B53D6)
-    CalendarItemType.MEETING  -> Color(0xFF34C759)
-    CalendarItemType.GIFT     -> Color(0xFFFF9500)
-    else                      -> Color(0xFF007AFF)
+    CalendarItemType.BIRTHDAY -> Color(0xFFC45D34)
+    CalendarItemType.CALL     -> Color(0xFF3E7E7A)
+    CalendarItemType.MEETING  -> Color(0xFF1C6B4C)
+    CalendarItemType.GIFT     -> Color(0xFFB68A36)
+    else                      -> Color(0xFF1C6B4C)
 }
 
 /**

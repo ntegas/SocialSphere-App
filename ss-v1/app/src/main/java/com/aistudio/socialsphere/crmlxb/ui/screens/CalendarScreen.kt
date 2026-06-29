@@ -369,13 +369,7 @@ fun MonthGridView(
                                     dayEvts.take(3).forEach { ev ->
                                         Box(
                                             Modifier.size(5.dp).clip(CircleShape).background(
-                                                when (ev.type) {
-                                                    CalendarItemType.BIRTHDAY -> Color(0xFFFF2D55)
-                                                    CalendarItemType.MEETING  -> Color(0xFF34C759)
-                                                    CalendarItemType.CALL     -> Color(0xFF5B53D6)
-                                                    CalendarItemType.GIFT     -> Color(0xFFFF9500)
-                                                    else                      -> AppleTheme.colors.brand
-                                                }
+                                                eventTypeColor(ev.type)
                                             )
                                         )
                                     }
@@ -433,13 +427,7 @@ fun CalendarEventItem(
     onFilterByType: ((CalendarEventFilter) -> Unit)? = null
 ) {
     val ctxLabel = LocalContext.current
-    val typeColor = when (event.type) {
-        CalendarItemType.BIRTHDAY -> Color(0xFFFF2D55)
-        CalendarItemType.CALL     -> Color(0xFF5B53D6)
-        CalendarItemType.MEETING  -> Color(0xFF34C759)
-        CalendarItemType.GIFT     -> Color(0xFFFF9500)
-        else                      -> AppleTheme.colors.brand
-    }
+    val typeColor = eventTypeColor(event.type)
     val typeIcon = when (event.type) {
         CalendarItemType.BIRTHDAY -> Icons.Default.Cake
         CalendarItemType.CALL     -> Icons.Default.Phone
