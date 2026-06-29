@@ -1,6 +1,7 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -49,26 +50,19 @@ fun CalendarEventFilter.title(context: android.content.Context): String = when (
     CalendarEventFilter.IMPORTANT -> context.getString(R.string.cal_f_important)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-private fun calFilterDot(f: CalendarEventFilter): Color? = when (f) {
-    CalendarEventFilter.BIRTHDAYS -> Color(0xFFFF2D55)
-    CalendarEventFilter.MEETINGS  -> Color(0xFF34C759)
-    CalendarEventFilter.CALLS     -> Color(0xFF5B53D6)
-    CalendarEventFilter.GIFTS     -> Color(0xFFFF9500)
-    else -> null
-}
-
 @Composable
-private fun CalFilterChip(label: String, active: Boolean, dot: Color?, onClick: () -> Unit) {
-    Row(
-        Modifier.height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp))
+private fun CalFilterChip(label: String, active: Boolean, onClick: () -> Unit) {
+    // Спека Aurelia: h28 r14, активный — бренд/белый 700; неактивный — card,
+    // вторичный текст 600, тонкая инсет-обводка. Без цветных точек (как в макете).
+    Box(
+        Modifier.height(28.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
             .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
-            .clickable { onClick() }.padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)
+            .then(if (!active) Modifier.border(1.dp, AppleTheme.colors.separator, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)) else Modifier)
+            .clickable { onClick() }.padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
-        if (dot != null && !active) Box(Modifier.size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(dot))
-        Text(label, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (active) Color.White else AppleTheme.colors.label)
+        Text(label, fontSize = 12.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+            color = if (active) Color.White else AppleTheme.colors.secondaryLabel)
     }
 }
 
@@ -107,18 +101,18 @@ fun CalendarScreen(
                     Icon(Icons.Default.Add, stringResource(R.string.cal_add_event), tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
-            // Сегмент-контрол видов (равные сегменты)
+            // Сегмент-контрол видов (спека Aurelia: трек fill r11 pad3, активный card r8 вес700)
             Row(
-                modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp)).background(Color(0x1F767680)).padding(2.dp)
+                modifier = Modifier.fillMaxWidth().height(36.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(AppleTheme.colors.fill).padding(3.dp)
             ) {
-                val orderedModes = listOf(CalendarViewMode.LIST, CalendarViewMode.TODAY, CalendarViewMode.WEEK, CalendarViewMode.MONTH)
+                val orderedModes = listOf(CalendarViewMode.TODAY, CalendarViewMode.LIST, CalendarViewMode.WEEK, CalendarViewMode.MONTH)
                 orderedModes.forEach { mode ->
                     val isSelected = selectedMode == mode
                     Box(
-                        modifier = Modifier.weight(1f).clip(androidx.compose.foundation.shape.RoundedCornerShape(7.dp)).background(if (isSelected) AppleTheme.colors.card else Color.Transparent).clickable { selectedMode = mode }.padding(vertical = 6.dp),
+                        modifier = Modifier.weight(1f).fillMaxHeight().clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).background(if (isSelected) AppleTheme.colors.card else Color.Transparent).clickable { selectedMode = mode },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(mode.title(ctxLabel), fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium, color = if (isSelected) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel)
+                        Text(mode.title(ctxLabel), fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, color = if (isSelected) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel)
                     }
                 }
             }
@@ -128,7 +122,7 @@ fun CalendarScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 filters.forEach { filter ->
-                    CalFilterChip(filter.title(ctxLabel), selectedFilter == filter, calFilterDot(filter)) { selectedFilter = filter }
+                    CalFilterChip(filter.title(ctxLabel), selectedFilter == filter) { selectedFilter = filter }
                 }
             }
 
@@ -217,7 +211,7 @@ fun CalendarScreen(
                         item(key = "c_$header") {
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                                 colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                                 elevation = CardDefaults.cardElevation(1.dp)
                             ) {
