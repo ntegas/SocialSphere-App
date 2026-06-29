@@ -88,18 +88,25 @@ private val SystemGreen  = Color(0xFF34C759)
 private val SystemBlue   = Color(0xFF007AFF)
 private val SystemPink   = Color(0xFFFF2D55)
 
+// Светлая палитра переотображена на дизайн-систему «Aurelia» (тёплая бумага/уголь,
+// малахит/золото). Поля AppleColors сохранены — экраны, читающие AppleTheme.colors.*,
+// автоматически получают новые цвета без переписывания каждого экрана.
 val AppleLightColors = AppleColors(
-    groupedBackground = Color(0xFFF2F2F7),
-    card              = Color(0xFFFFFFFF),
+    groupedBackground = Color(0xFFF1EDE6), // бумага
+    card              = Color(0xFFFCFBF8), // карточка
     cardElevated      = Color(0xFFFFFFFF),
-    label             = Color(0xFF000000),
-    secondaryLabel    = Color(0xFF86868B),
-    tertiaryLabel     = Color(0xFFC7C7CC),
-    separator         = Color(0x1F3C3C43), // rgba(60,60,67,0.12)
-    fill              = Color(0x1F787880), // rgba(118,118,128,0.12)
-    barBlur           = Color(0xD1F9F9F9), // rgba(249,249,249,0.82)
-    brand = BrandIndigo, red = SystemRed, orange = SystemOrange,
-    green = SystemGreen, blue = SystemBlue, pink = SystemPink,
+    label             = Color(0xFF1B1A16), // уголь
+    secondaryLabel    = Color(0xFF6F685B),
+    tertiaryLabel     = Color(0xFF9A9284),
+    separator         = Color(0x14232018), // rgba(35,32,24,.08)
+    fill              = Color(0x0F232018),
+    barBlur           = Color(0xD1F1EDE6), // матовая бумага
+    brand  = Color(0xFF1C6B4C),            // малахит
+    red    = Color(0xFFC45D34),            // терракот (тревога)
+    orange = Color(0xFFB68A36),            // золото (статус/просрочка)
+    green  = Color(0xFF1C6B4C),            // малахит
+    blue   = Color(0xFF2E6B57),            // приглушённый зелёный
+    pink   = Color(0xFFC45D34),
     isDark = false,
 )
 
@@ -139,10 +146,18 @@ fun AppleAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val colors = if (darkTheme) AppleDarkColors else AppleLightColors
-    CompositionLocalProvider(LocalAppleColors provides colors) {
-        // используем существующую Typography из Type.kt
-        MaterialTheme(typography = Typography, content = content)
+    // Акцент-цвет (бренд) выбирается в Настройках → Внешний вид. Один источник
+    // правды: переопределяем brand здесь, и все экраны через AppleTheme.colors.brand
+    // и AureliaTheme.colors.brand получают выбранный цвет.
+    val accent = Color(com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings.accentColorSafe().rgb)
+    val base = if (darkTheme) AppleDarkColors else AppleLightColors
+    val colors = base.copy(brand = accent)
+    CompositionLocalProvider(
+        LocalAppleColors provides colors,
+        LocalAureliaColors provides AureliaLightColors.copy(brand = accent),
+    ) {
+        // Типографика «Aurelia»: Playfair (serif) для заголовков/имён/чисел, Manrope для UI
+        MaterialTheme(typography = AureliaTypography, content = content)
     }
 }
 

@@ -2,11 +2,13 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -67,6 +69,54 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
                             }
                         }
                         if (!isDark) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                    }
+                }
+            }
+
+            // Accent section (по макету: 4 круга 44dp с кольцом активного)
+            val currentAccent by AppSettings.accentColor
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.4f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(stringResource(R.string.appearance_accent),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        AccentColor.values().forEach { ac ->
+                            val sel = currentAccent == ac
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(CircleShape)
+                                        .then(
+                                            if (sel) Modifier.border(2.dp, Color(ac.rgb), CircleShape)
+                                            else Modifier
+                                        )
+                                        .clickable { AppSettings.accentColor.value = ac }
+                                        .padding(6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        Modifier.size(44.dp).clip(CircleShape).background(Color(ac.rgb))
+                                    )
+                                }
+                                Spacer(Modifier.height(7.dp))
+                                Text(
+                                    stringResource(ac.labelRes),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (sel) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel
+                                )
+                            }
+                        }
                     }
                 }
             }

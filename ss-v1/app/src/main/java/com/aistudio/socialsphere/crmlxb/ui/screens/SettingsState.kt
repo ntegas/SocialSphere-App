@@ -18,6 +18,14 @@ enum class AppLanguage(val code: String, val displayName: String) {
     GREEK("el", "Ελληνικά")
 }
 
+/** Акцент-цвет приложения (бренд). Значения из макета Aurelia. */
+enum class AccentColor(val key: String, val rgb: Long, val labelRes: Int) {
+    MALACHITE ("malachite",  0xFF1C6B4C, com.aistudio.socialsphere.crmlxb.R.string.accent_malachite),
+    SAPPHIRE  ("sapphire",   0xFF2A5DB0, com.aistudio.socialsphere.crmlxb.R.string.accent_sapphire),
+    AMETHYST  ("amethyst",   0xFF7E5180, com.aistudio.socialsphere.crmlxb.R.string.accent_amethyst),
+    TERRACOTTA("terracotta", 0xFFC45D34, com.aistudio.socialsphere.crmlxb.R.string.accent_terracotta)
+}
+
 // ── Persisted state helper — сохраняется при перезапуске ──────
 class PersistedMutableState<T>(
     private val prefs: android.content.SharedPreferences,
@@ -71,6 +79,21 @@ object AppSettings {
             deserialize = { it == "true" }
         )
     }
+
+    /** Акцент-цвет (бренд). Персистентно. */
+    val accentColor: MutableState<AccentColor> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "accent_color",
+            default     = AccentColor.MALACHITE,
+            serialize   = { it.key },
+            deserialize = { k -> AccentColor.values().find { it.key == k } ?: AccentColor.MALACHITE }
+        )
+    }
+
+    /** Безопасное чтение акцента для слоя темы (в @Preview prefs может быть не инициализирован). */
+    fun accentColorSafe(): AccentColor =
+        try { accentColor.value } catch (e: Exception) { AccentColor.MALACHITE }
 
     val isNotificationsEnabled = mutableStateOf(true)
     val defaultReminderTime    = mutableStateOf(ReminderTime.DAY_1)

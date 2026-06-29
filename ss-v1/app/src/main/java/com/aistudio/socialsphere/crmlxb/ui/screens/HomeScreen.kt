@@ -91,6 +91,7 @@ fun HomeScreen(
     onNavigateToCalendarItem: (String) -> Unit = {},
     onNavigateToCalendar: () -> Unit = {},
     onNavigateToContacts: () -> Unit = {},
+    onNavigateToScan: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState  = rememberScrollState()
@@ -522,7 +523,9 @@ fun HomeScreen(
                             Text(dateLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.secondaryLabel)
                             Text(stringResource(R.string.home_today), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label, modifier = Modifier.padding(top = 3.dp))
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.padding(top = 6.dp)) {
+                            // Сканер визитки (по макету: акцент-заливка)
+                            HomeCircleButton(Icons.Default.DocumentScanner, "home_scan_button", filled = true) { onNavigateToScan() }
                             // Лупу прячем когда поиск активен — поле ввода уже в
                             // TopAppBar, иначе на экране две лупы.
                             if (!searchActive) HomeCircleButton(Icons.Default.Search, null) { searchActive = true }
@@ -618,7 +621,7 @@ fun HomeScreen(
                         }
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                             colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                             elevation = CardDefaults.cardElevation(1.dp)
                         ) {
@@ -663,7 +666,7 @@ fun HomeScreen(
                         )
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                             colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                             elevation = CardDefaults.cardElevation(1.dp)
                         ) {
@@ -866,15 +869,21 @@ private fun HomeSectionLabel(text: String, modifier: Modifier = Modifier) {
 private fun HomeCircleButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     testTag: String?,
+    filled: Boolean = false,
     onClick: () -> Unit
 ) {
     val base = if (testTag != null) Modifier.testTag(testTag) else Modifier
     Box(
-        modifier = base.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape)
-            .background(androidx.compose.ui.graphics.Color(0x1F767680)).clickable { onClick() },
+        modifier = base.size(38.dp).clip(androidx.compose.foundation.shape.CircleShape)
+            .background(
+                if (filled) AppleTheme.colors.brand
+                else AppleTheme.colors.brand.copy(alpha = 0.10f)
+            ).clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = AppleTheme.colors.brand, modifier = Modifier.size(19.dp))
+        Icon(icon, contentDescription = null,
+            tint = if (filled) Color.White else AppleTheme.colors.brand,
+            modifier = Modifier.size(18.dp))
     }
 }
 
@@ -890,8 +899,8 @@ private fun HomeStatCard(
 ) {
     Card(
         onClick   = onClick,
-        modifier  = modifier.height(94.dp),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        modifier  = modifier.height(98.dp),
+        shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
         colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
@@ -899,21 +908,29 @@ private fun HomeStatCard(
             Modifier.fillMaxSize().padding(13.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(icon, null, Modifier.size(20.dp), tint = iconColor)
+            Box(
+                Modifier.size(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
+                    .background(iconColor.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, Modifier.size(16.dp), tint = iconColor)
+            }
             Column {
                 Text(
                     value,
-                    fontSize   = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = valueColor,
-                    style      = MaterialTheme.typography.titleLarge
+                    style      = MaterialTheme.typography.headlineSmall,
+                    fontSize   = 27.sp,
+                    lineHeight = 27.sp,
+                    color      = valueColor
                 )
                 Text(
                     label,
-                    fontSize = 12.sp,
-                    color    = AppleTheme.colors.secondaryLabel,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    fontSize   = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = AppleTheme.colors.secondaryLabel,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                    modifier   = Modifier.padding(top = 2.dp)
                 )
             }
         }
@@ -925,8 +942,8 @@ private fun HomeEventCard(event: HomeEvent, onClick: () -> Unit) {
     val accent = eventColors.getOrElse(event.colorIndex) { AppleTheme.colors.brand }
     Card(
         onClick   = onClick,
-        modifier  = Modifier.width(200.dp),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        modifier  = Modifier.width(182.dp),
+        shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
         colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
