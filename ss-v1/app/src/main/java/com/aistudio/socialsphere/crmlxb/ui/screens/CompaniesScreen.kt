@@ -319,12 +319,13 @@ fun CompanyCardItem(company: Company, onClick: () -> Unit) {
 
     val keyCount = relations.count { AppStateStore.getContact(it.contactId)?.importanceLevel == ImportanceLevel.KEY }
     val importantCount = relations.count { AppStateStore.getContact(it.contactId)?.importanceLevel == ImportanceLevel.IMPORTANT }
+    // Палитра логотипов Aurelia (малахит/терракот/слива/тил/золото) вместо iOS-радуги.
     val grads = listOf(
-        listOf(Color(0xFF5AC8FA), Color(0xFF007AFF)),
-        listOf(Color(0xFFFF6B6B), Color(0xFFFF3B30)),
-        listOf(Color(0xFF7B73E8), Color(0xFF5B53D6)),
-        listOf(Color(0xFF30D158), Color(0xFF34C759)),
-        listOf(Color(0xFFFF9F45), Color(0xFFFF9500))
+        listOf(Color(0xFF2E8B6B), Color(0xFF155539)),
+        listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
+        listOf(Color(0xFFB58CB6), Color(0xFF7E5180)),
+        listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A)),
+        listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
     )
     val g = grads[kotlin.math.abs(company.id.hashCode()) % grads.size]
     Card(

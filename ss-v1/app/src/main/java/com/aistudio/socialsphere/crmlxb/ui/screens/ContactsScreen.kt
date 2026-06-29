@@ -657,12 +657,13 @@ fun ContactListCard(
         else                      -> Color.Transparent
     }
 
+    // Палитра аватаров Aurelia (терракот/сейдж/слива/тил/золото) вместо iOS-радуги.
     val grads = listOf(
-        listOf(Color(0xFF7B73E8), Color(0xFF5B53D6)),
-        listOf(Color(0xFF30D158), Color(0xFF34C759)),
-        listOf(Color(0xFF5AC8FA), Color(0xFF007AFF)),
-        listOf(Color(0xFFFF9F45), Color(0xFFFF9500)),
-        listOf(Color(0xFFFF6B9D), Color(0xFFFF2D55))
+        listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
+        listOf(Color(0xFF9DBE92), Color(0xFF5E8C66)),
+        listOf(Color(0xFFB58CB6), Color(0xFF7E5180)),
+        listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A)),
+        listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
     )
     val g = grads[kotlin.math.abs(contact.id.hashCode()) % grads.size]
     Row(

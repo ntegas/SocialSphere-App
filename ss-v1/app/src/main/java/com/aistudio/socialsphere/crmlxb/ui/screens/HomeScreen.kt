@@ -986,11 +986,12 @@ private fun HomeContactRow(
         else                                                 -> AppleTheme.colors.secondaryLabel
     }
 
+    // Срочность по палитре Aurelia: >60 терракот, >14 золото, иначе сейдж.
     val avaGrad = androidx.compose.ui.graphics.Brush.linearGradient(
         when {
-            contact.daysSince != null && contact.daysSince > 60 -> listOf(androidx.compose.ui.graphics.Color(0xFFFF6B6B), androidx.compose.ui.graphics.Color(0xFFFF3B30))
-            contact.daysSince != null && contact.daysSince > 14 -> listOf(androidx.compose.ui.graphics.Color(0xFFFF9F45), androidx.compose.ui.graphics.Color(0xFFFF9500))
-            else -> listOf(androidx.compose.ui.graphics.Color(0xFF7B73E8), androidx.compose.ui.graphics.Color(0xFF5B53D6))
+            contact.daysSince != null && contact.daysSince > 60 -> listOf(androidx.compose.ui.graphics.Color(0xFFE59A6B), androidx.compose.ui.graphics.Color(0xFFC45D34))
+            contact.daysSince != null && contact.daysSince > 14 -> listOf(androidx.compose.ui.graphics.Color(0xFFD8B26A), androidx.compose.ui.graphics.Color(0xFFB68A36))
+            else -> listOf(androidx.compose.ui.graphics.Color(0xFF9DBE92), androidx.compose.ui.graphics.Color(0xFF5E8C66))
         }
     )
     Row(
@@ -1045,12 +1046,13 @@ private fun HomeContactRow(
 
 @Composable
 private fun HomeRecentCard(contact: HomeContact, onClick: () -> Unit) {
+    // Палитра аватаров Aurelia (терракот/сейдж/слива/тил/золото).
     val grads = listOf(
-        listOf(Color(0xFF7B73E8), Color(0xFF5B53D6)),
-        listOf(Color(0xFF30D158), Color(0xFF34C759)),
-        listOf(Color(0xFF5AC8FA), Color(0xFF007AFF)),
-        listOf(Color(0xFFFF9F45), Color(0xFFFF9500)),
-        listOf(Color(0xFFFF6B9D), Color(0xFFFF2D55))
+        listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
+        listOf(Color(0xFF9DBE92), Color(0xFF5E8C66)),
+        listOf(Color(0xFFB58CB6), Color(0xFF7E5180)),
+        listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A)),
+        listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
     )
     val g = grads[kotlin.math.abs(contact.id.hashCode()) % grads.size]
     Card(
