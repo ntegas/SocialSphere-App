@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
@@ -46,6 +47,41 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     item {
         TabEditBar(isEditing = editing, onEdit = { onEditingChange(true) }, onDone = { onEditingChange(false) })
     }
+
+    // ── Следующий шаг — золотая карточка-акцент (спека Aurelia) ──
+    val nextStepText = contact.nextStep?.takeIf { it.isNotBlank() }
+    if (nextStepText != null) {
+        item {
+            val gold = AppleTheme.colors.orange
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            listOf(gold.copy(alpha = 0.16f), gold.copy(alpha = 0.07f))
+                        )
+                    )
+                    .border(1.dp, gold.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+                Column {
+                    Text(
+                        stringResource(R.string.ce_next_step).uppercase(),
+                        fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.14.em, color = gold
+                    )
+                    Text(
+                        nextStepText,
+                        fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        lineHeight = 22.sp, color = AppleTheme.colors.label,
+                        modifier = Modifier.padding(top = 5.dp)
+                    )
+                }
+            }
+        }
+    }
+
     // ── Краткий контекст ────────────────────────────────────
     val impNotes = AppStateStore.notes.filter {
         it.contactId == contact.id && it.type == NoteType.IMPORTANT_TO_REMEMBER
@@ -861,7 +897,7 @@ private fun FordBlock(
 ) {
     Card(
         modifier  = Modifier.fillMaxWidth(),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
         colors    = CardDefaults.cardColors(
             containerColor = AppleTheme.colors.card
         ),

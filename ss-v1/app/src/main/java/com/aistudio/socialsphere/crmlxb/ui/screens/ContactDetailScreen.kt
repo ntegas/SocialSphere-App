@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
 import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -158,33 +160,40 @@ fun ContactDetailScreen(
             // Header
             ContactHeader(contact, onNavigateToCheatSheet, onNavigateToCreateCalendarItem)
 
-            // Сегмент-контрол (спека HTML): трек fill r9, активный — белый r7
+            val dividerColor = AppleTheme.colors.separator
+            // Табы по макету: текст с подчёркиванием активного (брендовая полоса 2.5dp),
+            // нижняя волосяная линия-разделитель под всем рядом.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(AppleTheme.colors.fill)
-                    .padding(2.dp)
+                    .padding(top = 18.dp)
+                    .drawBehind {
+                        val y = size.height - 0.5.dp.toPx()
+                        drawLine(dividerColor, androidx.compose.ui.geometry.Offset(0f, y),
+                            androidx.compose.ui.geometry.Offset(size.width, y), 1f)
+                    }
+                    .padding(start = 24.dp, end = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 tabs.forEachIndexed { index, title ->
                     val sel = selectedTab == index
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(7.dp))
-                            .then(if (sel) Modifier.background(AppleTheme.colors.card) else Modifier)
-                            .clickable { selectedTab = index }
-                            .padding(vertical = 6.dp),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { selectedTab = index }
                     ) {
                         Text(
                             text = title,
-                            fontSize = 12.sp,
+                            fontSize = 15.sp,
                             maxLines = 1,
                             softWrap = false,
-                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (sel) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel
+                            fontWeight = if (sel) FontWeight.Bold else FontWeight.SemiBold,
+                            color = if (sel) AppleTheme.colors.label else AppleTheme.colors.tertiaryLabel,
+                            modifier = Modifier.padding(bottom = 11.dp)
+                        )
+                        Box(
+                            Modifier.height(2.5.dp).width(28.dp)
+                                .background(if (sel) AppleTheme.colors.brand else Color.Transparent,
+                                    RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
                         )
                     }
                 }
@@ -680,45 +689,44 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
     val context = androidx.compose.ui.platform.LocalContext.current
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)
     ) {
-        // Аватар — коралловый градиент (спека HTML)
-        Box(contentAlignment = Alignment.BottomEnd) {
+        // Шапка по макету: аватар 56 слева (терракот-градиент, золотое кольцо,
+        // инициалы Playfair) + имя/подзаголовок справа.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Box(
-                modifier = Modifier.size(96.dp).clip(CircleShape)
-                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
-                        androidx.compose.ui.graphics.Color(0xFFFF6B6B),
-                        androidx.compose.ui.graphics.Color(0xFFFF3B30)))),
+                modifier = Modifier.size(56.dp).clip(CircleShape)
+                    .background(AureliaTheme.colors.avatarTerracotta)
+                    .border(2.dp, AppleTheme.colors.orange.copy(alpha = 0.5f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(initials.uppercase(), color = androidx.compose.ui.graphics.Color.White,
-                    fontSize = 38.sp, fontWeight = FontWeight.SemiBold)
+                Text(initials.uppercase(), color = Color.White,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 22.sp, fontWeight = FontWeight.W600)
             }
-            if (badgeColor != null) {
-                Box(Modifier.size(20.dp).clip(CircleShape).background(badgeColor)
-                    .border(3.dp, AppleTheme.colors.groupedBackground, CircleShape))
+            Column(Modifier.weight(1f)) {
+                Text(name, color = AppleTheme.colors.label,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 21.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.01).em,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitle.isNotEmpty())
+                    Text(subtitle, color = AppleTheme.colors.secondaryLabel, fontSize = 12.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 1.dp))
+                if (!contact.nickname.isNullOrBlank())
+                    Text("«${contact.nickname}»", color = AppleTheme.colors.secondaryLabel, fontSize = 12.sp)
             }
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(name, color = AppleTheme.colors.label, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-            fontSize = 26.sp, fontWeight = FontWeight.W800, letterSpacing = (-0.01).em,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        if (subtitle.isNotEmpty()) {
-            Spacer(Modifier.height(4.dp))
-            Text(subtitle, color = AppleTheme.colors.secondaryLabel, fontSize = 15.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 24.dp))
-        }
-        if (!contact.nickname.isNullOrBlank()) {
-            Text("«${contact.nickname}»", color = AppleTheme.colors.secondaryLabel, fontSize = 13.sp)
         }
 
-        // Чипы — редактируемые (функция сохранена), вид по макету
+        // Чипы — редактируемые (функция сохранена), слева под именем
         Spacer(Modifier.height(11.dp))
         androidx.compose.foundation.layout.FlowRow(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             EditableChip(
                 current = contact.importanceLevel.label(ctxLabel),
@@ -746,8 +754,8 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
         if (contact.tags.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             androidx.compose.foundation.layout.FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 contact.tags.forEach { tag ->
                     Text(tag, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand,
@@ -760,7 +768,7 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
         val hasCtx = daysSince != null || !contact.nextStep.isNullOrBlank() || nearestDate != null
         if (hasCtx) {
             Spacer(Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (daysSince != null) {
                     val lateColor = when { daysSince > 60 -> AppleTheme.colors.red; daysSince > 30 -> AppleTheme.colors.orange; else -> AppleTheme.colors.green }
@@ -776,50 +784,78 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
             }
         }
 
-        // Быстрые действия — белые плитки (спека HTML); все функции сохранены
-        Spacer(Modifier.height(18.dp))
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            ActionTile(Icons.Outlined.Phone, stringResource(R.string.cd_call)) {
+        // Быстрые действия — круглые кнопки по макету (звонок залит брендом,
+        // шпаргалка — золотом, остальные — карточка с тонкой обводкой). Функции сохранены.
+        Spacer(Modifier.height(16.dp))
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            QuickCircle(Icons.Outlined.Phone, stringResource(R.string.cd_call), filled = true) {
                 val phone = contact.phones.find { it.isPrimary }?.number ?: contact.phones.firstOrNull()?.number
                 com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(context, phone)
             }
-            ActionTile(Icons.Outlined.ChatBubbleOutline, stringResource(R.string.cd_write)) {
+            QuickCircle(Icons.Outlined.ChatBubbleOutline, stringResource(R.string.cd_write)) {
                 val m = contact.messengers.find { it.isPrimary } ?: contact.messengers.firstOrNull()
                 if (m != null) com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(context, m)
                 else com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(context, contact.phones.firstOrNull()?.number)
             }
-            ActionTile(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) {
+            QuickCircle(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) {
                 val email = contact.emails.find { it.isPrimary }?.email ?: contact.emails.firstOrNull()?.email
                 com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(context, email)
             }
-            if (address != null) ActionTile(Icons.Outlined.Map, stringResource(R.string.cd_map)) {
+            if (address != null) QuickCircle(Icons.Outlined.Map, stringResource(R.string.cd_map)) {
                 if (address.latitude != null && address.longitude != null)
                     com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRouteByCoordinates(context, address.latitude, address.longitude)
                 else
                     com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
             }
-            ActionTile(Icons.Outlined.Event, stringResource(R.string.cd_create_event)) { onNavigateToCreateCalendarItem() }
-            ActionTile(Icons.Default.Lightbulb, stringResource(R.string.cd_cheatsheet)) { onNavigateToCheatSheet() }
+            QuickCircle(Icons.Default.Lightbulb, stringResource(R.string.cd_cheatsheet), gold = true) { onNavigateToCheatSheet() }
+            QuickCircle(Icons.Outlined.Event, stringResource(R.string.cd_create_event)) { onNavigateToCreateCalendarItem() }
         }
     }
 }
 
+
+/** Круглая быстрая кнопка карточки контакта (38dp) с подписью 9sp — по макету. */
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.ActionTile(
+private fun QuickCircle(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    filled: Boolean = false,
+    gold: Boolean = false,
     onClick: () -> Unit
 ) {
+    val gold9A = AppleTheme.colors.orange
     Column(
-        modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
-            .background(AppleTheme.colors.card)
-            .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 4.dp),
+        modifier = Modifier.width(52.dp).clip(RoundedCornerShape(12.dp)).clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        Icon(icon, contentDescription = label, tint = AppleTheme.colors.brand, modifier = Modifier.size(22.dp))
-        Text(label, color = AppleTheme.colors.secondaryLabel, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        Box(
+            modifier = Modifier.size(38.dp).clip(CircleShape)
+                .background(
+                    when {
+                        filled -> AppleTheme.colors.brand
+                        gold   -> gold9A.copy(alpha = 0.16f)
+                        else   -> AppleTheme.colors.card
+                    }
+                )
+                .then(
+                    if (!filled && !gold)
+                        Modifier.border(1.dp, AppleTheme.colors.separator, CircleShape)
+                    else Modifier
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon, contentDescription = label,
+                tint = when { filled -> Color.White; gold -> gold9A; else -> AppleTheme.colors.brand },
+                modifier = Modifier.size(17.dp)
+            )
+        }
+        Text(
+            label, color = if (gold) gold9A else AppleTheme.colors.secondaryLabel,
+            fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
