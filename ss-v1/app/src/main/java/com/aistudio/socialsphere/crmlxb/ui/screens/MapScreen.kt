@@ -401,19 +401,19 @@ fun MapScreen(
                             geoItems.forEach { obj ->
                                 val latLng = coordsOf(obj) ?: return@forEach
                                 val isSelected = obj.id == selectedItem?.id
-                                // Цвета маркеров СТРОГО совпадают с легендой ниже:
-                                // дом — синий, работа — зелёный, компания — фиолетовый,
-                                // выбранный — оранжевый.
+                                // Палитра Aurelia (см. легенду/список ниже — один набор):
+                                // дом — малахит(green), работа — золото(yellow),
+                                // компания — терракот(rose), выбранный — азур-подсветка.
                                 val hue = when {
-                                    isSelected -> BitmapDescriptorFactory.HUE_ORANGE
+                                    isSelected -> BitmapDescriptorFactory.HUE_AZURE
                                     obj.ownerType == AddressOwnerType.COMPANY ->
-                                        BitmapDescriptorFactory.HUE_VIOLET
+                                        BitmapDescriptorFactory.HUE_ROSE
                                     obj.locationType == AddressType.HOME ->
-                                        BitmapDescriptorFactory.HUE_AZURE
+                                        BitmapDescriptorFactory.HUE_GREEN
                                     obj.locationType in listOf(
                                         AddressType.WORK, AddressType.OFFICE
-                                    ) -> BitmapDescriptorFactory.HUE_GREEN
-                                    else -> BitmapDescriptorFactory.HUE_AZURE
+                                    ) -> BitmapDescriptorFactory.HUE_YELLOW
+                                    else -> BitmapDescriptorFactory.HUE_GREEN
                                 }
                                 Marker(
                                     state   = MarkerState(position = latLng),
@@ -465,10 +465,11 @@ fun MapScreen(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            // Цвета совпадают с цветами маркеров на карте (HUE_*)
-                            MapLegendDot(color = Color(0xFF2196F3), label = stringResource(R.string.addr_home))    // синий = дом
-                            MapLegendDot(color = Color(0xFF4CAF50), label = stringResource(R.string.addr_work))    // зелёный = работа
-                            MapLegendDot(color = Color(0xFF9C27B0), label = stringResource(R.string.addr_company)) // фиолетовый = компания
+                            // Палитра Aurelia (совпадает со списком и маркерами): дом — малахит,
+                            // работа — золото, компания — терракот.
+                            MapLegendDot(color = AppleTheme.colors.brand,  label = stringResource(R.string.addr_home))
+                            MapLegendDot(color = AppleTheme.colors.orange, label = stringResource(R.string.addr_work))
+                            MapLegendDot(color = AppleTheme.colors.red,    label = stringResource(R.string.addr_company))
                         }
                     }
 
@@ -627,14 +628,14 @@ fun MapListRow(obj: MapLocationItem, onClick: () -> Unit) {
         obj.locationType in listOf(AddressType.WORK, AddressType.OFFICE) -> Icons.Default.Work
         else -> Icons.Default.Person
     }
-    // Те же цвета, что у маркеров и легенды: дом — синий, работа — зелёный,
-    // компания — фиолетовый.
+    // Палитра Aurelia (совпадает с легендой и маркерами): дом — малахит,
+    // работа — золото, компания — терракот.
     val tint = when {
-        obj.ownerType == AddressOwnerType.COMPANY -> Color(0xFF9C27B0)
-        obj.locationType == AddressType.HOME      -> Color(0xFF2196F3)
+        obj.ownerType == AddressOwnerType.COMPANY -> AppleTheme.colors.red
+        obj.locationType == AddressType.HOME      -> AppleTheme.colors.brand
         obj.locationType in listOf(AddressType.WORK, AddressType.OFFICE) ->
-            Color(0xFF4CAF50)
-        else -> Color(0xFF2196F3)
+            AppleTheme.colors.orange
+        else -> AppleTheme.colors.brand
     }
 
     Card(
