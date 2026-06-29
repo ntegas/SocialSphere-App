@@ -75,13 +75,6 @@ private data class SmartList(
     val contacts: List<HomeContact>
 )
 
-private val eventColors = listOf(
-    Color(0xFFFF2D55),
-    Color(0xFF007AFF),
-    Color(0xFFFF9500),
-    Color(0xFF5B53D6)
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -939,7 +932,13 @@ private fun HomeStatCard(
 
 @Composable
 private fun HomeEventCard(event: HomeEvent, onClick: () -> Unit) {
-    val accent = eventColors.getOrElse(event.colorIndex) { AppleTheme.colors.brand }
+    // Акцент из темы (адаптируется к тёмной): ДР/подарок — золото, встреча/звонок —
+    // малахит, остальное — бренд. Раньше брались жёсткие iOS-цвета (не для Aurelia).
+    val accent = when (event.type) {
+        CalendarItemType.BIRTHDAY, CalendarItemType.GIFT -> AppleTheme.colors.orange
+        CalendarItemType.MEETING, CalendarItemType.CALL  -> AppleTheme.colors.green
+        else                                             -> AppleTheme.colors.brand
+    }
     Card(
         onClick   = onClick,
         modifier  = Modifier.width(182.dp),
