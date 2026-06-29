@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.isSystemInDarkTheme
 
@@ -193,12 +194,13 @@ object AppleShapes {
 /** Заголовок секции (UPPERCASE, вторичный цвет) — как над каждым списком. */
 @Composable
 fun SectionHeader(text: String, modifier: Modifier = Modifier) {
+    // Капсовый заголовок секции: Manrope 600, трекинг .16em как в макете.
     Text(
         text = text.uppercase(),
         color = AppleTheme.colors.secondaryLabel,
-        fontSize = 13.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = 0.4.sp,
+        letterSpacing = 0.16.em,
         modifier = modifier.padding(start = 22.dp, end = 22.dp, bottom = 7.dp),
     )
 }

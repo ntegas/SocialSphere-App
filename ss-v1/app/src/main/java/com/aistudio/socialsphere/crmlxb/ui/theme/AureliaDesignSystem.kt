@@ -11,6 +11,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
 /**
@@ -128,24 +129,26 @@ val AureliaSans: FontFamily = FontFamily(
     variableFont(MR, 700), variableFont(MR, 800),
 )
 
+// Шкала выверена по CSS макета: Playfair-заголовки letter-spacing -.01em/-.02em
+// (в em, как в CSS), вес 800; Manrope-интерфейс 500/600/700. Размеры и line-height 1:1.
 val AureliaTypography = Typography(
     // Заголовки/имена/числа — Playfair (serif)
-    displayLarge   = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W800, fontSize = 64.sp, lineHeight = 64.sp, letterSpacing = (-1.2).sp),
-    displayMedium  = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W800, fontSize = 44.sp, lineHeight = 48.sp, letterSpacing = (-0.5).sp),
-    displaySmall   = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W700, fontSize = 34.sp, lineHeight = 38.sp, letterSpacing = (-0.3).sp),
-    headlineLarge  = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W700, fontSize = 28.sp, lineHeight = 34.sp),
-    headlineMedium = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W700, fontSize = 24.sp, lineHeight = 30.sp),
-    headlineSmall  = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W700, fontSize = 20.sp, lineHeight = 26.sp),
-    titleLarge     = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W700, fontSize = 22.sp, lineHeight = 28.sp),
+    displayLarge   = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W800, fontSize = 64.sp, lineHeight = 64.sp, letterSpacing = (-0.02).em),
+    displayMedium  = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W800, fontSize = 40.sp, lineHeight = 44.sp, letterSpacing = (-0.02).em),
+    displaySmall   = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W800, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.01).em),
+    headlineLarge  = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W800, fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.01).em),
+    headlineMedium = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W800, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.01).em),
+    headlineSmall  = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W800, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = (-0.01).em),
+    titleLarge     = TextStyle(fontFamily = AureliaSerif, fontWeight = FontWeight.W700, fontSize = 21.sp, lineHeight = 27.sp),
     // Интерфейс/текст — Manrope (sans)
     titleMedium    = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W700, fontSize = 16.sp, lineHeight = 22.sp),
     titleSmall     = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W700, fontSize = 14.sp, lineHeight = 20.sp),
     bodyLarge      = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W500, fontSize = 16.sp, lineHeight = 24.sp),
     bodyMedium     = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W500, fontSize = 14.sp, lineHeight = 20.sp),
-    bodySmall      = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W500, fontSize = 12.sp, lineHeight = 16.sp),
-    labelLarge     = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W700, fontSize = 13.sp, lineHeight = 16.sp, letterSpacing = 0.2.sp),
-    labelMedium    = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W600, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.3.sp),
-    labelSmall     = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W600, fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.6.sp),
+    bodySmall      = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W500, fontSize = 13.sp, lineHeight = 19.sp),
+    labelLarge     = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W700, fontSize = 13.sp, lineHeight = 16.sp),
+    labelMedium    = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W600, fontSize = 12.sp, lineHeight = 16.sp),
+    labelSmall     = TextStyle(fontFamily = AureliaSans, fontWeight = FontWeight.W600, fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.1.em),
 )
 
 // ── Доступ из любого экрана ──────────────────────────────────────────────
@@ -168,9 +171,10 @@ fun AureliaScreenTitle(
     androidx.compose.material3.Text(
         text = text,
         fontFamily = AureliaSerif,
-        fontWeight = FontWeight.ExtraBold,
+        fontWeight = FontWeight.W800,
         fontSize = 34.sp,
-        letterSpacing = (-0.3).sp,
+        lineHeight = 40.sp,
+        letterSpacing = (-0.01).em,
         color = color,
         modifier = modifier,
     )

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
@@ -701,7 +702,7 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
         }
         Spacer(Modifier.height(14.dp))
         Text(name, color = AppleTheme.colors.label, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-            fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp,
+            fontSize = 26.sp, fontWeight = FontWeight.W800, letterSpacing = (-0.01).em,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         if (subtitle.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
