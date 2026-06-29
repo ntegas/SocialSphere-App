@@ -77,6 +77,9 @@ fun ContactDetailScreen(
     var noteText by remember { mutableStateOf("") }
     var noteType by remember { mutableStateOf(NoteType.GENERAL) }
     var noteIsImportant by remember { mutableStateOf(false) }
+    // Режим приватности — скрывает «защищённые» (важные) заметки блюром.
+    // Только на сессию, без персиста (как в макете).
+    var privacyMode by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -113,6 +116,26 @@ fun ContactDetailScreen(
                     }
                 },
                 actions = {
+                    // Замок приватности (по макету): малахит-кружок когда вкл.
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (privacyMode) AppleTheme.colors.brand
+                                else AppleTheme.colors.fill
+                            )
+                            .clickable { privacyMode = !privacyMode },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (privacyMode) Icons.Default.Lock else Icons.Default.LockOpen,
+                            contentDescription = stringResource(R.string.cd_privacy_toggle),
+                            modifier = Modifier.size(18.dp),
+                            tint = if (privacyMode) Color.White else AppleTheme.colors.secondaryLabel
+                        )
+                    }
                     TextButton(onClick = onNavigateToEdit) {
                         Text(stringResource(R.string.cd_edit_short), color = AppleTheme.colors.brand, fontSize = 17.sp)
                     }
@@ -203,7 +226,9 @@ fun ContactDetailScreen(
                         onShowVoice  = { showVoiceDialog = true },
                         onEditNote   = { editingNote = it },
                         onDeleteNote = { deletingNote = it }
-                    , ctxLabel = ctxLabel)
+                    , ctxLabel = ctxLabel,
+                        privacyMode = privacyMode,
+                        onTogglePrivacy = { privacyMode = false })
                 }
             }
         }

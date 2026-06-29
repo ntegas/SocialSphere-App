@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,7 +43,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
     onShowVoice: () -> Unit,
     onEditNote: (Note) -> Unit,
     onDeleteNote: (Note) -> Unit
-, ctxLabel: android.content.Context) {
+, ctxLabel: android.content.Context,
+    privacyMode: Boolean = false,
+    onTogglePrivacy: () -> Unit = {}) {
     item {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -261,7 +264,42 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                     }
                                 }
                                 Spacer(Modifier.height(6.dp))
-                                Text(note.text, style = MaterialTheme.typography.bodyMedium)
+                                // Приватность: важные («защищённые») заметки скрываются
+                                // блюром при включённом режиме приватности (замок в шапке).
+                                val protectedHidden = privacyMode && note.isImportant
+                                Box {
+                                    // На API<31 Modifier.blur не работает — маскируем текст,
+                                    // чтобы приватность соблюдалась на всех устройствах.
+                                    val masked = protectedHidden &&
+                                        android.os.Build.VERSION.SDK_INT < 31
+                                    Text(
+                                        if (masked) "•".repeat(note.text.length.coerceIn(4, 60))
+                                        else note.text,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = if (protectedHidden) Modifier.blur(7.dp) else Modifier
+                                    )
+                                    if (protectedHidden) {
+                                        Column(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(AppleTheme.colors.card.copy(alpha = 0.4f))
+                                                .clickable { onTogglePrivacy() },
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(Icons.Outlined.Lock, null, Modifier.size(20.dp),
+                                                tint = AppleTheme.colors.secondaryLabel)
+                                            Spacer(Modifier.height(4.dp))
+                                            Text(
+                                                stringResource(R.string.cd_note_tap_reveal),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = AppleTheme.colors.secondaryLabel
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
