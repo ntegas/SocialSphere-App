@@ -290,7 +290,7 @@
     <string name="cal_no_events_found">События не найдены</string>
     <string name="cal_time">Время: %1$s</string>
     <string name="cal_mode_today">Сегодня</string>
-    <string name="cal_mode_list">Список</string>
+    <string name="cal_mode_list">Лента</string>
     <string name="cal_mode_week">Неделя</string>
     <string name="cal_mode_month">Месяц</string>
     <string name="common_all">Все</string>
@@ -355,6 +355,7 @@
     <string name="settings_privacy_sub">Защитные настройки приложения</string>
     <string name="settings_import_export">Импорт и экспорт</string>
     <string name="settings_duplicates">Поиск дублей</string>
+    <string name="settings_duplicates_sub">Найти и объединить</string>
     <string name="dup_title">Дубликаты</string>
     <string name="dup_backup_hint">Совет: перед объединением сделайте бэкап (Настройки → Импорт и экспорт). Объединение нельзя отменить.</string>
     <string name="dup_none">Возможных дубликатов не найдено</string>
@@ -368,6 +369,7 @@
     <string name="appearance_dark">тёмная</string>
     <string name="appearance_note">Примечание: полное переключение тёмной темы требует перезапуска приложения. В следующей версии добавим автоматический режим.</string>
     <string name="appearance_accent">Акцент</string>
+    <string name="appearance_accent_preview">Так выглядит акцент</string>
     <string name="accent_malachite">Малахит</string>
     <string name="accent_sapphire">Сапфир</string>
     <string name="accent_amethyst">Аметист</string>
@@ -501,6 +503,9 @@
     <string name="compd_zone">Зона: %1$s</string>
     <string name="compd_accounts">Аккаунты: %1$s</string>
     <string name="compd_worknote">Заметка: %1$s</string>
+    <string name="compd_stat_people">сотрудников</string>
+    <string name="compd_mail_site">Почта и сайт</string>
+    <string name="compd_offices">Офисы</string>
     <string name="ce_edit">Редактирование</string>
     <string name="ce_new_contact">Новый контакт</string>
     <string name="ce_name_req">Имя *</string>
@@ -844,6 +849,8 @@
     <string name="ie_save_sub">Прямое сохранение бэкапа в файл (без «Поделиться»)</string>
     <string name="ie_save_done">Файл сохранён</string>
     <string name="cd_save_to_phone">Сохранить в контакты телефона</string>
+    <string name="cd_actions">Действия</string>
+    <string name="cd_share">Поделиться</string>
     <string name="ce_search_company">Поиск компании</string>
     <string name="cd_add_important_date">Добавить важную дату</string>
     <string name="cd_date_type">Тип</string>
@@ -900,6 +907,7 @@
     <string name="contacts_seg_clients">Клиенты</string>
     <string name="contacts_seg_family">Семья</string>
     <string name="comp_stat_contacts">контакта</string>
+    <string name="comp_people_n">%1$d чел.</string>
     <string name="comp_stat_key">ключевых</string>
     <string name="comp_stat_important">важных</string>
     <string name="set_remind_stale">Напоминать: пора связаться</string>
@@ -912,4 +920,13 @@
     <string name="sync_linked">Связан с телефоном</string>
     <string name="set_exact_alarms">Разрешить точные напоминания</string>
     <string name="set_exact_alarms_hint">Чтобы напоминания приходили точно в срок</string>
+
+    <!-- Онбординг (первый запуск) -->
+    <string name="onboarding_brand">SocialSphere</string>
+    <string name="onboarding_headline">Помните каждого, кто важен</string>
+    <string name="onboarding_subtitle">Личная CRM для тёплых связей: контакты, компании и поводы вовремя напомнить о себе.</string>
+    <string name="onboarding_feature_contacts">Профили с деталями — семья, интересы, о чём поговорить</string>
+    <string name="onboarding_feature_calendar">Напоминания по ритму общения и важным датам</string>
+    <string name="onboarding_feature_cheat">Шпаргалка перед встречей — всё главное на одном экране</string>
+    <string name="onboarding_start">Начать</string>
 </resources>

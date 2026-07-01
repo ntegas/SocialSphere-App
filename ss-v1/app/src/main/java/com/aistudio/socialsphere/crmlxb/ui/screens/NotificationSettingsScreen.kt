@@ -4,9 +4,12 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import androidx.compose.ui.platform.LocalContext
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
@@ -40,28 +43,31 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
     var remindNoStep           by remember { AppSettings.remindNoNextStep }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.notif_title), fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AppleTheme.colors.groupedBackground
-                )
-            )
-        }
+        containerColor = AppleTheme.colors.groupedBackground,
+        topBar = {}
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Шапка: круг-назад + заголовок (по макету) ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back), Modifier.size(20.dp), tint = AppleTheme.colors.label)
+                }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.notif_title))
+            }
 
             // ── Общие ─────────────────────────────────────────
             NotifCard(stringResource(R.string.notif_general)) {
@@ -243,16 +249,22 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
 // ─── Helpers ─────────────────────────────────────────────────
 @Composable
 private fun NotifCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier  = Modifier.fillMaxWidth(),
-        colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
-            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
-            content()
+    // По макету: капс-заголовок секции над плоской inset-картой.
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Text(
+            title.uppercase(),
+            fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+            color = AppleTheme.colors.tertiaryLabel,
+            modifier = Modifier.padding(start = 6.dp)
+        )
+        Card(
+            modifier  = Modifier.fillMaxWidth(),
+            colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+            elevation = CardDefaults.cardElevation(1.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                content()
+            }
         }
     }
 }
@@ -264,8 +276,12 @@ private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Text(label, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.label, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = AppleTheme.colors.brand)
+        )
     }
 }
 

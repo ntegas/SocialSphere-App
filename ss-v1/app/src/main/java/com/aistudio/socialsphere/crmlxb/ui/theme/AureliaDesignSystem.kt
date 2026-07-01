@@ -111,7 +111,7 @@ object AureliaShapes {
 // и заголовки выходят тоньше макета. Ось применяется на API 26+; на 24/25 —
 // дефолтное начертание (без краша). ──
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-private fun variableFont(resId: Int, w: Int) = androidx.compose.ui.text.font.Font(
+private fun variableFont(resId: Int, w: Int) = androidx.compose.ui.text.font.   Font(
     resId,
     weight = FontWeight(w),
     variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(

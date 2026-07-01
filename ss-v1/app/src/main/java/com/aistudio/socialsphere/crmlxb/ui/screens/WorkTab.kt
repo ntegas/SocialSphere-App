@@ -75,7 +75,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                 Text(
                     stringResource(R.string.cd_can_help),
                     style = MaterialTheme.typography.labelSmall,
-                    color = androidx.compose.ui.graphics.Color(0xFF059669),
+                    color = AppleTheme.colors.green,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
@@ -86,7 +86,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                 Text(
                     stringResource(R.string.cd_i_can_help),
                     style = MaterialTheme.typography.labelSmall,
-                    color = androidx.compose.ui.graphics.Color(0xFFD97706),
+                    color = AppleTheme.colors.orange,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
@@ -97,7 +97,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                 Text(
                     stringResource(R.string.cd_talking_points),
                     style = MaterialTheme.typography.labelSmall,
-                    color = androidx.compose.ui.graphics.Color(0xFF3B49C9),
+                    color = AppleTheme.colors.brand,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))

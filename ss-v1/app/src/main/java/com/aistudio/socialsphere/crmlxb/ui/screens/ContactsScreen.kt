@@ -649,7 +649,6 @@ fun ContactListCard(
     val ctxLabel = LocalContext.current
     val (company, position, city) = getContactVisuals(contact)
     val name = "${contact.firstName} ${contact.lastName}".trim()
-    val ctx  = LocalContext.current
 
     val importanceTint = when (contact.importanceLevel) {
         ImportanceLevel.KEY       -> AppleTheme.colors.red
@@ -690,17 +689,9 @@ fun ContactListCard(
             if (sub.isNotEmpty())
                 Text(sub, fontSize = 13.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallActionIcon(Icons.Outlined.Phone) {
-                val phone = contact.phones.find { it.isPrimary }?.number ?: contact.phones.firstOrNull()?.number
-                com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(ctx, phone)
-            }
-            SmallActionIcon(Icons.Outlined.ChatBubbleOutline) {
-                val m = contact.messengers.find { it.isPrimary }
-                if (m != null) com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(ctx, m)
-                else com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(ctx, contact.phones.firstOrNull()?.number)
-            }
-        }
+        // Шеврон по макету Aurelia (тап по строке → карточка контакта; звонок/
+        // сообщение — из карточки). Раньше тут были две быстрые кнопки.
+        Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
     }
 }
 
@@ -747,14 +738,6 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
             }
         }
     }
-}
-
-@Composable
-private fun SmallActionIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0x1F767680)).clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) { Icon(icon, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand) }
 }
 
 // kept for compat with HomeScreen usage

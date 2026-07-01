@@ -37,6 +37,7 @@ import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
 import com.aistudio.socialsphere.crmlxb.ui.components.TimePickerField
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
 import com.aistudio.socialsphere.crmlxb.model.ReminderTime
 import com.aistudio.socialsphere.crmlxb.model.RecurrenceMode
 
@@ -135,16 +136,32 @@ fun CalendarItemEditScreen(
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
-        topBar = {
-            TopAppBar(
-                title = { Text(if (isEditMode) stringResource(R.string.cie_edit) else stringResource(R.string.cie_new_event), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    Button(
+        topBar = {}
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // ── Шапка: Отмена · заголовок · Готово (по макету) ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    stringResource(R.string.common_cancel),
+                    fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.secondaryLabel,
+                    modifier = Modifier.clickable { onNavigateBack() }
+                )
+                Text(
+                    if (isEditMode) stringResource(R.string.cie_edit) else stringResource(R.string.cie_new_event),
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label
+                )
+                Button(
                         onClick = {
                             val links = mutableListOf<CalendarItemLink>()
                             linkedContacts.forEach { c -> links.add(CalendarItemLink(id = java.util.UUID.randomUUID().toString(), calendarItemId = "", targetType = CalendarTargetType.CONTACT, targetId = c.id)) }
@@ -198,24 +215,14 @@ fun CalendarItemEditScreen(
 
                             onNavigateBack()
                         },
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(stringResource(R.string.common_save))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(11.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = androidx.compose.ui.graphics.Color.White),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Text(stringResource(R.string.common_done), fontWeight = FontWeight.Bold)
+                }
+            }
             // ── Основное: название · тип · важность ──
             SectionCard(stringResource(R.string.cie_basic)) {
                 OutlinedTextField(
@@ -475,10 +482,10 @@ fun CalendarItemEditScreen(
 
 // Палитра типов событий Aurelia (терракот/тил/малахит/золото) вместо iOS-цветов.
 internal fun eventTypeColor(t: CalendarItemType): Color = when (t) {
-    CalendarItemType.BIRTHDAY -> Color(0xFFC45D34)
-    CalendarItemType.CALL     -> Color(0xFF3E7E7A)
-    CalendarItemType.MEETING  -> Color(0xFF1C6B4C)
-    CalendarItemType.GIFT     -> Color(0xFFB68A36)
+    CalendarItemType.BIRTHDAY -> Color(0xFFB68A36) // золото (точно по макету)
+    CalendarItemType.CALL     -> Color(0xFF5E8C66) // сейдж (точно по макету)
+    CalendarItemType.MEETING  -> Color(0xFF1C6B4C) // малахит/акцент (по макету var(--ac))
+    CalendarItemType.GIFT     -> Color(0xFFC45D34) // терракот
     else                      -> Color(0xFF1C6B4C)
 }
 
@@ -535,7 +542,7 @@ private fun EventTypePickerSheet(
     onDismiss: () -> Unit
 ) {
     val ctx = LocalContext.current
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, shape = SocialShape.Sheet) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             CalendarItemType.values().forEach { t ->
                 Row(
@@ -568,7 +575,7 @@ private fun ReminderPickerSheet(
         ReminderTime.NONE, ReminderTime.AT_EVENT, ReminderTime.MIN_10,
         ReminderTime.HOUR_1, ReminderTime.DAY_1, ReminderTime.WEEK_1
     )
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, shape = SocialShape.Sheet) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
                 Text(stringResource(R.string.cie_reminders), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

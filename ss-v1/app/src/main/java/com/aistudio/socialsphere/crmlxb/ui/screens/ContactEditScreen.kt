@@ -352,7 +352,7 @@ fun ContactEditScreen(
             title = { Text(stringResource(R.string.ce_add_phone), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(value = newPhone, onValueChange = { newPhone = it }, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = newPhone, onValueChange = { newPhone = it }, keyboardOptions = PhoneKeyboard, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth())
                     DropdownField(stringResource(R.string.ce_type), newPhoneType.label(ctxLabel), PhoneType.values().map { it.label(ctxLabel) }) { v -> newPhoneType = PhoneType.values().firstOrNull { it.label(ctxLabel) == v } ?: PhoneType.MOBILE }
                 }
             },
@@ -374,7 +374,7 @@ fun ContactEditScreen(
             title = { Text(stringResource(R.string.ce_add_email), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(value = newEmail, onValueChange = { newEmail = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = newEmail, onValueChange = { newEmail = it }, keyboardOptions = EmailKeyboard, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
                     DropdownField(stringResource(R.string.ce_type), newEmailType.label(ctxLabel), EmailType.values().map { it.label(ctxLabel) }) { v -> newEmailType = EmailType.values().firstOrNull { it.label(ctxLabel) == v } ?: EmailType.PERSONAL }
                 }
             },
@@ -423,21 +423,7 @@ fun ContactEditScreen(
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
-        topBar = {
-            TopAppBar(
-                title = { Text(if (isEditMode) stringResource(R.string.ce_edit) else stringResource(R.string.ce_new_contact), fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) } },
-                actions = {
-                    Button(
-                        onClick = ::buildAndSave,
-                        enabled = firstName.isNotBlank(),
-                        modifier = Modifier.padding(end = 8.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp)
-                    ) { Text(stringResource(R.string.common_save)) }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
-            )
-        }
+        topBar = {}
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -447,6 +433,31 @@ fun ContactEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Шапка: Отмена · заголовок · Готово (по макету) ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    stringResource(R.string.common_cancel),
+                    fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.secondaryLabel,
+                    modifier = Modifier.clickable { onNavigateBack() }
+                )
+                Text(
+                    if (isEditMode) stringResource(R.string.ce_edit) else stringResource(R.string.ce_new_contact),
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label
+                )
+                Button(
+                    onClick = ::buildAndSave,
+                    enabled = firstName.isNotBlank(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
+                    modifier = Modifier.height(34.dp)
+                ) { Text(stringResource(R.string.common_done), fontWeight = FontWeight.Bold) }
+            }
+
             // ── Name & photo ──────────────────────────────────────────
             SectionCard(stringResource(R.string.ce_basic)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -481,6 +492,7 @@ fun ContactEditScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedTextField(
                                     value = phone.number, onValueChange = { num -> phones = phones.toMutableList().also { it[idx] = phone.copy(number = num) } },
+                                    keyboardOptions = PhoneKeyboard,
                                     label = { Text(phone.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small,
                                     leadingIcon = {
                                         IconButton(
@@ -520,6 +532,7 @@ fun ContactEditScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedTextField(
                                     value = email.email, onValueChange = { v -> emails = emails.toMutableList().also { it[idx] = email.copy(email = v) } },
+                                    keyboardOptions = EmailKeyboard,
                                     label = { Text(email.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small,
                                     leadingIcon = {
                                         IconButton(
@@ -1057,4 +1070,12 @@ internal val CapWords = androidx.compose.foundation.text.KeyboardOptions(
 )
 internal val CapSentences = androidx.compose.foundation.text.KeyboardOptions(
     capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences
+)
+// Цифровая раскладка телефона (+ * # и цифры) и почтовая (@, без автокапитализации)
+// для соответствующих полей ввода — как в макете.
+internal val PhoneKeyboard = androidx.compose.foundation.text.KeyboardOptions(
+    keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
+)
+internal val EmailKeyboard = androidx.compose.foundation.text.KeyboardOptions(
+    keyboardType = androidx.compose.ui.text.input.KeyboardType.Email
 )

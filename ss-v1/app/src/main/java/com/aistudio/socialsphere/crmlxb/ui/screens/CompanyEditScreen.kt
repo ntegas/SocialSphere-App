@@ -75,6 +75,7 @@ fun CompanyEditScreen(
                     OutlinedTextField(
                         value = newPhoneNumber,
                         onValueChange = { newPhoneNumber = it },
+                        keyboardOptions = PhoneKeyboard,
                         label = { Text(stringResource(R.string.cce_phone_number)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -127,6 +128,7 @@ fun CompanyEditScreen(
                     OutlinedTextField(
                         value = newEmailAddress,
                         onValueChange = { newEmailAddress = it },
+                        keyboardOptions = EmailKeyboard,
                         label = { Text(stringResource(R.string.cce_email_addr)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -171,16 +173,32 @@ fun CompanyEditScreen(
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
-        topBar = {
-            TopAppBar(
-                title = { Text(if (isEditMode) stringResource(R.string.cce_edit) else stringResource(R.string.cce_new), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    Button(
+        topBar = {}
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // ── Шапка: Отмена · заголовок · Готово (по макету) ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    stringResource(R.string.common_cancel),
+                    fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.secondaryLabel,
+                    modifier = Modifier.clickable { onNavigateBack() }
+                )
+                Text(
+                    if (isEditMode) stringResource(R.string.cce_edit) else stringResource(R.string.cce_new),
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label
+                )
+                Button(
                         onClick = {
                             val newCompany = Company(
                                 id = originalCompany?.id ?: java.util.UUID.randomUUID().toString(),
@@ -201,24 +219,14 @@ fun CompanyEditScreen(
                             }
                             onNavigateBack()
                         },
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(stringResource(R.string.common_save))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Text(stringResource(R.string.common_done), fontWeight = FontWeight.Bold)
+                }
+            }
             // Main info
             SectionCard(stringResource(R.string.cce_basic)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -293,6 +301,7 @@ fun CompanyEditScreen(
                                             list[idx] = phone.copy(number = num)
                                         }
                                     },
+                                    keyboardOptions = PhoneKeyboard,
                                     label = { Text(phone.type.label(ctxLabel)) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
@@ -352,6 +361,7 @@ fun CompanyEditScreen(
                                             list[idx] = email.copy(email = addr)
                                         }
                                     },
+                                    keyboardOptions = EmailKeyboard,
                                     label = { Text(email.type.label(ctxLabel)) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,

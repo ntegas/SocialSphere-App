@@ -132,7 +132,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         FordBlock(
             letter     = "F",
             title      = stringResource(R.string.cd_family),
-            color      = androidx.compose.ui.graphics.Color(0xFFE53935),
+            color      = androidx.compose.ui.graphics.Color(0xFFC45D34), // Aurelia: терракот
             isEmpty    = familyRelations.isEmpty(),
             editing = editing
         ) {
@@ -309,7 +309,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         FordBlock(
             letter  = "O",
             title   = stringResource(R.string.cd_tab_work),
-            color   = androidx.compose.ui.graphics.Color(0xFF1E88E5),
+            color   = androidx.compose.ui.graphics.Color(0xFF3E7E7A), // Aurelia: тил
             isEmpty = !hasWork,
             editing = editing
         ) {
@@ -445,7 +445,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         FordBlock(
             letter  = "R",
             title   = stringResource(R.string.cd_interests_habits),
-            color   = androidx.compose.ui.graphics.Color(0xFF43A047),
+            color   = androidx.compose.ui.graphics.Color(0xFF2E8B6B), // Aurelia: малахит
             isEmpty = interests.isEmpty(),
             editing = editing
         ) {
@@ -568,7 +568,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         FordBlock(
             letter  = "D",
             title   = stringResource(R.string.cd_goals_dreams),
-            color   = androidx.compose.ui.graphics.Color(0xFFFB8C00),
+            color   = androidx.compose.ui.graphics.Color(0xFFB68A36), // Aurelia: золото
             isEmpty = dreamNotes.isEmpty() && restrictions.isEmpty(),
             editing = editing
         ) {

@@ -403,11 +403,11 @@ fun MapScreen(
                                 val isSelected = obj.id == selectedItem?.id
                                 // Палитра Aurelia (см. легенду/список ниже — один набор):
                                 // дом — малахит(green), работа — золото(yellow),
-                                // компания — терракот(rose), выбранный — азур-подсветка.
+                                // компания — терракот(orange ≈ #C45D34), выбранный — азур-подсветка.
                                 val hue = when {
                                     isSelected -> BitmapDescriptorFactory.HUE_AZURE
                                     obj.ownerType == AddressOwnerType.COMPANY ->
-                                        BitmapDescriptorFactory.HUE_ROSE
+                                        BitmapDescriptorFactory.HUE_ORANGE
                                     obj.locationType == AddressType.HOME ->
                                         BitmapDescriptorFactory.HUE_GREEN
                                     obj.locationType in listOf(

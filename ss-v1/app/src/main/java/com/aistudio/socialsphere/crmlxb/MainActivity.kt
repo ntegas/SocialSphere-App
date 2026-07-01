@@ -84,6 +84,14 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun SocialsphereApp() {
+    // Первый запуск — экран приветствия (макет Aurelia). После «Начать» ставим
+    // персистентный флаг, и это условие больше не срабатывает.
+    val onboardingDone by AppSettings.onboardingCompleted
+    if (!onboardingDone) {
+        OnboardingScreen(onStart = { AppSettings.onboardingCompleted.value = true })
+        return
+    }
+
     val navController = rememberNavController()
     
     val navigationItems = listOf(
@@ -103,17 +111,20 @@ fun SocialsphereApp() {
             val showBottomBar = navigationItems.any { it.first == currentDestination?.route }
             
             if (showBottomBar) {
-                // Навигация по вкладке — логика сохранена дословно (popBackStack/saveState).
+                // Навигация по вкладке — канонический паттерн нижней навигации Android:
+                // один navigate с popUpTo(start){saveState} + restoreState + singleTop.
+                // Раньше перед ним стоял «пробный» popBackStack(route), который при
+                // отсутствии маршрута на стеке (обычный случай — popUpTo(start) не
+                // копит вкладки) писал в лог «Ignoring popBackStack to route …»
+                // (безвредно, но шумно и засоряло стек). Переключение вкладок с
+                // сохранением/восстановлением состояния — идентично.
                 val onNavClick: (String) -> Unit = { route ->
                     val alreadyHere = currentDestination?.hierarchy?.any { it.route == route } == true
                     if (!alreadyHere) {
-                        val popped = navController.popBackStack(route = route, inclusive = false, saveState = true)
-                        if (!popped) {
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
                         }
                     }
                 }

@@ -290,7 +290,7 @@
     <string name="cal_no_events_found">No events found</string>
     <string name="cal_time">Time: %1$s</string>
     <string name="cal_mode_today">Today</string>
-    <string name="cal_mode_list">List</string>
+    <string name="cal_mode_list">Feed</string>
     <string name="cal_mode_week">Week</string>
     <string name="cal_mode_month">Month</string>
     <string name="common_all">All</string>
@@ -355,6 +355,7 @@
     <string name="settings_privacy_sub">App protection settings</string>
     <string name="settings_import_export">Import &amp; export</string>
     <string name="settings_duplicates">Find duplicates</string>
+    <string name="settings_duplicates_sub">Find and merge</string>
     <string name="dup_title">Duplicates</string>
     <string name="dup_backup_hint">Tip: back up before merging (Settings → Import &amp; export). Merging cannot be undone.</string>
     <string name="dup_none">No possible duplicates found</string>
@@ -368,6 +369,7 @@
     <string name="appearance_dark">dark</string>
     <string name="appearance_note">Note: full dark theme switch requires an app restart. An automatic mode is coming in the next version.</string>
     <string name="appearance_accent">Accent</string>
+    <string name="appearance_accent_preview">This is your accent</string>
     <string name="accent_malachite">Malachite</string>
     <string name="accent_sapphire">Sapphire</string>
     <string name="accent_amethyst">Amethyst</string>
@@ -501,6 +503,9 @@
     <string name="compd_zone">Area: %1$s</string>
     <string name="compd_accounts">Accounts: %1$s</string>
     <string name="compd_worknote">Note: %1$s</string>
+    <string name="compd_stat_people">employees</string>
+    <string name="compd_mail_site">Email &amp; website</string>
+    <string name="compd_offices">Offices</string>
     <string name="ce_edit">Edit</string>
     <string name="ce_new_contact">New contact</string>
     <string name="ce_name_req">First name *</string>
@@ -844,6 +849,8 @@
     <string name="ie_save_sub">Save the backup straight to a file (no Share sheet)</string>
     <string name="ie_save_done">File saved</string>
     <string name="cd_save_to_phone">Save to phone contacts</string>
+    <string name="cd_actions">Actions</string>
+    <string name="cd_share">Share</string>
     <string name="ce_search_company">Search company</string>
     <string name="cd_add_important_date">Add important date</string>
     <string name="cd_date_type">Type</string>
@@ -900,6 +907,7 @@
     <string name="contacts_seg_clients">Clients</string>
     <string name="contacts_seg_family">Family</string>
     <string name="comp_stat_contacts">contacts</string>
+    <string name="comp_people_n">%1$d ppl</string>
     <string name="comp_stat_key">key</string>
     <string name="comp_stat_important">important</string>
     <string name="set_remind_stale">Remind me to reach out</string>
@@ -912,4 +920,13 @@
     <string name="sync_linked">Linked to phone</string>
     <string name="set_exact_alarms">Allow exact alarms</string>
     <string name="set_exact_alarms_hint">So reminders arrive exactly on time</string>
+
+    <!-- Onboarding (first launch) -->
+    <string name="onboarding_brand">SocialSphere</string>
+    <string name="onboarding_headline">Remember everyone who matters</string>
+    <string name="onboarding_subtitle">A personal CRM for warm relationships: contacts, companies and the right moments to reach out.</string>
+    <string name="onboarding_feature_contacts">Rich profiles — family, interests, what to talk about</string>
+    <string name="onboarding_feature_calendar">Reminders based on your rhythm and key dates</string>
+    <string name="onboarding_feature_cheat">A pre-meeting cheat sheet with everything on one screen</string>
+    <string name="onboarding_start">Get started</string>
 </resources>

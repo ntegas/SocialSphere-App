@@ -1,8 +1,10 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.aistudio.socialsphere.crmlxb.ui.screens
-import androidx.compose.ui.graphics.Color
 
 import androidx.compose.foundation.background
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -15,15 +17,31 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
-import com.aistudio.socialsphere.crmlxb.utils.*
-import androidx.compose.ui.res.stringResource
-import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.utils.*
+
+// Палитра тёмного листа-шпаргалки (макет Aurelia)
+private val CsBg     = Color(0xFF13261D)
+private val CsTx     = Color(0xFFF3EFE8)
+private val CsMuted  = Color(0x8CF3EFE8) // .55
+private val CsCard   = Color(0x0DF3EFE8) // .05
+private val CsChip   = Color(0x14F3EFE8) // .08
+private val CsBorder = Color(0x14F3EFE8)
+private val CsGold   = Color(0xFFD7B468)
+private val CsSage   = Color(0xFF9FCBA6)
+private val CsTerra  = Color(0xFFE59A6B)
+private val CsWarn   = Color(0xFFE0846E)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,8 +53,8 @@ fun CheatSheetScreen(
     val ctxLabel = LocalContext.current
 
     if (contact == null) {
-        Box(Modifier.fillMaxSize(), Alignment.Center) {
-            Text(stringResource(R.string.cs_not_found))
+        Box(Modifier.fillMaxSize().background(CsBg), Alignment.Center) {
+            Text(stringResource(R.string.cs_not_found), color = CsTx)
         }
         return
     }
@@ -50,7 +68,6 @@ fun CheatSheetScreen(
         .find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
         ?.city ?: ""
 
-    // Data sources
     val impNotes     = AppStateStore.notes.filter {
         it.contactId == contact.id && it.type == NoteType.IMPORTANT_TO_REMEMBER
     }
@@ -89,37 +106,27 @@ fun CheatSheetScreen(
         ?: contact.messengers.firstOrNull()
 
     Scaffold(
-        containerColor = AppleTheme.colors.groupedBackground,
+        containerColor = CsBg,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringResource(R.string.cs_title), fontWeight = FontWeight.Bold)
-                        Text(name,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppleTheme.colors.secondaryLabel)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AppleTheme.colors.groupedBackground
-                )
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(stringResource(R.string.cs_title).uppercase(), fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp, color = CsGold)
+                Box(
+                    modifier = Modifier.size(32.dp).clip(CircleShape).background(CsChip).clickable { onNavigateBack() },
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.Close, stringResource(R.string.common_back), Modifier.size(17.dp), tint = CsTx) }
+            }
         },
         bottomBar = {
-            // ТЗ (Экран 4): кнопки внизу — 📞 Позвонить + 💬 Написать
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            Surface(color = AppleTheme.colors.card, shadowElevation = 8.dp) {
+            val ctx = LocalContext.current
+            Surface(color = CsBg) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                        .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp).navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
                     Button(
                         onClick = {
@@ -129,323 +136,207 @@ fun CheatSheetScreen(
                             )
                         },
                         enabled  = contact.phones.isNotEmpty(),
-                        modifier = Modifier.weight(1f),
-                        shape    = RoundedCornerShape(12.dp)
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape    = RoundedCornerShape(15.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White)
                     ) {
                         Icon(Icons.Default.Call, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.cs_call))
+                        Text(stringResource(R.string.cs_call), fontWeight = FontWeight.Bold)
                     }
                     Button(
                         onClick = {
                             val m = contact.messengers.firstOrNull()
                             if (m != null) ExternalActionHandler.openMessenger(ctx, m)
-                            else ExternalActionHandler.openSms(
-                                ctx, contact.phones.firstOrNull()?.number
-                            )
+                            else ExternalActionHandler.openSms(ctx, contact.phones.firstOrNull()?.number)
                         },
                         enabled  = contact.messengers.isNotEmpty() || contact.phones.isNotEmpty(),
-                        modifier = Modifier.weight(1f),
-                        shape    = RoundedCornerShape(12.dp),
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor = AppleTheme.colors.fill,
-                            contentColor   = AppleTheme.colors.label
-                        )
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape    = RoundedCornerShape(15.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = CsChip, contentColor = CsTx)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.cs_write))
+                        Text(stringResource(R.string.cs_write), fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
     ) { paddingValues ->
-
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
         ) {
-            // ── Hero card ──────────────────────────────────────
+            // ── Hero ──
             item {
-                Card(
-                    shape  = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f)
-                    ),
-                    elevation = CardDefaults.cardElevation(0.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(
+                        Modifier.size(60.dp).clip(CircleShape)
+                            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFE59A6B), Color(0xFFC45D34))))
+                            .border(2.dp, CsGold.copy(alpha = 0.5f), CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            Modifier.size(56.dp).clip(CircleShape)
-                                .background(AppleTheme.colors.brand),
-                            Alignment.Center
-                        ) {
-                            Text(
-                                contact.firstName.take(1) + contact.lastName.take(1),
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
-                            )
-                        }
-                        Column {
-                            Text(name, fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = AppleTheme.colors.brand)
-                            if (company.isNotEmpty())
-                                Text(
-                                    listOf(position, company).filter { it.isNotBlank() }.joinToString(" • "),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AppleTheme.colors.brand.copy(alpha = 0.75f)
-                                )
-                            if (city.isNotEmpty())
-                                Text(city, style = MaterialTheme.typography.bodySmall,
-                                    color = AppleTheme.colors.brand.copy(alpha = 0.6f))
-                        }
+                        Text((contact.firstName.take(1) + contact.lastName.take(1)).uppercase(),
+                            color = Color.White, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                            fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column {
+                        Text(name, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                            fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CsTx)
+                        val sub = listOf(position, company, city).filter { it.isNotBlank() }.joinToString(" · ")
+                        if (sub.isNotEmpty())
+                            Text(sub, fontSize = 12.sp, color = CsMuted, modifier = Modifier.padding(top = 2.dp))
                     }
                 }
             }
 
-            // ── Важно помнить ──────────────────────────────────
-            if (impNotes.isNotEmpty()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_remember)) {
-                        impNotes.forEach { note ->
-                            Text("• ${note.text}",
-                                style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.height(4.dp))
-                        }
-                    }
-                }
-            }
-
-            // ── Последний контакт ──────────────────────────────
-            if (lastNote != null) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_last_note)) {
-                        Text(lastNote.createdAt.take(10),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AppleTheme.colors.secondaryLabel)
+            // ── Важно помнить (золотая карта) ──
+            if (impNotes.isNotEmpty()) item {
+                CsBlock(stringResource(R.string.cs_remember), CsGold, Icons.Default.Star, gold = true) {
+                    impNotes.forEach { note ->
+                        Text(note.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CsTx, lineHeight = 21.sp)
                         Spacer(Modifier.height(4.dp))
-                        Text(lastNote.text,
-                            style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
 
-            // ── Ближайшие события ──────────────────────────────
-            if (upcomingEvents.isNotEmpty()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_upcoming)) {
-                        upcomingEvents.forEach { event ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                                Arrangement.SpaceBetween
-                            ) {
-                                Text(event.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f))
-                                Text(event.startDate,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AppleTheme.colors.brand,
-                                    fontWeight = FontWeight.Medium)
-                            }
+            // ── Последняя запись ──
+            if (lastNote != null) item {
+                CsBlock(stringResource(R.string.cs_last_note), CsSage, Icons.Default.Schedule) {
+                    Text(lastNote.createdAt.take(10), fontSize = 11.sp, color = CsMuted)
+                    Spacer(Modifier.height(4.dp))
+                    Text(lastNote.text, fontSize = 14.sp, color = CsTx)
+                }
+            }
+
+            // ── Ближайшее ──
+            if (upcomingEvents.isNotEmpty()) item {
+                CsBlock(stringResource(R.string.cs_upcoming), CsGold, Icons.Default.Event) {
+                    upcomingEvents.forEach { event ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), Arrangement.SpaceBetween) {
+                            Text(event.title, fontSize = 14.sp, color = CsTx, modifier = Modifier.weight(1f))
+                            Text(event.startDate, fontSize = 13.sp, color = CsGold, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
 
-            // ── Семья ──────────────────────────────────────────
-            if (familyRels.isNotEmpty()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_family)) {
-                        familyRels.forEach { rel ->
-                            val isFirst   = rel.firstContactId == contact.id
-                            val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
-                            // Роль ДРУГОГО человека
-                            val role      = if (isFirst) rel.secondRole else rel.firstRole
-                            val otherName = AppStateStore.getContact(otherId)
-                                ?.let { "${it.firstName} ${it.lastName}".trim() }
-                                ?: "—"
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                                Arrangement.SpaceBetween
-                            ) {
-                                Text(role, style = MaterialTheme.typography.bodySmall,
-                                    color = AppleTheme.colors.secondaryLabel,
-                                    modifier = Modifier.weight(0.4f))
-                                Text(otherName, style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.weight(0.6f),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.End)
-                            }
+            // ── Семья ──
+            if (familyRels.isNotEmpty()) item {
+                CsBlock(stringResource(R.string.cs_family), CsTerra, Icons.Default.Group) {
+                    familyRels.forEach { rel ->
+                        val isFirst   = rel.firstContactId == contact.id
+                        val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
+                        val role      = if (isFirst) rel.secondRole else rel.firstRole
+                        val otherName = AppStateStore.getContact(otherId)
+                            ?.let { "${it.firstName} ${it.lastName}".trim() } ?: "—"
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), Arrangement.SpaceBetween) {
+                            Text(role ?: "", fontSize = 13.sp, color = CsMuted, modifier = Modifier.weight(0.4f))
+                            Text(otherName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = CsTx,
+                                modifier = Modifier.weight(0.6f), textAlign = TextAlign.End)
                         }
                     }
                 }
             }
 
-            // ── Интересы ───────────────────────────────────────
-            if (interests.isNotEmpty()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_interests)) {
-                        interests.forEach { detail ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text("•", color = AppleTheme.colors.brand,
-                                    fontWeight = FontWeight.Bold)
-                                Text("${detail.category.label(ctxLabel)}: ${detail.value}",
-                                    style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
+            // ── Темы для разговора (чипы) ──
+            if (!contact.talkingPoints.isNullOrBlank()) item {
+                CsBlock(stringResource(R.string.cs_talking), CsSage, Icons.AutoMirrored.Filled.Chat) {
+                    val points = contact.talkingPoints.split("\n", ";").map { it.trim() }.filter { it.isNotBlank() }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        points.forEach { CsTag(it) }
                     }
                 }
             }
 
-            // ── Цели и мечты ───────────────────────────────────
-            if (dreamNotes.isNotEmpty()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_goals)) {
-                        dreamNotes.forEach { note ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text("→", color = AppleTheme.colors.brand,
-                                    fontWeight = FontWeight.Bold)
-                                Text(note.text, style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
+            // ── Интересы и вкусы (чипы) ──
+            if (interests.isNotEmpty()) item {
+                CsBlock(stringResource(R.string.cs_interests), CsTerra, Icons.Default.Favorite) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        interests.forEach { CsTag(it.value) }
                     }
-                }
-            }
-
-            // ── Чем может помочь ───────────────────────────────
-            if (!contact.canHelpWith.isNullOrBlank()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_can_help)) {
-                        Text(
-                            contact.canHelpWith,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            // ── Чем я могу помочь ──────────────────────────────
-            if (!contact.iCanHelpWith.isNullOrBlank()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_i_can_help)) {
-                        Text(
-                            contact.iCanHelpWith,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            // ── Темы для разговора ─────────────────────────────
-            if (!contact.talkingPoints.isNullOrBlank()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_talking)) {
-                        // Split by newline or semicolon for bullet list
-                        val points = contact.talkingPoints
-                            .split("\n", ";")
-                            .map { it.trim() }
-                            .filter { it.isNotBlank() }
-                        if (points.size > 1) {
-                            points.forEach { point ->
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                ) {
-                                    Text("→", color = AppleTheme.colors.brand,
-                                        fontWeight = FontWeight.Bold)
-                                    Text(point, style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-                        } else {
-                            Text(contact.talkingPoints,
-                                style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
-            }
-
-            // ── Ограничения / аллергии ─────────────────────────
-            if (restrictions.isNotEmpty()) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_restrictions)) {
+                    if (restrictions.isNotEmpty()) {
+                        Spacer(Modifier.height(11.dp))
+                        HorizontalDivider(color = CsBorder, thickness = 1.dp)
+                        Spacer(Modifier.height(11.dp))
                         restrictions.forEach { r ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text("!", color = AppleTheme.colors.red,
-                                    fontWeight = FontWeight.Bold)
-                                Text("${r.category.label(ctxLabel)}: ${r.value}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = AppleTheme.colors.red)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(vertical = 2.dp)) {
+                                Icon(Icons.Default.Warning, null, Modifier.size(14.dp), tint = CsWarn)
+                                Text("${r.category.label(ctxLabel)}: ${r.value}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CsWarn)
                             }
+                        }
+                    }
+                }
+            } else if (restrictions.isNotEmpty()) item {
+                CsBlock(stringResource(R.string.cs_restrictions), CsWarn, Icons.Default.Warning) {
+                    restrictions.forEach { r ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(vertical = 2.dp)) {
+                            Icon(Icons.Default.Warning, null, Modifier.size(14.dp), tint = CsWarn)
+                            Text("${r.category.label(ctxLabel)}: ${r.value}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CsWarn)
                         }
                     }
                 }
             }
 
-            // ── Как связаться ──────────────────────────────────
+            // ── Цели и мечты ──
+            if (dreamNotes.isNotEmpty()) item {
+                CsBlock(stringResource(R.string.cs_goals), CsGold, Icons.Default.Star) {
+                    dreamNotes.forEach { note ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("→", color = CsGold, fontWeight = FontWeight.Bold)
+                            Text(note.text, fontSize = 14.sp, color = CsTx)
+                        }
+                    }
+                }
+            }
+
+            // ── Чем может помочь ──
+            if (!contact.canHelpWith.isNullOrBlank()) item {
+                CsBlock(stringResource(R.string.cs_can_help), CsSage, Icons.Default.Favorite) {
+                    Text(contact.canHelpWith, fontSize = 14.sp, color = CsTx)
+                }
+            }
+
+            // ── Чем я могу помочь ──
+            if (!contact.iCanHelpWith.isNullOrBlank()) item {
+                CsBlock(stringResource(R.string.cs_i_can_help), CsSage, Icons.Default.Favorite) {
+                    Text(contact.iCanHelpWith, fontSize = 14.sp, color = CsTx)
+                }
+            }
+
+            // ── Как связаться ──
             val hasContact = primaryPhone.isNotBlank() || primaryMessenger != null
-            if (hasContact) {
-                item {
-                    SheetBlock(stringResource(R.string.cs_how_contact)) {
-                        if (primaryPhone.isNotBlank()) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Phone, null, Modifier.size(16.dp),
-                                    tint = AppleTheme.colors.brand)
-                                Text(primaryPhone, style = MaterialTheme.typography.bodyMedium)
-                            }
+            if (hasContact) item {
+                CsBlock(stringResource(R.string.cs_how_contact), CsSage, Icons.Default.Phone) {
+                    if (primaryPhone.isNotBlank()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Phone, null, Modifier.size(15.dp), tint = CsSage)
+                            Text(primaryPhone, fontSize = 14.sp, color = CsTx)
                         }
-                        if (primaryMessenger != null) {
-                            Spacer(Modifier.height(4.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.AutoMirrored.Filled.Chat, null, Modifier.size(16.dp),
-                                    tint = AppleTheme.colors.brand)
-                                Text("${primaryMessenger.type.label(ctxLabel)}: ${primaryMessenger.value}",
-                                    style = MaterialTheme.typography.bodyMedium)
-                            }
+                    }
+                    if (primaryMessenger != null) {
+                        Spacer(Modifier.height(5.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.AutoMirrored.Filled.Chat, null, Modifier.size(15.dp), tint = CsSage)
+                            Text("${primaryMessenger.type.label(ctxLabel)}: ${primaryMessenger.value}", fontSize = 14.sp, color = CsTx)
                         }
                     }
                 }
             }
 
-            // ── Пустое состояние ───────────────────────────────
+            // ── Пустое состояние ──
             if (!hasContact && impNotes.isEmpty() && lastNote == null &&
                 familyRels.isEmpty() && interests.isEmpty() && dreamNotes.isEmpty() &&
+                restrictions.isEmpty() &&
                 contact.canHelpWith.isNullOrBlank() && contact.iCanHelpWith.isNullOrBlank() &&
                 contact.talkingPoints.isNullOrBlank()
-            ) {
-                item {
-                    Box(Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                        Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.EditNote, null, Modifier.size(48.dp),
-                                tint = AppleTheme.colors.separator)
-                            Text(stringResource(R.string.cs_fill_profile),
-                                color = AppleTheme.colors.secondaryLabel)
-                            Text(stringResource(R.string.cs_fill_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AppleTheme.colors.separator)
-                        }
+            ) item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 40.dp), Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.EditNote, null, Modifier.size(48.dp), tint = CsMuted)
+                        Text(stringResource(R.string.cs_fill_profile), color = CsTx)
+                        Text(stringResource(R.string.cs_fill_hint), fontSize = 13.sp, color = CsMuted)
                     }
                 }
             }
@@ -454,32 +345,29 @@ fun CheatSheetScreen(
 }
 
 @Composable
-private fun SheetBlock(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        modifier  = Modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(
-            containerColor = AppleTheme.colors.card
-        ),
-        elevation = CardDefaults.cardElevation(0.dp)
+private fun CsBlock(title: String, accent: Color, icon: ImageVector, gold: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            .background(if (gold) CsGold.copy(alpha = 0.16f) else CsCard)
+            .border(1.dp, if (gold) CsGold.copy(alpha = 0.28f) else CsBorder, RoundedCornerShape(18.dp))
+            .padding(15.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                title,
-                style      = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color      = AppleTheme.colors.label
-            )
-            Spacer(Modifier.height(8.dp))
-            HorizontalDivider(
-                color     = AppleTheme.colors.separator,
-                thickness = 0.5.dp
-            )
-            Spacer(Modifier.height(8.dp))
-            content()
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(accent.copy(alpha = 0.22f)), Alignment.Center) {
+                Icon(icon, null, Modifier.size(13.dp), tint = accent)
+            }
+            // Строки cs_* содержат ведущий эмодзи — иконка показана плиткой слева,
+            // поэтому в подписи эмодзи убираем.
+            Text(title.dropWhile { !it.isLetter() }.trim().uppercase(),
+                fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = accent)
         }
+        Spacer(Modifier.height(10.dp))
+        content()
     }
+}
+
+@Composable
+private fun CsTag(text: String) {
+    Text(text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CsTx,
+        modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(CsChip).padding(horizontal = 12.dp, vertical = 6.dp))
 }

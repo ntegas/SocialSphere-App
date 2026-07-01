@@ -56,17 +56,7 @@ fun ScanCardScreen(
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.scan_title), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
-            )
-        }
+        topBar = {}
     ) { pv ->
         Column(
             modifier = Modifier
@@ -76,6 +66,21 @@ fun ScanCardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Шапка Aurelia (круглая кнопка назад + Playfair-заголовок) ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier.size(36.dp).clip(CircleShape).background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back), Modifier.size(20.dp), tint = AppleTheme.colors.label)
+                }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.scan_title))
+            }
+
             if (!reviewed) {
                 // ── Шаг 1: ввод текста визитки ──
                 Box(
@@ -149,9 +154,11 @@ fun ScanCardScreen(
                         label = { Text(stringResource(R.string.scan_last_name)) }, singleLine = true)
                 }
                 OutlinedTextField(phone, { phone = it }, Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.scan_phone)) }, singleLine = true)
+                    label = { Text(stringResource(R.string.scan_phone)) }, singleLine = true,
+                    keyboardOptions = PhoneKeyboard)
                 OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.scan_email)) }, singleLine = true)
+                    label = { Text(stringResource(R.string.scan_email)) }, singleLine = true,
+                    keyboardOptions = EmailKeyboard)
                 OutlinedTextField(company, { company = it }, Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.scan_company)) }, singleLine = true)
                 OutlinedTextField(position, { position = it }, Modifier.fillMaxWidth(),

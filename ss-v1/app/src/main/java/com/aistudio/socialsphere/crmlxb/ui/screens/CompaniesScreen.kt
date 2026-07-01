@@ -225,6 +225,23 @@ fun CompaniesScreen(
                 }
             }
 
+            // Контролы: чипы сортировки + фильтр (как в Contacts — сортировка видна в обычном режиме)
+            Row(
+                Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    CompaniesSortChip(stringResource(R.string.comp_sort_name_az), sortOrder == CompanySortOrder.NAME_AZ) { sortOrder = CompanySortOrder.NAME_AZ }
+                    CompaniesSortChip(stringResource(R.string.comp_sort_name_za), sortOrder == CompanySortOrder.NAME_ZA) { sortOrder = CompanySortOrder.NAME_ZA }
+                    CompaniesSortChip(stringResource(R.string.comp_sort_most), sortOrder == CompanySortOrder.MOST_CONTACTS) { sortOrder = CompanySortOrder.MOST_CONTACTS }
+                    CompaniesSortChip(stringResource(R.string.home_recently_added), sortOrder == CompanySortOrder.RECENTLY_ADDED) { sortOrder = CompanySortOrder.RECENTLY_ADDED }
+                }
+                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { showFilterSheet = true }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Tune, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                    if (hasActiveFilters) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.red))
+                }
+            }
+
             // ── Active filter chips ───────────────────────────
             val chips = buildList {
                 filterIndustries.forEach { add(it.label(ctxLabel) to { filterIndustries = filterIndustries - it }) }
@@ -260,10 +277,6 @@ fun CompaniesScreen(
                         }
                     }
                 }
-                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { showFilterSheet = true }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Tune, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
-                    if (hasActiveFilters) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.red))
-                }
             }
 
             // ── List ──────────────────────────────────────────
@@ -281,12 +294,30 @@ fun CompaniesScreen(
                 }
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding      = PaddingValues(start = 18.dp, end = 18.dp, top = 0.dp, bottom = 24.dp),
-                    modifier            = Modifier.fillMaxSize()
+                    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 0.dp, bottom = 24.dp),
+                    modifier       = Modifier.fillMaxSize()
                 ) {
-                    items(filteredCompanies, key = { it.id }) { company ->
-                        CompanyCardItem(company = company, onClick = { onNavigateToCompany(company.id) })
+                    // Сгруппированная inset-карточка со строками компаний (по макету Aurelia):
+                    // лого + имя + «отрасль · город» + пилюля «N чел.», строки с разделителем.
+                    item {
+                        Card(
+                            modifier  = Modifier.fillMaxWidth(),
+                            shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                            colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                            elevation = CardDefaults.cardElevation(1.dp)
+                        ) {
+                            Column {
+                                filteredCompanies.forEachIndexed { idx, company ->
+                                    CompanyRow(company = company, onClick = { onNavigateToCompany(company.id) })
+                                    if (idx < filteredCompanies.lastIndex)
+                                        HorizontalDivider(
+                                            modifier  = Modifier.padding(start = 78.dp),
+                                            color     = AppleTheme.colors.separator,
+                                            thickness = 0.5.dp
+                                        )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -294,32 +325,24 @@ fun CompaniesScreen(
     }
 }
 
-// ─── Company card (moved here from CompaniesScreen old) ──────
+// ─── Строка компании в сгруппированной карточке (по макету Aurelia) ──────
+// Простая строка: лого-квадрат + имя + «отрасль · город» + пилюля «N чел.».
+// Заменила тяжёлую карточку с 3 стат-боксами (контакты/ключевые/важные) и
+// шевроном — макет таких блоков не содержит (детали — в карточке компании).
 @Composable
-fun CompanyCardItem(company: Company, onClick: () -> Unit) {
+fun CompanyRow(company: Company, onClick: () -> Unit) {
     val ctxLabel = LocalContext.current
-    val ctx = LocalContext.current
-    // Пересчёт только при смене данных, а не на каждой рекомпозиции при скролле
     val addresses by remember(company.id) {
         derivedStateOf {
             AppStateStore.addresses.filter { it.ownerId == company.id && it.ownerType == AddressOwnerType.COMPANY }
         }
     }
-    val relations by remember(company.id) {
-        derivedStateOf {
-            AppStateStore.companyRelations.filter { it.companyId == company.id }
-        }
+    val peopleCount by remember(company.id) {
+        derivedStateOf { AppStateStore.companyRelations.count { it.companyId == company.id } }
     }
     val mainCity = addresses.firstOrNull { it.addressType == AddressType.OFFICE || it.addressType == AddressType.LEGAL }?.city
         ?: addresses.firstOrNull()?.city ?: ""
-    val peopleCount = relations.size
-    val peopleSample = relations.take(2).mapNotNull {
-        AppStateStore.getContact(it.contactId)?.let { c -> "${c.firstName} ${c.lastName}" }
-    }.joinToString(", ")
-
-    val keyCount = relations.count { AppStateStore.getContact(it.contactId)?.importanceLevel == ImportanceLevel.KEY }
-    val importantCount = relations.count { AppStateStore.getContact(it.contactId)?.importanceLevel == ImportanceLevel.IMPORTANT }
-    // Палитра логотипов Aurelia (малахит/терракот/слива/тил/золото) вместо iOS-радуги.
+    // Палитра логотипов Aurelia (малахит/терракот/слива/тил/золото).
     val grads = listOf(
         listOf(Color(0xFF2E8B6B), Color(0xFF155539)),
         listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
@@ -328,43 +351,45 @@ fun CompanyCardItem(company: Company, onClick: () -> Unit) {
         listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
     )
     val g = grads[kotlin.math.abs(company.id.hashCode()) % grads.size]
-    Card(
-        onClick   = onClick,
-        modifier  = Modifier.fillMaxWidth(),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
-        colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-        elevation = CardDefaults.cardElevation(1.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                Box(
-                    modifier = Modifier.size(50.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).background(androidx.compose.ui.graphics.Brush.linearGradient(g)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(company.name.take(1).uppercase(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.White)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(company.name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    val sub = listOf(company.industry.label(ctxLabel), mainCity).filter { it.isNotEmpty() }.joinToString(" · ")
-                    if (sub.isNotEmpty())
-                        Text(sub, fontSize = 13.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
-                }
-                Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
-            }
-            Row(modifier = Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CompanyStatBox(Modifier.weight(1f), peopleCount.toString(), stringResource(R.string.comp_stat_contacts), AppleTheme.colors.label)
-                CompanyStatBox(Modifier.weight(1f), keyCount.toString(), stringResource(R.string.comp_stat_key), AppleTheme.colors.red)
-                CompanyStatBox(Modifier.weight(1f), importantCount.toString(), stringResource(R.string.comp_stat_important), AppleTheme.colors.label)
+        Box(
+            modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).background(androidx.compose.ui.graphics.Brush.linearGradient(g)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(company.name.take(1).uppercase(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Color.White)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(company.name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val sub = listOf(company.industry.label(ctxLabel), mainCity).filter { it.isNotEmpty() }.joinToString(" · ")
+            if (sub.isNotEmpty())
+                Text(sub, fontSize = 13.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+        }
+        if (peopleCount > 0) {
+            Box(
+                Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
+                    .background(AppleTheme.colors.brand.copy(alpha = 0.12f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    stringResource(R.string.comp_people_n, peopleCount),
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CompanyStatBox(modifier: Modifier, value: String, label: String, valueColor: Color) {
-    Column(modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(AppleTheme.colors.groupedBackground).padding(horizontal = 12.dp, vertical = 9.dp)) {
-        Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = valueColor)
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.secondaryLabel, modifier = Modifier.padding(top = 3.dp))
+private fun CompaniesSortChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp)).background(Color(0x1F767680)).clickable { onClick() }.padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, color = if (active) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel)
     }
 }
 

@@ -290,7 +290,7 @@
     <string name="cal_no_events_found">Δεν βρέθηκαν γεγονότα</string>
     <string name="cal_time">Ώρα: %1$s</string>
     <string name="cal_mode_today">Σήμερα</string>
-    <string name="cal_mode_list">Λίστα</string>
+    <string name="cal_mode_list">Ροή</string>
     <string name="cal_mode_week">Εβδομάδα</string>
     <string name="cal_mode_month">Μήνας</string>
     <string name="common_all">Όλα</string>
@@ -355,6 +355,7 @@
     <string name="settings_privacy_sub">Ρυθμίσεις προστασίας εφαρμογής</string>
     <string name="settings_import_export">Εισαγωγή &amp; εξαγωγή</string>
     <string name="settings_duplicates">Εύρεση διπλότυπων</string>
+    <string name="settings_duplicates_sub">Εύρεση και συγχώνευση</string>
     <string name="dup_title">Διπλότυπα</string>
     <string name="dup_backup_hint">Συμβουλή: κάντε αντίγραφο πριν τη συγχώνευση (Ρυθμίσεις → Εισαγωγή &amp; εξαγωγή). Η συγχώνευση δεν αναιρείται.</string>
     <string name="dup_none">Δεν βρέθηκαν πιθανά διπλότυπα</string>
@@ -368,6 +369,7 @@
     <string name="appearance_dark">σκοτεινό</string>
     <string name="appearance_note">Σημείωση: η πλήρης αλλαγή σκοτεινού θέματος απαιτεί επανεκκίνηση. Αυτόματη λειτουργία στην επόμενη έκδοση.</string>
     <string name="appearance_accent">Τόνος</string>
+    <string name="appearance_accent_preview">Έτσι φαίνεται ο τόνος</string>
     <string name="accent_malachite">Μαλαχίτης</string>
     <string name="accent_sapphire">Ζαφείρι</string>
     <string name="accent_amethyst">Αμέθυστος</string>
@@ -501,6 +503,9 @@
     <string name="compd_zone">Ζώνη: %1$s</string>
     <string name="compd_accounts">Λογαριασμοί: %1$s</string>
     <string name="compd_worknote">Σημείωση: %1$s</string>
+    <string name="compd_stat_people">υπάλληλοι</string>
+    <string name="compd_mail_site">Email &amp; ιστότοπος</string>
+    <string name="compd_offices">Γραφεία</string>
     <string name="ce_edit">Επεξεργασία</string>
     <string name="ce_new_contact">Νέα επαφή</string>
     <string name="ce_name_req">Όνομα *</string>
@@ -844,6 +849,8 @@
     <string name="ie_save_sub">Άμεση αποθήκευση αντιγράφου σε αρχείο (χωρίς Κοινή χρήση)</string>
     <string name="ie_save_done">Το αρχείο αποθηκεύτηκε</string>
     <string name="cd_save_to_phone">Αποθήκευση στις επαφές τηλεφώνου</string>
+    <string name="cd_actions">Ενέργειες</string>
+    <string name="cd_share">Κοινή χρήση</string>
     <string name="ce_search_company">Αναζήτηση εταιρείας</string>
     <string name="cd_add_important_date">Προσθήκη σημαντικής ημερομηνίας</string>
     <string name="cd_date_type">Τύπος</string>
@@ -900,6 +907,7 @@
     <string name="contacts_seg_clients">Πελάτες</string>
     <string name="contacts_seg_family">Οικογένεια</string>
     <string name="comp_stat_contacts">επαφές</string>
+    <string name="comp_people_n">%1$d άτ.</string>
     <string name="comp_stat_key">βασικές</string>
     <string name="comp_stat_important">σημαντικές</string>
     <string name="set_remind_stale">Υπενθύμιση επικοινωνίας</string>
@@ -912,4 +920,13 @@
     <string name="sync_linked">Συνδεδεμένο με τηλέφωνο</string>
     <string name="set_exact_alarms">Επιτρέψτε ακριβείς υπενθυμίσεις</string>
     <string name="set_exact_alarms_hint">Ώστε οι υπενθυμίσεις να φτάνουν ακριβώς στην ώρα τους</string>
+
+    <!-- Εισαγωγή (πρώτη εκκίνηση) -->
+    <string name="onboarding_brand">SocialSphere</string>
+    <string name="onboarding_headline">Θυμηθείτε όλους όσους μετρούν</string>
+    <string name="onboarding_subtitle">Προσωπικό CRM για ζεστές σχέσεις: επαφές, εταιρείες και οι σωστές στιγμές για επικοινωνία.</string>
+    <string name="onboarding_feature_contacts">Πλούσια προφίλ — οικογένεια, ενδιαφέροντα, θέματα συζήτησης</string>
+    <string name="onboarding_feature_calendar">Υπενθυμίσεις με βάση τον ρυθμό σας και σημαντικές ημερομηνίες</string>
+    <string name="onboarding_feature_cheat">Σύνοψη πριν τη συνάντηση — όλα σε μία οθόνη</string>
+    <string name="onboarding_start">Ξεκινήστε</string>
 </resources>

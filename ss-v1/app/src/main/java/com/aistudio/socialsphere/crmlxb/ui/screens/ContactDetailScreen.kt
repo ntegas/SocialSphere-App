@@ -39,6 +39,7 @@ import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -75,6 +76,9 @@ fun ContactDetailScreen(
     var showSizesDialog by remember { mutableStateOf(false) }
     var showAddPref     by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    // Единая шторка «⋯ Действия» из шапки (по макету): Редактировать /
+    // Сохранить в телефон / Поделиться / Удалить.
+    var showActionsSheet by remember { mutableStateOf(false) }
 
     // Add note state
     var noteText by remember { mutableStateOf("") }
@@ -104,18 +108,57 @@ fun ContactDetailScreen(
         )
     }
 
+    // ── Шторка «⋯ Действия» (по макету): единая точка входа для действий,
+    // раскиданных ранее по вкладкам/низу. Функции переиспользуют существующую
+    // логику (vCard-экспорт, share-file, диалог удаления). ──
+    if (showActionsSheet) {
+        val ctx = LocalContext.current
+        val scope = rememberCoroutineScope()
+        ModalBottomSheet(onDismissRequest = { showActionsSheet = false }) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                Text(
+                    stringResource(R.string.cd_actions),
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)
+                )
+                ActionSheetRow(Icons.Default.Edit, stringResource(R.string.common_edit)) {
+                    showActionsSheet = false; onNavigateToEdit()
+                }
+                ActionSheetRow(Icons.Default.PersonAdd, stringResource(R.string.cd_save_to_phone)) {
+                    showActionsSheet = false
+                    scope.launch {
+                        val file = com.aistudio.socialsphere.crmlxb.utils.ExportManager.exportContactVCard(ctx, contact)
+                        com.aistudio.socialsphere.crmlxb.utils.ExportManager.openVcfInContacts(ctx, file)
+                    }
+                }
+                ActionSheetRow(Icons.Default.Share, stringResource(R.string.cd_share)) {
+                    showActionsSheet = false
+                    scope.launch {
+                        val file = com.aistudio.socialsphere.crmlxb.utils.ExportManager.exportContactVCard(ctx, contact)
+                        com.aistudio.socialsphere.crmlxb.utils.ExportManager.shareFile(ctx, file, "text/x-vcard")
+                    }
+                }
+                ActionSheetRow(Icons.Default.Delete, stringResource(R.string.common_delete), destructive = true) {
+                    showActionsSheet = false; showDeleteDialog = true
+                }
+            }
+        }
+    }
+
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
         topBar = {
             TopAppBar(
                 title = { },
                 navigationIcon = {
-                    Row(
-                        modifier = Modifier.clickable { onNavigateBack() }.padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Круглая кнопка назад (по макету)
+                    Box(
+                        modifier = Modifier.padding(start = 12.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.ChevronLeft, contentDescription = stringResource(R.string.common_back), tint = AppleTheme.colors.brand, modifier = Modifier.size(28.dp))
-                        Text(stringResource(R.string.common_back), color = AppleTheme.colors.brand, fontSize = 17.sp)
+                        Icon(Icons.Default.ChevronLeft, contentDescription = stringResource(R.string.common_back),
+                            modifier = Modifier.size(22.dp), tint = AppleTheme.colors.label)
                     }
                 },
                 actions = {
@@ -139,8 +182,23 @@ fun ContactDetailScreen(
                             tint = if (privacyMode) Color.White else AppleTheme.colors.secondaryLabel
                         )
                     }
-                    TextButton(onClick = onNavigateToEdit) {
-                        Text(stringResource(R.string.cd_edit_short), color = AppleTheme.colors.brand, fontSize = 17.sp)
+                    // Круглая кнопка «Изменить» (по макету)
+                    Box(
+                        modifier = Modifier.padding(start = 4.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.brand.copy(alpha = 0.12f)).clickable { onNavigateToEdit() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit),
+                            modifier = Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                    }
+                    // Круглая кнопка «⋯» — единая шторка действий (по макету)
+                    Box(
+                        modifier = Modifier.padding(start = 4.dp, end = 12.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.fill).clickable { showActionsSheet = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.MoreHoriz, contentDescription = stringResource(R.string.cd_actions),
+                            modifier = Modifier.size(20.dp), tint = AppleTheme.colors.label)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -631,6 +689,27 @@ fun ContactDetailScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
+/** Строка в шторке «⋯ Действия»: иконка + подпись, деструктив — красным. */
+@Composable
+private fun ActionSheetRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit
+) {
+    val tint = if (destructive) AppleTheme.colors.red else AppleTheme.colors.label
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Icon(icon, null, Modifier.size(22.dp), tint = tint)
+        Text(text, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = tint)
+    }
+}
+
+@Composable
 fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onNavigateToCreateCalendarItem: () -> Unit = {}) {
     val ctxLabel = LocalContext.current
     val compRel  = contact.companyRelations.firstOrNull { it.isPrimary } ?: contact.companyRelations.firstOrNull()
@@ -666,25 +745,6 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
 
     val initials = contact.firstName.take(1) + contact.lastName.take(1)
     val subtitle = listOf(company, position, city).filter { it.isNotEmpty() }.joinToString(" · ")
-    val today = java.time.LocalDate.now()
-    val weekAgo = today.minusDays(7).toString()
-    val rhythmDays: Long? = when (contact.communicationRhythm) {
-        CommunicationRhythm.WEEKLY -> 7L
-        CommunicationRhythm.MONTHLY -> 30L
-        CommunicationRhythm.EVERY_3_MONTHS -> 90L
-        CommunicationRhythm.EVERY_6_MONTHS -> 180L
-        CommunicationRhythm.YEARLY -> 365L
-        else -> null
-    }
-    val daysSinceLast = contact.lastContactDate?.let {
-        try { java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.parse(it.take(10)), today) } catch (e: Exception) { null }
-    }
-    val badgeColor = when {
-        contact.contactStatus == ContactStatus.ARCHIVED -> null
-        rhythmDays != null && daysSinceLast != null && daysSinceLast > rhythmDays -> androidx.compose.ui.graphics.Color(0xFFDC2626)
-        contact.createdAt.take(10) >= weekAgo -> androidx.compose.ui.graphics.Color(0xFF7C3AED)
-        else -> androidx.compose.ui.graphics.Color(0xFF059669)
-    }
     val nowIso = { java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -738,6 +798,12 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                 options = RelationshipType.values().map { it.label(ctxLabel) },
                 container = AppleTheme.colors.brand.copy(alpha = 0.10f), labelColor = AppleTheme.colors.brand
             ) { picked -> RelationshipType.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(relationshipType = it, updatedAt = nowIso())) } }
+            // Уровень связи (по макету — третий чип hero). Редактируемый.
+            EditableChip(
+                current = contact.connectionLevel.label(ctxLabel),
+                options = ConnectionLevel.values().map { it.label(ctxLabel) },
+                container = AppleTheme.colors.orange.copy(alpha = 0.12f), labelColor = AppleTheme.colors.orange
+            ) { picked -> ConnectionLevel.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(connectionLevel = it, updatedAt = nowIso())) } }
             EditableChip(
                 current = contact.communicationRhythm.label(ctxLabel),
                 options = CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) },

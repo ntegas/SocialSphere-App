@@ -2,6 +2,7 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 import androidx.compose.ui.graphics.Color
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -154,34 +155,28 @@ fun CalendarItemDetailScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cid_edit))
-                    }
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete), tint = AppleTheme.colors.red)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
-            )
-        }
+        containerColor = AppleTheme.colors.groupedBackground,
+        topBar = {}
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
+            contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Шапка: круглые кнопки назад / править / удалить ──
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    CircleBtn(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) { onNavigateBack() }
+                    Spacer(Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        CircleBtn(Icons.Default.Edit, stringResource(R.string.cid_edit), tinted = true) { onNavigateToEdit() }
+                        CircleBtn(Icons.Default.Delete, stringResource(R.string.common_delete), danger = true) { showDeleteDialog = true }
+                    }
+                }
+            }
             item {
                 EventHeader(event)
             }
@@ -301,8 +296,8 @@ fun CalendarItemDetailScreen(
                         modifier = Modifier.weight(1f),
                         enabled = event.status != CalendarItemStatus.COMPLETED,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f),
-                            contentColor   = AppleTheme.colors.brand,
+                            containerColor = AppleTheme.colors.brand,
+                            contentColor   = Color.White,
                             disabledContainerColor = AppleTheme.colors.card,
                             disabledContentColor   = AppleTheme.colors.separator
                         )
@@ -336,54 +331,90 @@ fun CalendarItemDetailScreen(
 @Composable
 fun EventHeader(event: CalendarItem) {
     val ctxLabel = LocalContext.current
-    val iconInfo = when (event.type) {
-        CalendarItemType.BIRTHDAY -> Pair(Icons.Default.Cake, AppleTheme.colors.brand.copy(alpha = 0.10f))
-        CalendarItemType.CALL -> Pair(Icons.Default.Phone, AppleTheme.colors.fill)
-        CalendarItemType.MEETING -> Pair(Icons.Default.Group, AppleTheme.colors.orange.copy(alpha = 0.14f))
-        CalendarItemType.GIFT -> Pair(Icons.Default.CardGiftcard, AppleTheme.colors.brand.copy(alpha = 0.10f))
-        else -> Pair(Icons.Default.Event, AppleTheme.colors.card)
+    val accent = eventTypeColor(event.type)
+    val icon = when (event.type) {
+        CalendarItemType.BIRTHDAY -> Icons.Default.Cake
+        CalendarItemType.CALL     -> Icons.Default.Phone
+        CalendarItemType.MEETING  -> Icons.Default.Group
+        CalendarItemType.GIFT     -> Icons.Default.CardGiftcard
+        else                      -> Icons.Default.Event
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    // По макету: левый хедер — иконка-плитка, тип-капс, Playfair-заголовок, чипы даты/времени.
+    Column(modifier = Modifier.fillMaxWidth()) {
         Box(
-            modifier = Modifier.size(64.dp).clip(CircleShape).background(iconInfo.second),
+            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(15.dp)).background(accent.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(iconInfo.first, contentDescription = null, modifier = Modifier.size(32.dp), tint = AppleTheme.colors.label)
+            Icon(icon, contentDescription = null, modifier = Modifier.size(26.dp), tint = accent)
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = AppleTheme.colors.brand)
-            Text(text = event.startDate, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-        }
-
-        if (!event.startTime.isNullOrEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = AppleTheme.colors.secondaryLabel)
-                Text(text = "${event.startTime}" + (if (!event.endTime.isNullOrEmpty()) " - ${event.endTime}" else ""), style = MaterialTheme.typography.bodyMedium, color = AppleTheme.colors.secondaryLabel)
+        Text(
+            event.type.label(ctxLabel).uppercase(),
+            fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
+            color = accent, modifier = Modifier.padding(top = 14.dp)
+        )
+        Text(
+            com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel),
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontSize = 28.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DetailChip(Icons.Default.CalendarToday, event.startDate)
+            if (!event.startTime.isNullOrEmpty()) {
+                DetailChip(Icons.Default.Schedule, event.startTime + (if (!event.endTime.isNullOrEmpty()) "–${event.endTime}" else ""))
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = {}, label = { Text(event.type.label(ctxLabel), fontSize = 12.sp) })
-            AssistChip(onClick = {}, label = { Text(event.status.label(ctxLabel), fontSize = 12.sp) })
+        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.clip(RoundedCornerShape(12.dp)).background(AppleTheme.colors.fill).padding(horizontal = 11.dp, vertical = 5.dp)
+            ) { Text(event.status.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel) }
             if (event.importance in listOf(ImportanceLevel.IMPORTANT, ImportanceLevel.KEY)) {
-                 AssistChip(
-                     onClick = {},
-                     label = { Text(event.importance.label(ctxLabel), fontSize = 12.sp) },
-                     leadingIcon = { Box(modifier = Modifier.clip(CircleShape).size(8.dp).background(AppleTheme.colors.red)) }
-                 )
+                Row(
+                    Modifier.clip(RoundedCornerShape(12.dp)).background(AppleTheme.colors.red.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(AppleTheme.colors.red))
+                    Text(event.importance.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.red)
+                }
             }
         }
     }
+}
+
+@Composable
+private fun DetailChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(
+        Modifier.clip(RoundedCornerShape(11.dp)).background(AppleTheme.colors.card).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Icon(icon, null, Modifier.size(15.dp), tint = AppleTheme.colors.brand)
+        Text(text, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
+    }
+}
+
+@Composable
+private fun CircleBtn(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    tinted: Boolean = false,
+    danger: Boolean = false,
+    onClick: () -> Unit
+) {
+    val bg = when {
+        danger -> AppleTheme.colors.red.copy(alpha = 0.12f)
+        tinted -> AppleTheme.colors.brand.copy(alpha = 0.12f)
+        else   -> AppleTheme.colors.fill
+    }
+    val tint = when {
+        danger -> AppleTheme.colors.red
+        tinted -> AppleTheme.colors.brand
+        else   -> AppleTheme.colors.label
+    }
+    Box(
+        modifier = Modifier.size(36.dp).clip(CircleShape).background(bg).clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) { Icon(icon, contentDescription, Modifier.size(18.dp), tint = tint) }
 }
 
 @Composable

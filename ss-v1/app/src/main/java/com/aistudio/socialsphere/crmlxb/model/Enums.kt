@@ -50,7 +50,9 @@ enum class CalendarTargetType {
     CONTACT, COMPANY, GIFT, NOTE, ADDRESS
 }
 enum class CalendarViewMode {
-    TODAY, LIST, WEEK, MONTH
+    // «Лента» (LIST) / «Неделя» (WEEK) / «Месяц» (MONTH) — по макету Aurelia.
+    // Легаси-значение TODAY убрано: миграция в AppSettings.calendarDefaultMode.
+    LIST, WEEK, MONTH
 }
 enum class CalendarEventFilter {
     ALL, BIRTHDAYS, CALLS, MEETINGS, GIFTS, IMPORTANT

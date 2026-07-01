@@ -95,6 +95,17 @@ object AppSettings {
     fun accentColorSafe(): AccentColor =
         try { accentColor.value } catch (e: Exception) { AccentColor.MALACHITE }
 
+    /** Пройден ли онбординг первого запуска. До этого показываем экран приветствия. */
+    val onboardingCompleted: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "onboarding_completed",
+            default     = false,
+            serialize   = { it.toString() },
+            deserialize = { it == "true" }
+        )
+    }
+
     val isNotificationsEnabled = mutableStateOf(true)
     val defaultReminderTime    = mutableStateOf(ReminderTime.DAY_1)
     val birthdayReminderTimes  = mutableStateOf(setOf(ReminderTime.ON_DAY, ReminderTime.DAY_1))
@@ -143,7 +154,8 @@ object AppSettings {
             // запасной вариант для будущих имён enum
             deserialize = { raw ->
                 when (raw) {
-                    "Сегодня" -> CalendarViewMode.TODAY
+                    // Легаси «Сегодня»/TODAY больше нет — сводим к «Ленте» (LIST).
+                    "Сегодня", "TODAY" -> CalendarViewMode.LIST
                     "Список"  -> CalendarViewMode.LIST
                     "Неделя"  -> CalendarViewMode.WEEK
                     "Месяц"   -> CalendarViewMode.MONTH

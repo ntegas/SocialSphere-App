@@ -365,7 +365,7 @@ fun HomeScreen(
                     "birthdays", strSlBirthdays,
                     strSlBirthdaysSub,
                     Icons.Default.Cake,
-                    androidx.compose.ui.graphics.Color(0xFFE53935),
+                    androidx.compose.ui.graphics.Color(0xFFC45D34), // Aurelia: терракот
                     birthdayContacts.size, birthdayContacts
                 ))
             }
@@ -387,7 +387,7 @@ fun HomeScreen(
                     "followup", strSlFollowup,
                     strSlFollowupSub,
                     Icons.Default.CheckCircle,
-                    androidx.compose.ui.graphics.Color(0xFF43A047),
+                    androidx.compose.ui.graphics.Color(0xFF2E8B6B), // Aurelia: малахит
                     followUpContacts.size, followUpContacts
                 ))
             }
@@ -412,7 +412,7 @@ fun HomeScreen(
                     "nonextstep", strSlNoStep,
                     strSlNoStepSub,
                     Icons.Default.WarningAmber,
-                    androidx.compose.ui.graphics.Color(0xFFFB8C00),
+                    androidx.compose.ui.graphics.Color(0xFFB68A36), // Aurelia: золото
                     noNextStep.size, noNextStep
                 ))
             }
@@ -525,25 +525,8 @@ fun HomeScreen(
                             HomeCircleButton(Icons.Default.Settings, "home_settings_button") { onNavigateToSettings() }
                         }
                     }
-                    // Капсула поиска — прячется когда поиск активен (поле ввода
-                    // живёт в TopAppBar), иначе было два поля. Остальной дашборд
-                    // остаётся видимым.
-                    if (!searchActive) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 14.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().height(38.dp)
-                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
-                                    .background(androidx.compose.ui.graphics.Color(0x1F767680))
-                                    .clickable { searchActive = true }
-                                    .padding(horizontal = 11.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(7.dp)
-                            ) {
-                                Icon(Icons.Default.Search, null, tint = androidx.compose.ui.graphics.Color(0xFF8E8E93), modifier = Modifier.size(17.dp))
-                                Text(stringResource(R.string.home_search_placeholder), fontSize = 17.sp, color = androidx.compose.ui.graphics.Color(0xFF8E8E93))
-                            }
-                        }
-                    }
+                    // Поисковой капсулы нет — в макете Aurelia поиск с Главной идёт
+                    // через круглую кнопку-лупу в шапке (дублирующая капсула убрана).
                     // Stats
                     Row(
                         modifier = Modifier
@@ -557,7 +540,7 @@ fun HomeScreen(
                             icon      = Icons.Outlined.CardGiftcard,
                             value     = birthdaysThisMonth.toString(),
                             label     = stringResource(R.string.home_counter_birthdays),
-                            iconColor = AppleTheme.colors.brand,
+                            iconColor = AppleTheme.colors.orange, // золото (по макету)
                             valueColor = AppleTheme.colors.label,
                             onClick   = {
                                 expandBirthdayList = true
@@ -580,11 +563,11 @@ fun HomeScreen(
                         // ⚠️ Просроченных контактов
                         HomeStatCard(
                             modifier  = Modifier.weight(1f),
-                            icon      = Icons.Outlined.NotificationsActive,
+                            icon      = Icons.Outlined.WarningAmber,
                             value     = overdueCount.toString(),
                             label     = stringResource(R.string.home_counter_overdue),
-                            iconColor = AppleTheme.colors.orange,
-                            valueColor = AppleTheme.colors.orange,
+                            iconColor = AppleTheme.colors.red,   // терракот-тревога (по макету)
+                            valueColor = AppleTheme.colors.red,
                             onClick   = {
                                 if (overdueCount > 0) {
                                     // ТЗ: прокрутка к блоку «Нужно связаться»

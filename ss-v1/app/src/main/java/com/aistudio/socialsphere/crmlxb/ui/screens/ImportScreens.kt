@@ -139,8 +139,13 @@ fun ImportContactsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.imp_contacts_title), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    Box(
+                        modifier = Modifier.padding(start = 12.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
+                            modifier = Modifier.size(20.dp), tint = AppleTheme.colors.label)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
@@ -354,8 +359,13 @@ fun ImportPreviewScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.imp_preview), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    Box(
+                        modifier = Modifier.padding(start = 12.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
+                            modifier = Modifier.size(20.dp), tint = AppleTheme.colors.label)
                     }
                 },
                 actions = {
@@ -621,8 +631,13 @@ fun ImportDuplicatesScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.imp_possible_dups), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    Box(
+                        modifier = Modifier.padding(start = 12.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
+                            modifier = Modifier.size(20.dp), tint = AppleTheme.colors.label)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)

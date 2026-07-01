@@ -13,11 +13,11 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,8 +48,13 @@ fun CompanyDetailScreen(
     }
 
     val ctxLabel = LocalContext.current
+    // Вкладки по макету Aurelia: Люди · Контакты · Адреса
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf(stringResource(R.string.cd_tab_overview), stringResource(R.string.compd_tab_people))
+    val tabs = listOf(
+        stringResource(R.string.compd_tab_people),
+        stringResource(R.string.common_contacts),
+        stringResource(R.string.cd_addresses)
+    )
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
@@ -68,97 +73,176 @@ fun CompanyDetailScreen(
         )
     }
 
+    // Статистика по сотрудникам (для трёх стат-боксов hero)
+    val relations = AppStateStore.companyRelations.filter { it.companyId == company.id }
+    val peopleCount    = relations.size
+    val keyCount       = relations.count { AppStateStore.getContact(it.contactId)?.importanceLevel == ImportanceLevel.KEY }
+    val importantCount = relations.count { AppStateStore.getContact(it.contactId)?.importanceLevel == ImportanceLevel.IMPORTANT }
+
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit))
-                    }
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color(0xFF2E8B6B), navigationIconContentColor = androidx.compose.ui.graphics.Color.White, actionIconContentColor = androidx.compose.ui.graphics.Color.White, titleContentColor = androidx.compose.ui.graphics.Color.White)
-            )
-        }
+        containerColor = AppleTheme.colors.groupedBackground,
+        topBar = {}
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            CompanyHeader(company)
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            // ── Шапка: круглые кнопки назад / редактировать / удалить (по макету) ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                companyPeopleTab(company, onNavigateToContact, ctxLabel = ctxLabel)
-                companyOverviewTab(company, onNavigateToCreateCalendarItem, ctxLabel = ctxLabel)
+                CircleIconButton(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) { onNavigateBack() }
+                Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    CircleIconButton(Icons.Default.Edit, stringResource(R.string.common_edit), tinted = true) { onNavigateToEdit() }
+                    CircleIconButton(Icons.Default.Delete, stringResource(R.string.common_delete), danger = true) { showDeleteDialog = true }
+                }
+            }
+
+            // ── Hero: центрированный лого + название + чипы ──
+            CompanyHero(company, ctxLabel)
+
+            // ── 3 стат-бокса: сотрудников · ключевых · важных ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                CompanyStat(peopleCount.toString(), stringResource(R.string.compd_stat_people), AppleTheme.colors.label, Modifier.weight(1f))
+                CompanyStat(keyCount.toString(), stringResource(R.string.comp_stat_key), AppleTheme.colors.orange, Modifier.weight(1f))
+                CompanyStat(importantCount.toString(), stringResource(R.string.comp_stat_important), AppleTheme.colors.red, Modifier.weight(1f))
+            }
+
+            // ── Вкладки: активная — бренд-подчёркивание 2.5dp + волосяная линия ──
+            val dividerColor = AppleTheme.colors.separator
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+                    .drawBehind {
+                        val y = size.height - 0.5.dp.toPx()
+                        drawLine(dividerColor, androidx.compose.ui.geometry.Offset(0f, y),
+                            androidx.compose.ui.geometry.Offset(size.width, y), 1f)
+                    }
+                    .padding(start = 24.dp, end = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(22.dp)
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    val sel = selectedTab == index
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { selectedTab = index }
+                    ) {
+                        Text(
+                            text = title,
+                            fontSize = 15.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            fontWeight = if (sel) FontWeight.Bold else FontWeight.SemiBold,
+                            color = if (sel) AppleTheme.colors.label else AppleTheme.colors.tertiaryLabel,
+                            modifier = Modifier.padding(bottom = 11.dp)
+                        )
+                        Box(
+                            Modifier.height(2.5.dp).width(28.dp)
+                                .background(if (sel) AppleTheme.colors.brand else Color.Transparent,
+                                    RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                        )
+                    }
+                }
+            }
+
+            // weight(1f), НЕ fillMaxSize() — иначе список под шапкой+табами схлопывается
+            // до «полэкрана» (повторяющийся баг скролла в Column).
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                when (selectedTab) {
+                    0 -> companyPeopleTab(company, onNavigateToContact, ctxLabel = ctxLabel)
+                    1 -> companyContactsTab(company, onNavigateToCreateCalendarItem, ctxLabel = ctxLabel)
+                    2 -> companyAddressesTab(company, onNavigateToEdit, ctxLabel = ctxLabel)
+                }
             }
         }
     }
 }
 
+// ─── Круглая кнопка-иконка шапки (по макету) ─────────────────────────────
 @Composable
-fun CompanyHeader(company: Company, onShowPeople: () -> Unit = {}) {
-    val ctxLabel = LocalContext.current
+private fun CircleIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    tinted: Boolean = false,
+    danger: Boolean = false,
+    onClick: () -> Unit
+) {
+    val bg = when {
+        danger -> AppleTheme.colors.red.copy(alpha = 0.12f)
+        tinted -> AppleTheme.colors.brand.copy(alpha = 0.12f)
+        else   -> AppleTheme.colors.fill
+    }
+    val tint = when {
+        danger -> AppleTheme.colors.red
+        tinted -> AppleTheme.colors.brand
+        else   -> AppleTheme.colors.label
+    }
+    Box(
+        modifier = Modifier.size(36.dp).clip(CircleShape).background(bg).clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription, Modifier.size(18.dp), tint = tint)
+    }
+}
+
+// ─── Центрированный hero компании (по макету Aurelia) ────────────────────
+@Composable
+fun CompanyHero(company: Company, ctxLabel: android.content.Context) {
     val addresses = AppStateStore.addresses.filter { it.ownerId == company.id && it.ownerType == AddressOwnerType.COMPANY }
     val mainCity = addresses.firstOrNull { it.addressType == AddressType.OFFICE || it.addressType == AddressType.LEGAL }?.city
-        ?: addresses.firstOrNull()?.city ?: stringResource(R.string.common_unknown)
-
+        ?: addresses.firstOrNull()?.city ?: ""
     val initial = company.name.take(1).uppercase()
-    val cW = androidx.compose.ui.graphics.Color.White
 
-    Box(
-        modifier = Modifier.fillMaxWidth()
-            // Малахитовый градиент Aurelia (был старый индиго #5B53D6 — не из палитры).
-            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
-                androidx.compose.ui.graphics.Color(0xFF2E8B6B),
-                androidx.compose.ui.graphics.Color(0xFF1C6B4C),
-                androidx.compose.ui.graphics.Color(0xFF155539))))
-            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 18.dp)
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                Box(
-                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(15.dp)).background(cW.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(initial, color = cW, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(company.name, color = cW, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(company.industry.label(ctxLabel) + " · " + mainCity, color = cW.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
-                }
+        Box(
+            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(22.dp))
+                // Малахитовый градиент Aurelia (точно по макету)
+                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+                    Color(0xFF2E8B6B), Color(0xFF155539)))),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(initial, color = Color.White,
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                fontSize = 34.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(
+            company.name,
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontSize = 26.sp, fontWeight = FontWeight.Bold,
+            color = AppleTheme.colors.label,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 14.dp)
+        )
+        Row(
+            modifier = Modifier.padding(top = 9.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Box(
+                Modifier.clip(RoundedCornerShape(13.dp)).background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                    .padding(horizontal = 11.dp, vertical = 5.dp)
+            ) {
+                Text(company.industry.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand)
             }
-            val hasContact = company.phones.isNotEmpty() || company.emails.isNotEmpty() || company.website != null
-            if (hasContact) {
-                Spacer(modifier = Modifier.height(14.dp))
-                Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(cW.copy(alpha = 0.12f))) {
-                    company.phones.forEach { ph ->
-                        CompanyInfoRow(Icons.Default.Phone, ph.number, ph.type.label(ctxLabel)) {
-                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(ctxLabel, ph.number)
-                        }
-                    }
-                    company.emails.forEach { em ->
-                        CompanyInfoRow(Icons.Default.Email, em.email, em.type.label(ctxLabel)) {
-                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(ctxLabel, em.email)
-                        }
-                    }
-                    company.website?.let { ws ->
-                        CompanyInfoRow(Icons.Default.Language, ws, stringResource(R.string.comp_website)) {
-                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openWebsite(ctxLabel, ws)
-                        }
-                    }
+            if (mainCity.isNotEmpty()) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(13.dp)).background(AppleTheme.colors.fill)
+                        .padding(horizontal = 11.dp, vertical = 5.dp)
+                ) {
+                    Text(mainCity, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.secondaryLabel)
                 }
             }
         }
@@ -166,100 +250,39 @@ fun CompanyHeader(company: Company, onShowPeople: () -> Unit = {}) {
 }
 
 @Composable
-private fun CompanyInfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, sub: String, onClick: () -> Unit) {
-    val w = androidx.compose.ui.graphics.Color.White
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 13.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp)
+private fun CompanyStat(value: String, label: String, valueColor: Color, modifier: Modifier) {
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(16.dp)).background(AppleTheme.colors.card).padding(vertical = 13.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = w.copy(alpha = 0.9f), modifier = Modifier.size(18.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(value, color = w, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(sub, color = w.copy(alpha = 0.72f), style = MaterialTheme.typography.labelSmall)
-        }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = w.copy(alpha = 0.55f), modifier = Modifier.size(18.dp))
-    }
-}
-
-fun androidx.compose.foundation.lazy.LazyListScope.companyOverviewTab(company: Company, onNavigateToCreateCalendarItem: () -> Unit, ctxLabel: android.content.Context) {
-    
-    val addresses = AppStateStore.addresses.filter { it.ownerId == company.id && it.ownerType == AddressOwnerType.COMPANY }
-    if (addresses.isNotEmpty()) {
-        item {
-            CardBlock(title = stringResource(R.string.cd_addresses)) {
-                addresses.forEachIndexed { index, address ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(address.addressType.label(ctxLabel), color = AppleTheme.colors.brand, style = MaterialTheme.typography.bodySmall)
-                            Text("${address.addressLine}, ${address.city}${address.postalCode?.let { " $it" } ?: ""}, ${address.country}", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(onClick = { 
-                            if (address.latitude != null && address.longitude != null) {
-                                com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRouteByCoordinates(context, address.latitude, address.longitude)
-                            } else {
-                                com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
-                            }
-                        }, modifier = Modifier.size(36.dp).background(AppleTheme.colors.card, CircleShape)) {
-                            Icon(Icons.Default.Directions, contentDescription = stringResource(R.string.map_route), modifier = Modifier.size(18.dp), tint = AppleTheme.colors.brand)
-                        }
-                    }
-                    if (index < addresses.size - 1) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = AppleTheme.colors.card)
-                    }
-                }
-            }
-        }
-    }
-    
-    company.description?.let { desc ->
-        item {
-            CardBlock(title = stringResource(R.string.compd_description)) {
-                Text(desc, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-    }
-    
-    item {
-        CardBlock(title = stringResource(R.string.home_upcoming)) {
-            val events = AppStateStore.calendarItems.filter { it.links.any { link -> link.targetId == company.id } && it.status == CalendarItemStatus.ACTIVE }
-            if (events.isNotEmpty()) {
-                events.forEach { InfoRow(it.startDate, it.title) }
-            } else {
-                Text(stringResource(R.string.cd_no_events), color = AppleTheme.colors.secondaryLabel, style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = onNavigateToCreateCalendarItem,
-                colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.card, contentColor = AppleTheme.colors.secondaryLabel),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.cal_add_event))
-            }
-        }
-    }
-    
-    item {
-        CardBlock(title = stringResource(R.string.cd_tab_notes)) {
-            val notes = AppStateStore.notes.filter { it.companyId == company.id }
-            if (notes.isNotEmpty()) {
-                notes.forEach { Text("• ${it.text}", style = MaterialTheme.typography.bodyMedium) }
-            } else {
-                Text(stringResource(R.string.cd_no_notes_yet), color = AppleTheme.colors.secondaryLabel, style = MaterialTheme.typography.bodySmall)
-            }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(value, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                fontSize = 22.sp, fontWeight = FontWeight.Bold, color = valueColor)
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                color = AppleTheme.colors.secondaryLabel, modifier = Modifier.padding(top = 1.dp))
         }
     }
 }
 
-fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Company, onNavigateToContact: (String) -> Unit, ctxLabel: android.content.Context) {
+// ─── Заголовок секции внутри вкладки ─────────────────────────────────────
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text.uppercase(),
+        fontSize = 11.sp, fontWeight = FontWeight.Bold,
+        letterSpacing = 1.sp,
+        color = AppleTheme.colors.tertiaryLabel,
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+    )
+}
+
+// ════════════════════════ ВКЛАДКА «ЛЮДИ» ════════════════════════════════
+fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(
+    company: Company, onNavigateToContact: (String) -> Unit, ctxLabel: android.content.Context
+) {
     val relations = AppStateStore.companyRelations.filter { it.companyId == company.id }
 
+    // Добавление сотрудника (функция сохранена из прежней реализации)
     item {
         var showAdd  by remember { mutableStateOf(false) }
         var search   by remember { mutableStateOf("") }
@@ -336,7 +359,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
             )
         }
     }
-    
+
     if (relations.isEmpty()) {
         item {
             Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
@@ -344,62 +367,266 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(company: Com
             }
         }
     } else {
-        items(relations, key = { it.id }) { rel ->
-            val contact = AppStateStore.getContact(rel.contactId)
-            if (contact != null) {
-                Card(
-                    onClick = { onNavigateToContact(contact.id) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
+        // Сгруппированная inset-карточка со строками сотрудников (по макету):
+        // аватар-градиент + имя + должность/отдел/роль + шеврон → карточка контакта.
+        item {
+            Card(
+                modifier  = Modifier.fillMaxWidth(),
+                shape     = RoundedCornerShape(18.dp),
+                colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                elevation = CardDefaults.cardElevation(1.dp)
+            ) {
+                Column {
+                    relations.forEachIndexed { idx, rel ->
+                        val contact = AppStateStore.getContact(rel.contactId)
+                        if (contact != null) {
+                            CompanyPersonRow(contact, rel) { onNavigateToContact(contact.id) }
+                            if (idx < relations.lastIndex)
+                                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val companyPersonGrads = listOf(
+    listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
+    listOf(Color(0xFF9DBE92), Color(0xFF5E8C66)),
+    listOf(Color(0xFFB58CB6), Color(0xFF7E5180)),
+    listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A)),
+    listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
+)
+
+@Composable
+private fun CompanyPersonRow(contact: Contact, rel: ContactCompanyRelation, onClick: () -> Unit) {
+    val g = companyPersonGrads[kotlin.math.abs(contact.id.hashCode()) % companyPersonGrads.size]
+    val sub = listOfNotNull(rel.position, rel.department, rel.role).filter { it.isNotBlank() }.joinToString(" · ")
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(42.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Brush.linearGradient(g)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                (contact.firstName.firstOrNull()?.toString() ?: "") + (contact.lastName.firstOrNull()?.toString() ?: ""),
+                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text("${contact.firstName} ${contact.lastName}".trim(), fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (sub.isNotEmpty())
+                Text(sub, fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
+    }
+}
+
+// ════════════════════════ ВКЛАДКА «КОНТАКТЫ» ════════════════════════════
+fun androidx.compose.foundation.lazy.LazyListScope.companyContactsTab(
+    company: Company, onNavigateToCreateCalendarItem: () -> Unit, ctxLabel: android.content.Context
+) {
+    val hasChannels = company.phones.isNotEmpty() || company.emails.isNotEmpty() || company.website != null
+
+    // Описание
+    company.description?.takeIf { it.isNotBlank() }?.let { desc ->
+        item {
+            CardBlock(title = stringResource(R.string.compd_description)) {
+                Text(desc, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+
+    if (hasChannels) {
+        // Телефоны
+        if (company.phones.isNotEmpty()) {
+            item {
+                Column {
+                    SectionLabel(stringResource(R.string.cd_phones))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                        elevation = CardDefaults.cardElevation(1.dp)
+                    ) {
+                        val context = LocalContext.current
+                        Column {
+                            company.phones.forEachIndexed { idx, ph ->
+                                ChannelRow(Icons.Default.Phone, ph.number, ph.type.label(ctxLabel), AppleTheme.colors.brand) {
+                                    com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(context, ph.number)
+                                }
+                                if (idx < company.phones.lastIndex)
+                                    HorizontalDivider(modifier = Modifier.padding(start = 58.dp), color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Почта и сайт
+        if (company.emails.isNotEmpty() || company.website != null) {
+            item {
+                Column {
+                    SectionLabel(stringResource(R.string.compd_mail_site))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                        elevation = CardDefaults.cardElevation(1.dp)
+                    ) {
+                        val context = LocalContext.current
+                        Column {
+                            val items = buildList {
+                                company.emails.forEach { add(it) }
+                                company.website?.let { add(it) }
+                            }
+                            company.emails.forEachIndexed { idx, em ->
+                                ChannelRow(Icons.Default.Email, em.email, em.type.label(ctxLabel), Color(0xFF5E78C4)) {
+                                    com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(context, em.email)
+                                }
+                                val last = idx == company.emails.lastIndex && company.website == null
+                                if (!last) HorizontalDivider(modifier = Modifier.padding(start = 58.dp), color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                            }
+                            company.website?.let { ws ->
+                                ChannelRow(Icons.Default.Language, ws, stringResource(R.string.comp_website), AppleTheme.colors.brand) {
+                                    com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openWebsite(context, ws)
+                                }
+                            }
+                            if (items.isEmpty()) Spacer(Modifier.height(0.dp))
+                        }
+                    }
+                }
+            }
+        }
+    } else if (company.description.isNullOrBlank()) {
+        item {
+            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.compd_no_contacts), color = AppleTheme.colors.secondaryLabel)
+            }
+        }
+    }
+
+    // Ближайшие события + кнопка добавления (функция сохранена)
+    item {
+        CardBlock(title = stringResource(R.string.home_upcoming)) {
+            val events = AppStateStore.calendarItems.filter { it.links.any { link -> link.targetId == company.id } && it.status == CalendarItemStatus.ACTIVE }
+            if (events.isNotEmpty()) {
+                events.forEach { InfoRow(it.startDate, it.title) }
+            } else {
+                Text(stringResource(R.string.cd_no_events), color = AppleTheme.colors.secondaryLabel, style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onNavigateToCreateCalendarItem,
+                colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.card, contentColor = AppleTheme.colors.secondaryLabel),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.cal_add_event))
+            }
+        }
+    }
+
+    // Заметки
+    item {
+        CardBlock(title = stringResource(R.string.cd_tab_notes)) {
+            val notes = AppStateStore.notes.filter { it.companyId == company.id }
+            if (notes.isNotEmpty()) {
+                notes.forEach { Text("• ${it.text}", style = MaterialTheme.typography.bodyMedium) }
+            } else {
+                Text(stringResource(R.string.cd_no_notes_yet), color = AppleTheme.colors.secondaryLabel, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelRow(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, sub: String, tint: Color, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp)
+    ) {
+        Box(
+            Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(tint.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) { Icon(icon, null, Modifier.size(16.dp), tint = tint) }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (sub.isNotEmpty())
+                Text(sub, fontSize = 11.sp, color = AppleTheme.colors.secondaryLabel)
+        }
+    }
+}
+
+// ════════════════════════ ВКЛАДКА «АДРЕСА» ══════════════════════════════
+fun androidx.compose.foundation.lazy.LazyListScope.companyAddressesTab(
+    company: Company, onNavigateToEdit: () -> Unit, ctxLabel: android.content.Context
+) {
+    val addresses = AppStateStore.addresses.filter { it.ownerId == company.id && it.ownerType == AddressOwnerType.COMPANY }
+
+    // Декоративная мини-карта (по макету; реальная карта — на вкладке «Карта»)
+    item {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFFE6E0D4)),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(Modifier.size(26.dp).clip(CircleShape).background(AppleTheme.colors.brand))
+        }
+    }
+
+    // Заголовок «Офисы» + добавить
+    item {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 2.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+            SectionLabel(stringResource(R.string.compd_offices))
+            Text("+ " + stringResource(R.string.common_add), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                color = AppleTheme.colors.brand, modifier = Modifier.clickable { onNavigateToEdit() }.padding(bottom = 8.dp))
+        }
+    }
+
+    if (addresses.isEmpty()) {
+        item {
+            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.cd_addresses_none), color = AppleTheme.colors.secondaryLabel)
+            }
+        }
+    } else {
+        items(addresses, key = { it.id }) { address ->
+            val context = LocalContext.current
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                elevation = CardDefaults.cardElevation(1.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier.size(48.dp).clip(CircleShape).background(AppleTheme.colors.brand),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = contact.firstName.take(1) + contact.lastName.take(1),
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Text(text = "${contact.firstName} ${contact.lastName}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(text = rel.employmentStatus.label(ctxLabel), style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel)
-                                }
-                                
-                                val posRoles = listOfNotNull(rel.position, rel.department, rel.role).filter { it.isNotBlank() }
-                                if (posRoles.isNotEmpty()) {
-                                    Text(text = posRoles.joinToString(" • "), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                }
-                            }
-                        }
-                        
-                        val workContext = listOfNotNull(
-                            if (!rel.responsibilities.isNullOrBlank()) stringResource(R.string.compd_zone, rel.responsibilities) else null,
-                            if (!rel.managedAccounts.isNullOrBlank()) stringResource(R.string.compd_accounts, rel.managedAccounts) else null,
-                            if (!rel.workNote.isNullOrBlank()) stringResource(R.string.compd_worknote, rel.workNote) else null
+                    Box(
+                        Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(AppleTheme.colors.brand.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Default.LocationOn, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand) }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(address.addressType.label(ctxLabel), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
+                        Text(
+                            "${address.addressLine}, ${address.city}${address.postalCode?.let { " $it" } ?: ""}",
+                            fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis
                         )
-                        
-                        if (workContext.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            workContext.forEach { ctx ->
-                                Text("• $ctx", style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
-                            }
+                    }
+                    IconButton(onClick = {
+                        if (address.latitude != null && address.longitude != null) {
+                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRouteByCoordinates(context, address.latitude, address.longitude)
+                        } else {
+                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
                         }
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AssistChip(onClick = {}, label = { Text(contact.relationshipType.label(ctxLabel), fontSize = 10.sp) })
-                            AssistChip(onClick = {}, label = { Text(contact.importanceLevel.label(ctxLabel), fontSize = 10.sp) })
-                            if (contact.socialRole != SocialRole.REGULAR) {
-                                AssistChip(onClick = {}, label = { Text(contact.socialRole.label(ctxLabel), fontSize = 10.sp) })
-                            }
-                        }
+                    }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Directions, contentDescription = stringResource(R.string.map_route), modifier = Modifier.size(18.dp), tint = AppleTheme.colors.brand)
                     }
                 }
             }
