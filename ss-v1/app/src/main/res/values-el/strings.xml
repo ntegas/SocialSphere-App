@@ -849,7 +849,6 @@
     <string name="ie_save_sub">Άμεση αποθήκευση αντιγράφου σε αρχείο (χωρίς Κοινή χρήση)</string>
     <string name="ie_save_done">Το αρχείο αποθηκεύτηκε</string>
     <string name="cd_save_to_phone">Αποθήκευση στις επαφές τηλεφώνου</string>
-    <string name="cd_actions">Ενέργειες</string>
     <string name="cd_share">Κοινή χρήση</string>
     <string name="ce_search_company">Αναζήτηση εταιρείας</string>
     <string name="cd_add_important_date">Προσθήκη σημαντικής ημερομηνίας</string>

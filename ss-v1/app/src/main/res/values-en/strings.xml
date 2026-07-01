@@ -849,7 +849,6 @@
     <string name="ie_save_sub">Save the backup straight to a file (no Share sheet)</string>
     <string name="ie_save_done">File saved</string>
     <string name="cd_save_to_phone">Save to phone contacts</string>
-    <string name="cd_actions">Actions</string>
     <string name="cd_share">Share</string>
     <string name="ce_search_company">Search company</string>
     <string name="cd_add_important_date">Add important date</string>

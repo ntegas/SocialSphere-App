@@ -849,7 +849,6 @@
     <string name="ie_save_sub">Прямое сохранение бэкапа в файл (без «Поделиться»)</string>
     <string name="ie_save_done">Файл сохранён</string>
     <string name="cd_save_to_phone">Сохранить в контакты телефона</string>
-    <string name="cd_actions">Действия</string>
     <string name="cd_share">Поделиться</string>
     <string name="ce_search_company">Поиск компании</string>
     <string name="cd_add_important_date">Добавить важную дату</string>
