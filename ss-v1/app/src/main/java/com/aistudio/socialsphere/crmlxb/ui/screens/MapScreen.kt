@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -37,7 +38,6 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
@@ -401,28 +401,19 @@ fun MapScreen(
                             geoItems.forEach { obj ->
                                 val latLng = coordsOf(obj) ?: return@forEach
                                 val isSelected = obj.id == selectedItem?.id
-                                // Палитра Aurelia (см. легенду/список ниже — один набор):
-                                // дом — малахит(green), работа — золото(yellow),
-                                // компания — терракот(orange ≈ #C45D34), выбранный — азур-подсветка.
-                                val hue = when {
-                                    isSelected -> BitmapDescriptorFactory.HUE_AZURE
-                                    obj.ownerType == AddressOwnerType.COMPANY ->
-                                        BitmapDescriptorFactory.HUE_ORANGE
-                                    obj.locationType == AddressType.HOME ->
-                                        BitmapDescriptorFactory.HUE_GREEN
-                                    obj.locationType in listOf(
-                                        AddressType.WORK, AddressType.OFFICE
-                                    ) -> BitmapDescriptorFactory.HUE_YELLOW
-                                    else -> BitmapDescriptorFactory.HUE_GREEN
-                                }
-                                Marker(
+                                // Маркер — круглый аватар-пин (как в макете Aurelia): контакт —
+                                // градиент+инициалы (тот же стиль, что в MapItemDetailCard ниже),
+                                // компания — плитка с иконкой на брендовом фоне.
+                                MarkerComposable(
+                                    keys    = arrayOf(obj.id, isSelected),
                                     state   = MarkerState(position = latLng),
                                     title   = obj.title,
                                     snippet = "${obj.subtitle} · ${obj.city}",
-                                    icon    = BitmapDescriptorFactory.defaultMarker(hue),
                                     zIndex  = if (isSelected) 1f else 0f,
                                     onClick = { selectedItem = obj; false }
-                                )
+                                ) {
+                                    MapMarkerPin(obj = obj, selected = isSelected)
+                                }
                             }
                         }
                     }
@@ -449,27 +440,6 @@ fun MapScreen(
                                 stringResource(R.string.map_grant_location),
                                 tint = AppleTheme.colors.brand
                             )
-                        }
-                    }
-
-                    // Legend
-                    Card(
-                        modifier  = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                        shape     = RoundedCornerShape(12.dp),
-                        colors    = CardDefaults.cardColors(
-                            containerColor = AppleTheme.colors.card.copy(alpha = 0.92f)
-                        ),
-                        elevation = CardDefaults.cardElevation(4.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            // Палитра Aurelia (совпадает со списком и маркерами): дом — малахит,
-                            // работа — золото, компания — терракот.
-                            MapLegendDot(color = AppleTheme.colors.brand,  label = stringResource(R.string.addr_home))
-                            MapLegendDot(color = AppleTheme.colors.orange, label = stringResource(R.string.addr_work))
-                            MapLegendDot(color = AppleTheme.colors.red,    label = stringResource(R.string.addr_company))
                         }
                     }
 
@@ -564,26 +534,26 @@ fun MapScreen(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.weight(1f).height(48.dp),
-                        placeholder = { Text(stringResource(R.string.map_search_hint), color = Color(0xFF8E8E93)) },
-                        leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF8E8E93), modifier = Modifier.size(18.dp)) },
+                        placeholder = { Text(stringResource(R.string.map_search_hint), color = AppleTheme.colors.secondaryLabel) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = AppleTheme.colors.secondaryLabel, modifier = Modifier.size(18.dp)) },
                         trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) } },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(15.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White.copy(alpha = 0.92f),
-                            unfocusedContainerColor = Color.White.copy(alpha = 0.85f),
+                            focusedContainerColor = AppleTheme.colors.card,
+                            unfocusedContainerColor = AppleTheme.colors.card,
                             focusedBorderColor = Color.Transparent,
                             unfocusedBorderColor = Color.Transparent
                         )
                     )
                     Box(
-                        Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.85f)).clickable { showMapView = !showMapView },
+                        Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(AppleTheme.colors.brand).clickable { showMapView = !showMapView },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             if (showMapView) Icons.AutoMirrored.Filled.FormatListBulleted else Icons.Default.Map,
                             contentDescription = if (showMapView) stringResource(R.string.map_list) else stringResource(R.string.map_title),
-                            tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp)
+                            tint = Color.White, modifier = Modifier.size(21.dp)
                         )
                     }
                 }
@@ -592,13 +562,13 @@ fun MapScreen(
                     tabs.forEachIndexed { idx, title ->
                         val active = selectedTab == idx
                         Box(
-                            Modifier.height(30.dp).clip(RoundedCornerShape(15.dp))
-                                .background(if (active) AppleTheme.colors.brand else Color.White.copy(alpha = 0.9f))
+                            Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
+                                .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
                                 .clickable { selectedTab = idx; selectedItem = null }
                                 .padding(horizontal = 14.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(title, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, color = if (active) Color.White else Color(0xFF1C1C1E))
+                            Text(title, fontSize = 13.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold, color = if (active) Color.White else AppleTheme.colors.label)
                         }
                     }
                 }
@@ -607,15 +577,40 @@ fun MapScreen(
     }
 }
 
+/**
+ * Пин на карте в стиле Aurelia: контакт — круглый градиент-аватар с инициалами
+ * (тот же токен [AureliaTheme.colors.avatarTerracotta], что и в [MapItemDetailCard]),
+ * компания — плитка с иконкой на брендовом фоне. Выбранный элемент — крупнее,
+ * с золотой окантовкой вместо обычной card-рамки.
+ */
 @Composable
-private fun MapLegendDot(color: androidx.compose.ui.graphics.Color, label: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-        Text(label, style = MaterialTheme.typography.labelSmall,
-            color = AppleTheme.colors.secondaryLabel)
+private fun MapMarkerPin(obj: MapLocationItem, selected: Boolean) {
+    val size = if (selected) 52.dp else 44.dp
+    val ringColor = if (selected) AureliaTheme.colors.gold else AppleTheme.colors.card
+    val ringWidth = if (selected) 3.dp else 2.dp
+    if (obj.ownerType == AddressOwnerType.COMPANY) {
+        Box(
+            modifier = Modifier.size(size)
+                .clip(RoundedCornerShape(12.dp))
+                .background(AppleTheme.colors.brand)
+                .border(ringWidth, ringColor, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Business, null, tint = Color.White, modifier = Modifier.size(size / 2))
+        }
+    } else {
+        val initials = obj.title.split(" ")
+            .mapNotNull { it.firstOrNull()?.uppercase() }
+            .take(2).joinToString("")
+        Box(
+            modifier = Modifier.size(size)
+                .clip(CircleShape)
+                .background(AureliaTheme.colors.avatarTerracotta)
+                .border(ringWidth, ringColor, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size.value / 2.8).sp)
+        }
     }
 }
 

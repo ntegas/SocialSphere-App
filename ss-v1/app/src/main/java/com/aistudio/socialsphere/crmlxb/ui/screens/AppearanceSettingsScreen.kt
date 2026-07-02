@@ -47,13 +47,8 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(AppleTheme.colors.fill).clickable { onNavigateBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back), Modifier.size(20.dp), tint = AppleTheme.colors.label)
-                }
-                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.settings_appearance))
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(stringResource(R.string.common_back)) { onNavigateBack() }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.settings_appearance), fontSize = 28.sp)
             }
 
             // ── ТЕМА — две карточки-превью ──
@@ -141,10 +136,9 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
 
 @Composable
 private fun CapsLabel(text: String) {
-    Text(
-        text.uppercase(),
-        fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-        color = AppleTheme.colors.tertiaryLabel,
+    // Тонкая обёртка канонической caps-подписи (ui/theme/AureliaComponents.kt)
+    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel(
+        text,
         modifier = Modifier.padding(start = 22.dp, bottom = 10.dp)
     )
 }

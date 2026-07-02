@@ -5,6 +5,8 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 import androidx.compose.foundation.border
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -66,6 +68,30 @@ fun ContactDetailScreen(
     val tabs = listOf(stringResource(R.string.cd_tab_overview), stringResource(R.string.cd_tab_work),
         stringResource(R.string.cd_tab_comm), stringResource(R.string.cd_tab_gifts), stringResource(R.string.cd_tab_notes))
 
+    // Инлайн-редактирование вкладки — ОДНА кнопка в шапке (карандаш) вместо
+    // отдельной «Изменить» на каждой вкладке. Обзор/Работа/Связь поддерживают
+    // инлайн-правку; Подарки/Заметки — нет (там уже свои диалоги добавления),
+    // для них кнопка неактивна. «⋯ → Редактировать» — отдельная, полная форма
+    // редактирования контакта (ContactEditScreen), не путать с этим переключателем.
+    var editingOverview by remember { mutableStateOf(false) }
+    var editingComm by remember { mutableStateOf(false) }
+    var editingWork by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedTab) { editingOverview = false; editingComm = false; editingWork = false }
+    val currentTabEditable = selectedTab in 0..2
+    val currentTabEditing = when (selectedTab) {
+        0 -> editingOverview
+        1 -> editingWork
+        2 -> editingComm
+        else -> false
+    }
+    fun toggleCurrentTabEditing() {
+        when (selectedTab) {
+            0 -> editingOverview = !editingOverview
+            1 -> editingWork = !editingWork
+            2 -> editingComm = !editingComm
+        }
+    }
+
     var showAddDialog by remember { mutableStateOf(false) }
     var showVoiceDialog by remember { mutableStateOf(false) }
     var editingNote  by remember { mutableStateOf<Note?>(null) }
@@ -114,12 +140,12 @@ fun ContactDetailScreen(
     if (showActionsSheet) {
         val ctx = LocalContext.current
         val scope = rememberCoroutineScope()
-        ModalBottomSheet(onDismissRequest = { showActionsSheet = false }) {
-            Column(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showActionsSheet = false }) {
+            Column(Modifier.fillMaxWidth()) {
                 Text(
                     stringResource(R.string.cd_actions),
                     fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)
+                    modifier = Modifier.padding(start = 6.dp, end = 6.dp, bottom = 8.dp)
                 )
                 ActionSheetRow(Icons.Default.Edit, stringResource(R.string.common_edit)) {
                     showActionsSheet = false; onNavigateToEdit()
@@ -151,54 +177,71 @@ fun ContactDetailScreen(
             TopAppBar(
                 title = { },
                 navigationIcon = {
-                    // Круглая кнопка назад (по макету)
-                    Box(
-                        modifier = Modifier.padding(start = 12.dp).size(36.dp).clip(CircleShape)
-                            .background(AppleTheme.colors.fill).clickable { onNavigateBack() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.ChevronLeft, contentDescription = stringResource(R.string.common_back),
-                            modifier = Modifier.size(22.dp), tint = AppleTheme.colors.label)
+                    Box(Modifier.padding(start = 12.dp)) {
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(
+                            contentDescription = stringResource(R.string.common_back),
+                            onClick = onNavigateBack
+                        )
                     }
                 },
                 actions = {
                     // Замок приватности (по макету): малахит-кружок когда вкл.
+                    Box(Modifier.padding(end = 4.dp)) {
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleButton(
+                            icon = if (privacyMode) Icons.Default.Lock else Icons.Default.LockOpen,
+                            contentDescription = stringResource(R.string.cd_privacy_toggle),
+                            style = if (privacyMode) com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Filled
+                                    else com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Neutral,
+                            size = 36.dp, iconSize = 18.dp,
+                            onClick = { privacyMode = !privacyMode }
+                        )
+                    }
+                    // Круглая кнопка инлайн-правки ТЕКУЩЕЙ вкладки — заменяет старые
+                    // отдельные «Изменить» на Обзоре/Работе/Связи (была одна на каждой
+                    // вкладке + свой отступ — теперь одна общая здесь). Неактивна на
+                    // Подарках/Заметках (там нет режима правки, только диалоги).
+                    // Полная форма редактирования контакта — отдельно, через «⋯».
+                    // Свой Box (не AureliaCircleButton) — нужно 3-е, «неактивное»
+                    // состояние, которого нет в AureliaCircleStyle; цвета/размеры
+                    // те же токены (neutralFill/brand), чтобы не расходиться с ним.
                     Box(
                         modifier = Modifier
-                            .padding(end = 4.dp)
+                            .padding(start = 4.dp)
                             .size(36.dp)
                             .clip(CircleShape)
                             .background(
-                                if (privacyMode) AppleTheme.colors.brand
-                                else AppleTheme.colors.fill
+                                when {
+                                    !currentTabEditable -> AppleTheme.colors.neutralFill
+                                    currentTabEditing    -> AppleTheme.colors.brand
+                                    else                  -> AppleTheme.colors.brand.copy(alpha = 0.10f)
+                                }
                             )
-                            .clickable { privacyMode = !privacyMode },
+                            .then(
+                                if (currentTabEditable) Modifier.clickable { toggleCurrentTabEditing() }
+                                else Modifier
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            if (privacyMode) Icons.Default.Lock else Icons.Default.LockOpen,
-                            contentDescription = stringResource(R.string.cd_privacy_toggle),
+                            if (currentTabEditing) Icons.Default.Check else Icons.Default.Edit,
+                            contentDescription = stringResource(if (currentTabEditing) R.string.common_done else R.string.common_edit),
                             modifier = Modifier.size(18.dp),
-                            tint = if (privacyMode) Color.White else AppleTheme.colors.secondaryLabel
+                            tint = when {
+                                !currentTabEditable -> AppleTheme.colors.tertiaryLabel
+                                currentTabEditing    -> Color.White
+                                else                  -> AppleTheme.colors.brand
+                            }
                         )
                     }
-                    // Круглая кнопка «Изменить» (по макету)
-                    Box(
-                        modifier = Modifier.padding(start = 4.dp).size(36.dp).clip(CircleShape)
-                            .background(AppleTheme.colors.brand.copy(alpha = 0.12f)).clickable { onNavigateToEdit() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit),
-                            modifier = Modifier.size(18.dp), tint = AppleTheme.colors.brand)
-                    }
                     // Круглая кнопка «⋯» — единая шторка действий (по макету)
-                    Box(
-                        modifier = Modifier.padding(start = 4.dp, end = 12.dp).size(36.dp).clip(CircleShape)
-                            .background(AppleTheme.colors.fill).clickable { showActionsSheet = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.MoreHoriz, contentDescription = stringResource(R.string.cd_actions),
-                            modifier = Modifier.size(20.dp), tint = AppleTheme.colors.label)
+                    Box(Modifier.padding(start = 4.dp, end = 12.dp)) {
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleButton(
+                            icon = Icons.Default.MoreHoriz,
+                            contentDescription = stringResource(R.string.cd_actions),
+                            style = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Neutral,
+                            size = 36.dp, iconSize = 20.dp,
+                            onClick = { showActionsSheet = true }
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -219,8 +262,10 @@ fun ContactDetailScreen(
             ContactHeader(contact, onNavigateToCheatSheet, onNavigateToCreateCalendarItem)
 
             val dividerColor = AppleTheme.colors.separator
-            // Табы по макету: текст с подчёркиванием активного (брендовая полоса 2.5dp),
-            // нижняя волосяная линия-разделитель под всем рядом.
+            // Табы по макету (сверено getComputedStyle): 14sp, зазор 15dp — было 15sp/20dp,
+            // на реальном устройстве (плюс системный масштаб шрифта) 5 вкладок не помещались
+            // в ширину и «Заметки» обрезалась до «Заме» (жалоба владельца). horizontalScroll —
+            // подстраховка на ещё более узких экранах/крупном системном шрифте, ничего не обрезает.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -230,8 +275,9 @@ fun ContactDetailScreen(
                         drawLine(dividerColor, androidx.compose.ui.geometry.Offset(0f, y),
                             androidx.compose.ui.geometry.Offset(size.width, y), 1f)
                     }
+                    .horizontalScroll(rememberScrollState())
                     .padding(start = 24.dp, end = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                horizontalArrangement = Arrangement.spacedBy(15.dp)
             ) {
                 tabs.forEachIndexed { index, title ->
                     val sel = selectedTab == index
@@ -241,7 +287,7 @@ fun ContactDetailScreen(
                     ) {
                         Text(
                             text = title,
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             maxLines = 1,
                             softWrap = false,
                             fontWeight = if (sel) FontWeight.Bold else FontWeight.SemiBold,
@@ -256,11 +302,6 @@ fun ContactDetailScreen(
                     }
                 }
             }
-
-            var editingOverview by remember { mutableStateOf(false) }
-            var editingComm by remember { mutableStateOf(false) }
-            var editingWork by remember { mutableStateOf(false) }
-            LaunchedEffect(selectedTab) { editingOverview = false; editingComm = false; editingWork = false }
 
             // Tab Content
             // ВАЖНО: weight(1f), НЕ fillMaxSize() — внутри Column fillMaxSize даёт
@@ -688,7 +729,6 @@ fun ContactDetailScreen(
 }
 
 @OptIn(ExperimentalLayoutApi::class)
-@Composable
 /** Строка в шторке «⋯ Действия»: иконка + подпись, деструктив — красным. */
 @Composable
 private fun ActionSheetRow(
@@ -699,8 +739,9 @@ private fun ActionSheetRow(
 ) {
     val tint = if (destructive) AppleTheme.colors.red else AppleTheme.colors.label
     Row(
+        // Горизонталь 6dp: AureliaSheet уже даёт 18dp по краям (итого 24, как в макете)
         modifier = Modifier.fillMaxWidth().clickable { onClick() }
-            .padding(horizontal = 24.dp, vertical = 14.dp),
+            .padding(horizontal = 6.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -1091,15 +1132,30 @@ fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {
 }
 
 @Composable
-fun SizeChip(label: String, value: String) {
+fun SizeChip(label: String, value: String, highlight: Boolean = false) {
     Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-        modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (highlight) AppleTheme.colors.red.copy(alpha = 0.1f) else AppleTheme.colors.card
+        ),
+        modifier = Modifier.padding(end = 9.dp, bottom = 9.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel)
-            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+        Column(
+            modifier = Modifier.padding(12.dp).widthIn(min = 64.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (highlight) AppleTheme.colors.red else AppleTheme.colors.label
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (highlight) AppleTheme.colors.red else AppleTheme.colors.secondaryLabel
+            )
         }
     }
 }

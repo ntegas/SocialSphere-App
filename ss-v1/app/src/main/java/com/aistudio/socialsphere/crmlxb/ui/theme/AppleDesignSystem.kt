@@ -38,8 +38,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -62,22 +65,27 @@ import androidx.compose.foundation.isSystemInDarkTheme
 
 @Immutable
 data class AppleColors(
-    val groupedBackground: Color, // фон экрана  (light #F2F2F7 / dark #000000)
-    val card: Color,              // фон карточки (light #FFFFFF / dark #1C1C1E)
+    val groupedBackground: Color, // фон экрана  (прототип --bg)
+    val card: Color,              // фон карточки (--card)
     val cardElevated: Color,      // вложенная плитка / сегмент
-    val label: Color,             // основной текст (light #000 / dark #F5F5F7)
-    val secondaryLabel: Color,    // вторичный текст (#86868B / rgba(235,235,245,.6))
-    val tertiaryLabel: Color,     // chevron / placeholder (#C7C7CC / rgba(235,235,245,.3))
-    val separator: Color,         // волосяной разделитель
-    val fill: Color,              // поиск / segmented track (rgba(118,118,128,.x))
-    val barBlur: Color,           // матовый таб-бар / модальная шапка
-    // системные акценты iOS (одинаковы в обеих темах)
-    val brand: Color,             // индиго-бренд #5B53D6
-    val red: Color,               // #FF3B30
-    val orange: Color,            // #FF9500
-    val green: Color,             // #34C759
-    val blue: Color,              // #007AFF
-    val pink: Color,              // #FF2D55
+    val label: Color,             // основной текст (--tx)
+    val secondaryLabel: Color,    // вторичный текст (--tx2)
+    val tertiaryLabel: Color,     // подписи-приглушённые (--tx3)
+    val quaternaryLabel: Color,   // самый тихий: chevron'ы, плейсхолдеры (--tx4)
+    val separator: Color,         // волосяной разделитель (rgba(--line,.07))
+    val fill: Color,              // тёплая заливка-подложка (rgba(--line,.06))
+    val neutralFill: Color,       // нейтрально-серая заливка кнопок/полей (rgba(120,120,128,.10))
+    val sheet: Color,             // фон bottom-sheet (--sheet)
+    val barBlur: Color,           // матовый таб-бар / модальная шапка (--navbg)
+    // акценты Aurelia
+    val brand: Color,             // малахит / выбранный акцент (--ac)
+    val red: Color,               // терракот-тревога
+    val alarmRed: Color,          // тревожный красный (#C0492F): опасная зона, «никогда не общались»
+    val orange: Color,            // золото (статус/просрочка)
+    val goldLabel: Color,         // тёмное золото для подписей (#9A7223 на светлом)
+    val green: Color,             // = brand (легаси-поле)
+    val blue: Color,              // приглушённый зелёный (легаси-поле)
+    val pink: Color,              // = red (легаси-поле)
     val isDark: Boolean,
 )
 
@@ -92,40 +100,54 @@ private val SystemPink   = Color(0xFFFF2D55)
 // Светлая палитра переотображена на дизайн-систему «Aurelia» (тёплая бумага/уголь,
 // малахит/золото). Поля AppleColors сохранены — экраны, читающие AppleTheme.colors.*,
 // автоматически получают новые цвета без переписывания каждого экрана.
+// Значения 1:1 из ЖИВОГО прототипа («Socialsphere Прототип.dc.html», JS themeVars):
+// светлая: --bg:#F1EDE6 --card:#FCFBF8 --sheet:#F4F1EA --tx:#1B1A16 --tx2:#807A6E
+//          --tx3:#A79F90 --tx4:#C4BDB0 --line:35,32,24 --navbg:252,251,248
 val AppleLightColors = AppleColors(
     groupedBackground = Color(0xFFF1EDE6), // бумага
     card              = Color(0xFFFCFBF8), // карточка
     cardElevated      = Color(0xFFFFFFFF),
-    label             = Color(0xFF1B1A16), // уголь
-    secondaryLabel    = Color(0xFF6F685B),
-    tertiaryLabel     = Color(0xFF9A9284),
+    label             = Color(0xFF1B1A16), // уголь (--tx)
+    secondaryLabel    = Color(0xFF807A6E), // --tx2
+    tertiaryLabel     = Color(0xFFA79F90), // --tx3
+    quaternaryLabel   = Color(0xFFC4BDB0), // --tx4 (chevron'ы)
     separator         = Color(0x14232018), // rgba(35,32,24,.08)
     fill              = Color(0x0F232018),
+    neutralFill       = Color(0x1A787880), // rgba(120,120,128,.10)
+    sheet             = Color(0xFFF4F1EA), // --sheet
     barBlur           = Color(0xD1F1EDE6), // матовая бумага
     brand  = Color(0xFF1C6B4C),            // малахит
     red    = Color(0xFFC45D34),            // терракот (тревога)
+    alarmRed = Color(0xFFC0492F),          // тревожный красный (прототип)
     orange = Color(0xFFB68A36),            // золото (статус/просрочка)
+    goldLabel = Color(0xFF9A7223),         // тёмное золото подписей на светлом
     green  = Color(0xFF1C6B4C),            // малахит
     blue   = Color(0xFF2E6B57),            // приглушённый зелёный
     pink   = Color(0xFFC45D34),
     isDark = false,
 )
 
-// Тёмная палитра переотображена на Aurelia-dark (тёплый уголь + осветлённый
-// малахит/золото). Поля AppleColors сохранены — экраны меняются автоматически.
+// Тёмная палитра 1:1 из ЖИВОГО прототипа (JS themeVars, dark):
+// --bg:#100E0A --card:#1B1813 --sheet:#221E18 --tx:#F3EFE8 --tx2:#A39B8C
+// --tx3:#7A7264 --tx4:#544E44 --line:255,255,255
 val AppleDarkColors = AppleColors(
-    groupedBackground = Color(0xFF0E0D0A), // тёплый уголь
-    card              = Color(0xFF1A1813),
+    groupedBackground = Color(0xFF100E0A), // тёплый уголь (--bg)
+    card              = Color(0xFF1B1813), // --card
     cardElevated      = Color(0xFF26221A),
-    label             = Color(0xFFF3EFE8),
-    secondaryLabel    = Color(0xFF8E877A),
-    tertiaryLabel     = Color(0xFF6B655A),
+    label             = Color(0xFFF3EFE8), // --tx
+    secondaryLabel    = Color(0xFFA39B8C), // --tx2
+    tertiaryLabel     = Color(0xFF7A7264), // --tx3
+    quaternaryLabel   = Color(0xFF544E44), // --tx4
     separator         = Color(0x14FFFFFF), // rgba(255,255,255,.08)
     fill              = Color(0x0DFFFFFF), // rgba(255,255,255,.05)
+    neutralFill       = Color(0x14FFFFFF), // нейтральная заливка на тёмном
+    sheet             = Color(0xFF221E18), // --sheet
     barBlur           = Color(0xDB14120E), // rgba(20,18,14,.86)
     brand  = Color(0xFF5FB894),            // осветлённый малахит
     red    = Color(0xFFE0846E),            // терракот (тревога)
+    alarmRed = Color(0xFFE0846E),          // на тёмном — осветлённый (читаемость)
     orange = Color(0xFFD7B468),            // золото
+    goldLabel = Color(0xFFD7B468),         // на тёмном — светлое золото
     green  = Color(0xFF5FB894),
     blue   = Color(0xFF7FBDB2),
     pink   = Color(0xFFE0846E),
@@ -167,9 +189,91 @@ fun AppleAppTheme(
         LocalAppleColors provides colors,
         LocalAureliaColors provides (if (isDefaultAccent) aureliaBase else aureliaBase.copy(brand = Color(accentChoice.rgb))),
     ) {
-        // Типографика «Aurelia»: Playfair (serif) для заголовков/имён/чисел, Manrope для UI
-        MaterialTheme(typography = AureliaTypography, content = content)
+        // Типографика «Aurelia»: Playfair (serif) для заголовков/имён/чисел, Manrope для UI.
+        // colorScheme ОБЯЗАТЕЛЕН: без него голые M3-компоненты (Button/FilterChip/
+        // TabRow-индикатор/TextButton и т.д. без явных colors=...) берут дефолтную
+        // Material You палитру (синий/фиолетовый), а не малахит/акцент из Настроек —
+        // это системный баг, который проявлялся точечно на каждом экране редизайна
+        // (Контакты, Дубликаты, Заметки — везде отдельно чинился один и тот же корень).
+        MaterialTheme(
+            colorScheme = aureliaColorScheme(colors),
+            typography = AureliaTypography,
+            content = content
+        )
     }
+}
+
+/**
+ * Строит M3 ColorScheme из палитры Aurelia/Apple, чтобы ЛЮБОЙ M3-компонент без
+ * явного `colors = ...` (Button, FilterChip, TextButton, TabRow-индикатор,
+ * Switch, RadioButton, Checkbox, Slider…) по умолчанию рендерился в брендовых
+ * тонах, а не в дефолтной Material You палитре.
+ */
+private fun aureliaColorScheme(c: AppleColors): ColorScheme {
+    val onBrand = if (c.isDark) Color(0xFF12100C) else Color.White
+    // Ограниченный набор параметров (как в уже существующем Theme.kt этого
+    // проекта) — вызов lightColorScheme/darkColorScheme СО ВСЕМИ ~33 полями
+    // (surfaceContainer*, scrim и т.д.) ломает компиляцию Kotlin: "Named
+    // arguments are prohibited for function types" — похоже на предел
+    // компилятора по числу именованных аргументов у функции с дефолтами.
+    return if (c.isDark) darkColorScheme(
+        primary = c.brand,
+        onPrimary = onBrand,
+        primaryContainer = c.brand.copy(alpha = 0.14f),
+        onPrimaryContainer = c.brand,
+        inversePrimary = c.brand,
+        secondary = c.brand,
+        onSecondary = onBrand,
+        secondaryContainer = c.brand.copy(alpha = 0.14f),
+        onSecondaryContainer = c.brand,
+        tertiary = c.orange,
+        onTertiary = onBrand,
+        tertiaryContainer = c.orange.copy(alpha = 0.16f),
+        onTertiaryContainer = c.orange,
+        error = c.red,
+        onError = Color.White,
+        errorContainer = c.red.copy(alpha = 0.14f),
+        onErrorContainer = c.red,
+        background = c.groupedBackground,
+        onBackground = c.label,
+        surface = c.card,
+        onSurface = c.label,
+        surfaceVariant = c.fill,
+        onSurfaceVariant = c.secondaryLabel,
+        outline = c.secondaryLabel.copy(alpha = 0.4f),
+        outlineVariant = c.separator,
+        inverseSurface = c.label,
+        inverseOnSurface = c.card,
+    )
+    else lightColorScheme(
+        primary = c.brand,
+        onPrimary = onBrand,
+        primaryContainer = c.brand.copy(alpha = 0.14f),
+        onPrimaryContainer = c.brand,
+        inversePrimary = c.brand,
+        secondary = c.brand,
+        onSecondary = onBrand,
+        secondaryContainer = c.brand.copy(alpha = 0.14f),
+        onSecondaryContainer = c.brand,
+        tertiary = c.orange,
+        onTertiary = onBrand,
+        tertiaryContainer = c.orange.copy(alpha = 0.16f),
+        onTertiaryContainer = c.orange,
+        error = c.red,
+        onError = Color.White,
+        errorContainer = c.red.copy(alpha = 0.14f),
+        onErrorContainer = c.red,
+        background = c.groupedBackground,
+        onBackground = c.label,
+        surface = c.card,
+        onSurface = c.label,
+        surfaceVariant = c.fill,
+        onSurfaceVariant = c.secondaryLabel,
+        outline = c.secondaryLabel.copy(alpha = 0.4f),
+        outlineVariant = c.separator,
+        inverseSurface = c.label,
+        inverseOnSurface = c.card,
+    )
 }
 
 // ============================================================================
@@ -277,13 +381,13 @@ fun InsetRow(
 }
 
 /**
- * Цветная иконка-плитка 30dp (как в Настройках). Передавайте сюда Icon().
+ * Цветная иконка-плитка 32dp/r9 (прототип, строки Настроек). Передавайте Icon().
  *   IconTile(AppleTheme.colors.red) { ... }
  */
 @Composable
 fun IconTile(color: Color, content: @Composable () -> Unit) {
     Box(
-        Modifier.size(30.dp).clip(AppleShapes.iconBox).background(color),
+        Modifier.size(32.dp).clip(AppleShapes.iconBox).background(color),
         contentAlignment = Alignment.Center,
         content = { content() },
     )

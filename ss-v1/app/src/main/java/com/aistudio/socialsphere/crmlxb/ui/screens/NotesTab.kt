@@ -1,5 +1,6 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
@@ -31,11 +32,16 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
+// Солидный тон градиента avatarSage (0xFF9DBE92→0xFF5E8C66) — для бейджа
+// «Рабочая» заметки нужен ровный цвет, не Brush.
+private val NoteWorkGreen = Color(0xFF5E8C66)
+
 // ═══════════════════════════════════════════════════════════════
-// TAB 4 — ЗАМЕТКИ (Timeline по месяцам)
+// TAB 4 — ЗАМЕТКИ (по макету Aurelia)
 // ═══════════════════════════════════════════════════════════════
 fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
     contact: Contact,
@@ -46,35 +52,23 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
 , ctxLabel: android.content.Context,
     privacyMode: Boolean = false,
     onTogglePrivacy: () -> Unit = {}) {
+    // Одна большая кнопка по макету (было две тесных в ряд — из-за этого
+    // текст второй кнопки визуально обрезался). Добавление личной детали
+    // (бывшая вторая кнопка, onShowVoice/showVoiceDialog) перенесено к
+    // разделу «Личные детали» ниже — там, где эти данные и показываются.
     item {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Button(
+            onClick = onShowAdd,
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = AppleTheme.colors.brand,
+                contentColor   = Color.White
+            )
         ) {
-            Button(
-                onClick = onShowAdd,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f),
-                    contentColor   = AppleTheme.colors.brand
-                )
-            ) {
-                Icon(Icons.Default.Add, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.common_add))
-            }
-            Button(
-                onClick = onShowVoice,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AppleTheme.colors.fill,
-                    contentColor   = AppleTheme.colors.label
-                )
-            ) {
-                Icon(Icons.Default.PersonAdd, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.cd_add_detail))
-            }
+            Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.cd_add_note), fontWeight = FontWeight.Bold)
         }
     }
 
@@ -116,7 +110,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                 AppleTheme.colors.brand.copy(alpha = 0.10f), AppleTheme.colors.brand)
         }
 
-        // Группировка по месяцам
+        // Группировка по месяцам (без «Цели и мечты» — те в своём разделе ниже,
+        // как в макете: «Мечты и цели» вынесены из общей ленты).
         val ruMonths = mapOf(
             1 to stringResource(R.string.month_1), 2 to stringResource(R.string.month_2),
             3 to stringResource(R.string.month_3), 4 to stringResource(R.string.month_4),
@@ -125,7 +120,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
             9 to stringResource(R.string.month_9), 10 to stringResource(R.string.month_10),
             11 to stringResource(R.string.month_11), 12 to stringResource(R.string.month_12)
         )
-        val notesByMonth = allNotes.groupBy { note ->
+        val timelineNotes = allNotes.filterNot { it.type == NoteType.PERSONAL_DETAIL }
+        val notesByMonth = timelineNotes.groupBy { note ->
             try {
                 val d = java.time.LocalDate.parse(note.createdAt.take(10))
                 "${ruMonths[d.monthValue]} ${d.year}"
@@ -142,62 +138,24 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                     color      = AppleTheme.colors.secondaryLabel,
                     modifier   = Modifier.padding(top = 16.dp, bottom = 8.dp)
                 )
-                // Заметки месяца с Timeline
-                monthNotes.forEachIndexed { idx, note ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // Заметки месяца (по макету: сплошная карточка, без timeline-
+                // точек/линий — важные отмечены цветной левой полосой, а не
+                // тонировкой всей карточки).
+                monthNotes.forEach { note ->
+                    val badgeColor = when {
+                        note.isImportant                 -> AppleTheme.colors.red
+                        note.type == NoteType.WORK        -> NoteWorkGreen
+                        note.type == NoteType.DATE_EVENT  -> AppleTheme.colors.brand
+                        note.type == NoteType.GIFT        -> AureliaTheme.colors.gold
+                        else                               -> AppleTheme.colors.secondaryLabel
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        shape    = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        colors   = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                        border   = if (note.isImportant) BorderStroke(2.4.dp, AppleTheme.colors.red) else null,
+                        elevation = CardDefaults.cardElevation(0.dp)
                     ) {
-                        // Линия + точка
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.width(20.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when (note.type) {
-                                            NoteType.IMPORTANT_TO_REMEMBER ->
-                                                AppleTheme.colors.red
-                                            NoteType.WORK ->
-                                                AppleTheme.colors.orange
-                                            NoteType.DATE_EVENT ->
-                                                AppleTheme.colors.brand
-                                            else ->
-                                                AppleTheme.colors.tertiaryLabel
-                                        }
-                                    )
-                            )
-                            if (idx < monthNotes.size - 1) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(2.dp)
-                                        .height(if (note.text.length > 80) 80.dp else 56.dp)
-                                        .background(
-                                            AppleTheme.colors.separator.copy(alpha = 0.4f)
-                                        )
-                                )
-                            }
-                        }
-                        // Карточка заметки (Aurelia: сплошная карточка r16, важные/
-                        // рабочие — с лёгким цветным тоном вместо мутной полупрозрачности)
-                        Card(
-                            modifier = Modifier.weight(1f).padding(bottom = 8.dp),
-                            shape    = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                            colors   = CardDefaults.cardColors(
-                                containerColor = when {
-                                    note.isImportant ->
-                                        AppleTheme.colors.red.copy(alpha = 0.10f)
-                                    note.type == NoteType.WORK ->
-                                        AppleTheme.colors.orange.copy(alpha = 0.10f)
-                                    else ->
-                                        AppleTheme.colors.card
-                                }
-                            ),
-                            elevation = CardDefaults.cardElevation(0.dp)
-                        ) {
                             Column(Modifier.padding(10.dp)) {
                                 Row(
                                     Modifier.fillMaxWidth(),
@@ -209,22 +167,25 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                         verticalAlignment     = Alignment.CenterVertically
                                     ) {
                                         Surface(
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                                            color = AppleTheme.colors.brand.copy(alpha = 0.10f)
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                                            color = badgeColor.copy(alpha = if (note.isImportant) 0.14f else 0.18f)
                                         ) {
-                                            Text(
-                                                note.type.label(ctxLabel),
-                                                style    = MaterialTheme.typography.labelSmall,
-                                                color    = AppleTheme.colors.brand,
-                                                modifier = Modifier.padding(
-                                                    horizontal = 6.dp, vertical = 2.dp
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                if (note.isImportant)
+                                                    Icon(Icons.Outlined.Lock, null, Modifier.size(10.dp), tint = badgeColor)
+                                                Text(
+                                                    if (note.isImportant) stringResource(R.string.cd_note_protected)
+                                                    else note.type.label(ctxLabel),
+                                                    style    = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color    = badgeColor
                                                 )
-                                            )
+                                            }
                                         }
-                                        if (note.isImportant)
-                                            Icon(Icons.Outlined.Star, null,
-                                                Modifier.size(12.dp),
-                                                tint = AppleTheme.colors.red)
                                     }
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -307,9 +268,54 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                 }
             }
         }
+
+    // Цели, мечты и важное — NoteType.PERSONAL_DETAIL вынесены из общей ленты
+    // в свою секцию с иконкой (по макету «Мечты и цели»).
+    item {
+        val dreamNotes = AppStateStore.notes.filter {
+            it.contactId == contact.id && it.type == NoteType.PERSONAL_DETAIL
+        }
+        if (dreamNotes.isNotEmpty()) {
+            Text(
+                stringResource(R.string.cd_goals_dreams).uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                color = AppleTheme.colors.tertiaryLabel,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                dreamNotes.forEach { note ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(AppleTheme.colors.card)
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+                                .background(AureliaTheme.colors.gold.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Star, null, Modifier.size(18.dp), tint = AureliaTheme.colors.gold)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(note.text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            if (!note.date.isNullOrBlank())
+                                Text(note.date, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    // Личные детали
+    // Личные детали — кнопка добавления (бывшая вторая кнопка вверху вкладки,
+    // onShowVoice/showVoiceDialog — на деле открывает форму «личная деталь» с
+    // выбором категории, а не голосовой ввод) видна всегда, список — только
+    // если есть данные (как в GiftsTab: «+ Добавить» отдельно над CardBlock).
     item {
         val pd = contact.personalDetails.filter {
             it.category in setOf(
@@ -318,8 +324,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                 PersonalDetailCategory.OTHER
             )
         }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onShowVoice, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(R.string.cd_add_detail))
+        }
         if (pd.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
             CardBlock(title = stringResource(R.string.cd_personal_details)) {
                 pd.groupBy { it.category }.forEach { (cat, items) ->
                     Text(cat.label(ctxLabel), style = MaterialTheme.typography.labelSmall,

@@ -4,6 +4,7 @@ import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -48,13 +49,8 @@ fun CalendarSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(AppleTheme.colors.fill).clickable { onNavigateBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back), Modifier.size(20.dp), tint = AppleTheme.colors.label)
-                }
-                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.settings_calendar))
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(stringResource(R.string.common_back)) { onNavigateBack() }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.settings_calendar), fontSize = 28.sp)
             }
             CardBlock(stringResource(R.string.calset_display)) {
                 Text(stringResource(R.string.calset_default_mode), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
@@ -84,29 +80,18 @@ fun CalendarSettingsScreen(
                 // «Формат времени» вернётся, когда события получат время суток
             }
 
-            CardBlock(stringResource(R.string.calset_colors)) {
-                val colorMap = mapOf(
-                    stringResource(R.string.evt_birthday) to AppleTheme.colors.brand.copy(alpha = 0.10f),
-                    stringResource(R.string.evt_meeting) to AppleTheme.colors.orange.copy(alpha = 0.14f),
-                    stringResource(R.string.evt_call) to AppleTheme.colors.fill,
-                    stringResource(R.string.evt_gift) to AppleTheme.colors.brand.copy(alpha = 0.10f),
-                    stringResource(R.string.evt_task) to AppleTheme.colors.card,
-                    stringResource(R.string.evt_note) to AppleTheme.colors.card,
-                    stringResource(R.string.evt_company) to AppleTheme.colors.fill
-                )
-                colorMap.forEach { (name, color) ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(name, style = MaterialTheme.typography.bodyLarge)
-                        Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(color))
-                    }
-                }
-            }
+            // Блок «Цвета» удалён: легенда показывала ВЫДУМАННЫЕ цвета (заливки
+            // brand@10%/fill/card, не реальные цвета типов) — обманка (§2 KNOWLEDGE).
+            // Настоящие цвета типов видны квадратиками в «Видимости типов» ниже;
+            // в прототипе отдельной легенды нет.
 
-            CardBlock(stringResource(R.string.calset_visibility)) {
+            // «Видимость типов»: caps-заголовок снаружи карточки (прототип)
+            Column {
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel(
+                    stringResource(R.string.calset_visibility),
+                    modifier = Modifier.padding(start = 4.dp, bottom = 9.dp)
+                )
+                CardBlock(null) {
                 Text(
                     stringResource(R.string.calset_visibility_hint),
                     style = MaterialTheme.typography.bodySmall,
@@ -136,7 +121,7 @@ fun CalendarSettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Box(Modifier.size(14.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp)).background(eventTypeColor(type)))
-                            Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.label)
+                            Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label)
                         }
                         Switch(
                             checked = type.name !in hidden,
@@ -147,6 +132,7 @@ fun CalendarSettingsScreen(
                             colors = SwitchDefaults.colors(checkedTrackColor = AppleTheme.colors.brand)
                         )
                     }
+                }
                 }
             }
         }
@@ -159,6 +145,11 @@ private fun SegButton(label: String, selected: Boolean, modifier: Modifier, onCl
     Box(
         modifier = modifier.height(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
             .background(if (selected) AppleTheme.colors.brand else AppleTheme.colors.card)
+            .then(
+                if (!selected) Modifier.border(1.dp, AppleTheme.colors.separator,
+                    androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
+                else Modifier
+            )
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {

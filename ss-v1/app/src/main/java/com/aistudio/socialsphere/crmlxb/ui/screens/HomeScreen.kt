@@ -518,11 +518,13 @@ fun HomeScreen(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.padding(top = 6.dp)) {
                             // Сканер визитки (по макету: акцент-заливка)
-                            HomeCircleButton(Icons.Default.DocumentScanner, "home_scan_button", filled = true) { onNavigateToScan() }
+                            AureliaCircleButton(Icons.Default.DocumentScanner, stringResource(R.string.scan_title),
+                                style = AureliaCircleStyle.Filled, testTag = "home_scan_button") { onNavigateToScan() }
                             // Лупу прячем когда поиск активен — поле ввода уже в
                             // TopAppBar, иначе на экране две лупы.
-                            if (!searchActive) HomeCircleButton(Icons.Default.Search, null) { searchActive = true }
-                            HomeCircleButton(Icons.Default.Settings, "home_settings_button") { onNavigateToSettings() }
+                            if (!searchActive) AureliaCircleButton(Icons.Default.Search, stringResource(R.string.common_search)) { searchActive = true }
+                            AureliaCircleButton(Icons.Default.Settings, stringResource(R.string.common_settings),
+                                testTag = "home_settings_button") { onNavigateToSettings() }
                         }
                     }
                     // Поисковой капсулы нет — в макете Aurelia поиск с Главной идёт
@@ -534,15 +536,14 @@ fun HomeScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // 🎂 Дни рождения в этом месяце
-                        HomeStatCard(
-                            modifier  = Modifier.weight(1f),
-                            icon      = Icons.Outlined.CardGiftcard,
-                            value     = birthdaysThisMonth.toString(),
-                            label     = stringResource(R.string.home_counter_birthdays),
-                            iconColor = AppleTheme.colors.orange, // золото (по макету)
-                            valueColor = AppleTheme.colors.label,
-                            onClick   = {
+                        // 🎂 Дни рождения в этом месяце (плитка — золото, по макету)
+                        AureliaStatCard(
+                            modifier = Modifier.weight(1f),
+                            icon     = Icons.Outlined.CardGiftcard,
+                            tile     = AppleTheme.colors.orange,
+                            value    = birthdaysThisMonth.toString(),
+                            label    = stringResource(R.string.home_counter_birthdays),
+                            onClick  = {
                                 expandBirthdayList = true
                                 coroutineScope.launch {
                                     kotlinx.coroutines.delay(100)
@@ -550,25 +551,25 @@ fun HomeScreen(
                                 }
                             }
                         )
-                        // 📞 Встречи/звонки на неделе
-                        HomeStatCard(
-                            modifier  = Modifier.weight(1f),
-                            icon      = Icons.Outlined.EventAvailable,
-                            value     = meetingsThisWeek.toString(),
-                            label     = stringResource(R.string.home_counter_meetings),
-                            iconColor = AppleTheme.colors.green,
-                            valueColor = AppleTheme.colors.label,
-                            onClick   = { onNavigateToCalendar() }
+                        // 📞 Встречи/звонки на неделе (плитка — акцент var(--ac), по макету:
+                        // следует за выбранным акцентом, не фиксированный малахит)
+                        AureliaStatCard(
+                            modifier = Modifier.weight(1f),
+                            icon     = Icons.Outlined.EventAvailable,
+                            tile     = AppleTheme.colors.brand,
+                            value    = meetingsThisWeek.toString(),
+                            label    = stringResource(R.string.home_counter_meetings),
+                            onClick  = { onNavigateToCalendar() }
                         )
-                        // ⚠️ Просроченных контактов
-                        HomeStatCard(
-                            modifier  = Modifier.weight(1f),
-                            icon      = Icons.Outlined.WarningAmber,
-                            value     = overdueCount.toString(),
-                            label     = stringResource(R.string.home_counter_overdue),
-                            iconColor = AppleTheme.colors.red,   // терракот-тревога (по макету)
+                        // ⚠️ Просроченных контактов (терракот и число, и плитка)
+                        AureliaStatCard(
+                            modifier   = Modifier.weight(1f),
+                            icon       = Icons.Outlined.WarningAmber,
+                            tile       = AppleTheme.colors.red,
+                            value      = overdueCount.toString(),
+                            label      = stringResource(R.string.home_counter_overdue),
                             valueColor = AppleTheme.colors.red,
-                            onClick   = {
+                            onClick    = {
                                 if (overdueCount > 0) {
                                     // ТЗ: прокрутка к блоку «Нужно связаться»
                                     coroutineScope.launch {
@@ -583,18 +584,16 @@ fun HomeScreen(
 
                     // Нужно связаться (по макету: заголовок + Все + сгруппированная карточка)
                     if (needAttention.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
+                        AureliaSectionHeader(
+                            title      = stringResource(R.string.home_need_attention),
+                            actionText = stringResource(R.string.common_see_all),
+                            onAction   = onNavigateToContacts,
+                            modifier   = Modifier
                                 .padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 8.dp)
                                 .onGloballyPositioned { coords ->
                                     needAttentionSectionY = coords.positionInParent().y.roundToInt()
-                                },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(stringResource(R.string.home_need_attention), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
-                            Text(stringResource(R.string.common_see_all), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.brand, modifier = Modifier.clickable { onNavigateToContacts() })
-                        }
+                                }
+                        )
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
@@ -614,12 +613,11 @@ fun HomeScreen(
 
                     // Upcoming events — clickable
                     if (upcomingEvents.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.home_upcoming),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AppleTheme.colors.label,
-                            modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 12.dp)
+                        AureliaSectionHeader(
+                            title      = stringResource(R.string.home_upcoming),
+                            actionText = stringResource(R.string.view_all),
+                            onAction   = onNavigateToCalendar,
+                            modifier   = Modifier.padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 12.dp)
                         )
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -635,9 +633,8 @@ fun HomeScreen(
 
                     // Smart lists (по макету: заголовок + сгруппированная карточка)
                     if (smartLists.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.home_smart_lists),
-                            fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label,
+                        AureliaSectionHeader(
+                            title    = stringResource(R.string.home_smart_lists),
                             modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 26.dp, bottom = 10.dp)
                         )
                         Card(
@@ -661,9 +658,8 @@ fun HomeScreen(
 
                     // Recently added (по макету: заголовок + карточки 128px)
                     if (recentlyAdded.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.home_recently_added),
-                            fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label,
+                        AureliaSectionHeader(
+                            title    = stringResource(R.string.home_recently_added),
                             modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 10.dp)
                         )
                         LazyRow(
@@ -743,18 +739,8 @@ private fun HomeSearchResults(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Box(
-                            Modifier.size(40.dp).clip(CircleShape)
-                                .background(AppleTheme.colors.brand),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                (c.firstName.firstOrNull()?.toString() ?: "") +
-                                (c.lastName.firstOrNull()?.toString() ?: ""),
-                                fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                                color = Color.White
-                            )
-                        }
+                        AureliaAvatar(c.id, "${c.firstName} ${c.lastName}".trim(),
+                            size = 40.dp, fontSize = 13.sp)
                         Column(Modifier.weight(1f)) {
                             Text("${c.firstName} ${c.lastName}".trim(),
                                 fontWeight = FontWeight.SemiBold,
@@ -832,86 +818,9 @@ private fun HomeSearchResults(
 }
 
 // ─── Dashboard components ─────────────────────────────────────
-@Composable
-private fun HomeSectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = AppleTheme.colors.brand,
-        modifier = modifier)
-}
-
-@Composable
-private fun HomeCircleButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    testTag: String?,
-    filled: Boolean = false,
-    onClick: () -> Unit
-) {
-    val base = if (testTag != null) Modifier.testTag(testTag) else Modifier
-    Box(
-        modifier = base.size(38.dp).clip(androidx.compose.foundation.shape.CircleShape)
-            .background(
-                if (filled) AppleTheme.colors.brand
-                else AppleTheme.colors.brand.copy(alpha = 0.10f)
-            ).clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, contentDescription = null,
-            tint = if (filled) Color.White else AppleTheme.colors.brand,
-            modifier = Modifier.size(18.dp))
-    }
-}
-
-@Composable
-private fun HomeStatCard(
-    modifier: Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    value: String,
-    label: String,
-    iconColor: Color,
-    valueColor: Color,
-    onClick: () -> Unit = {}
-) {
-    Card(
-        onClick   = onClick,
-        modifier  = modifier.height(98.dp),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-        colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(13.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Box(
-                Modifier.size(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
-                    .background(iconColor.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, null, Modifier.size(16.dp), tint = iconColor)
-            }
-            Column {
-                Text(
-                    value,
-                    style      = MaterialTheme.typography.headlineSmall,
-                    fontSize   = 27.sp,
-                    lineHeight = 27.sp,
-                    color      = valueColor
-                )
-                Text(
-                    label,
-                    fontSize   = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color      = AppleTheme.colors.secondaryLabel,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis,
-                    modifier   = Modifier.padding(top = 2.dp)
-                )
-            }
-        }
-    }
-}
+// Круглые кнопки шапки, стат-карты и заголовки секций — общие компоненты
+// дизайн-системы (AureliaCircleButton / AureliaStatCard / AureliaSectionHeader,
+// ui/theme/AureliaComponents.kt). Локальных копий не заводить.
 
 @Composable
 private fun HomeEventCard(event: HomeEvent, onClick: () -> Unit) {
@@ -969,30 +878,14 @@ private fun HomeContactRow(
         else                                                 -> AppleTheme.colors.secondaryLabel
     }
 
-    // Срочность по палитре Aurelia: >60 терракот, >14 золото, иначе сейдж.
-    val avaGrad = androidx.compose.ui.graphics.Brush.linearGradient(
-        when {
-            contact.daysSince != null && contact.daysSince > 60 -> listOf(androidx.compose.ui.graphics.Color(0xFFE59A6B), androidx.compose.ui.graphics.Color(0xFFC45D34))
-            contact.daysSince != null && contact.daysSince > 14 -> listOf(androidx.compose.ui.graphics.Color(0xFFD8B26A), androidx.compose.ui.graphics.Color(0xFFB68A36))
-            else -> listOf(androidx.compose.ui.graphics.Color(0xFF9DBE92), androidx.compose.ui.graphics.Color(0xFF5E8C66))
-        }
-    )
+    // Срочность по палитре Aurelia (общая палитра, без локальных копий).
+    val avaGrad = AureliaAvatars.urgencyBrush(contact.daysSince)
     Row(
         Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
-        Box(
-            Modifier.size(46.dp).clip(CircleShape).background(avaGrad),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                contact.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString(""),
-                fontWeight = FontWeight.SemiBold,
-                fontSize   = 18.sp,
-                color      = Color.White
-            )
-        }
+        AureliaAvatar(contact.id, contact.name, size = 46.dp, fontSize = 17.sp, brush = avaGrad)
         Column(Modifier.weight(1f)) {
             Text(
                 contact.name,
@@ -1023,21 +916,14 @@ private fun HomeContactRow(
                 )
             }
         }
-        Box(Modifier.size(7.dp).clip(CircleShape).background(importanceColor))
+        // Точка с пульсом (au-pulse из макета); цвет несёт важность контакта —
+        // функция сохранена, анимация по прототипу.
+        AureliaPulseDot(color = importanceColor)
     }
 }
 
 @Composable
 private fun HomeRecentCard(contact: HomeContact, onClick: () -> Unit) {
-    // Палитра аватаров Aurelia (терракот/сейдж/слива/тил/золото).
-    val grads = listOf(
-        listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
-        listOf(Color(0xFF9DBE92), Color(0xFF5E8C66)),
-        listOf(Color(0xFFB58CB6), Color(0xFF7E5180)),
-        listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A)),
-        listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
-    )
-    val g = grads[kotlin.math.abs(contact.id.hashCode()) % grads.size]
     Card(
         onClick   = onClick,
         // Фиксированная высота: строка должности опциональна, без неё карточка
@@ -1049,12 +935,7 @@ private fun HomeRecentCard(contact: HomeContact, onClick: () -> Unit) {
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(54.dp).clip(CircleShape)
-                .background(androidx.compose.ui.graphics.Brush.linearGradient(g)),
-                contentAlignment = Alignment.Center) {
-                Text(contact.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString(""),
-                    fontWeight = FontWeight.SemiBold, fontSize = 20.sp, color = Color.White)
-            }
+            AureliaAvatar(contact.id, contact.name, size = 54.dp, fontSize = 20.sp)
             Text(contact.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
             val role = contact.position.ifEmpty { contact.company }

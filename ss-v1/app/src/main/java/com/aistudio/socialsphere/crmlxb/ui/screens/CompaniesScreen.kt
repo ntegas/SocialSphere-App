@@ -3,6 +3,7 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -213,12 +214,13 @@ fun CompaniesScreen(
                     horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
                 ) {
                     com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(stringResource(R.string.comp_title))
-                    Box(Modifier.size(38.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.brand).clickable { onNavigateToCreateCompany() }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Add, stringResource(R.string.comp_add), tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleButton(
+                        Icons.Default.Add, stringResource(R.string.comp_add),
+                        style = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Filled
+                    ) { onNavigateToCreateCompany() }
                 }
                 Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
-                    Row(Modifier.fillMaxWidth().height(40.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(13.dp)).background(Color(0x17787880)).clickable { searchActive = true }.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth().height(40.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(13.dp)).background(AppleTheme.colors.neutralFill).clickable { searchActive = true }.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Search, null, tint = AppleTheme.colors.tertiaryLabel, modifier = Modifier.size(17.dp))
                         Text(stringResource(R.string.comp_search_hint), fontSize = 16.sp, color = AppleTheme.colors.tertiaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
@@ -236,7 +238,7 @@ fun CompaniesScreen(
                     CompaniesSortChip(stringResource(R.string.comp_sort_most), sortOrder == CompanySortOrder.MOST_CONTACTS) { sortOrder = CompanySortOrder.MOST_CONTACTS }
                     CompaniesSortChip(stringResource(R.string.home_recently_added), sortOrder == CompanySortOrder.RECENTLY_ADDED) { sortOrder = CompanySortOrder.RECENTLY_ADDED }
                 }
-                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { showFilterSheet = true }, contentAlignment = Alignment.Center) {
+                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.neutralFill).clickable { showFilterSheet = true }, contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Tune, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
                     if (hasActiveFilters) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.red))
                 }
@@ -293,6 +295,13 @@ fun CompaniesScreen(
                     }
                 }
             } else {
+                // Счётчик «N компаний» над списком (прототип: 13px 700 tx2)
+                Text(
+                    stringResource(R.string.comp_count, filteredCompanies.size),
+                    fontSize = 13.sp, fontWeight = FontWeight.W700,
+                    color = AppleTheme.colors.secondaryLabel,
+                    modifier = Modifier.padding(start = 24.dp, bottom = 7.dp)
+                )
                 LazyColumn(
                     contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 0.dp, bottom = 24.dp),
                     modifier       = Modifier.fillMaxSize()
@@ -302,7 +311,7 @@ fun CompaniesScreen(
                     item {
                         Card(
                             modifier  = Modifier.fillMaxWidth(),
-                            shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                            shape     = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                             colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                             elevation = CardDefaults.cardElevation(1.dp)
                         ) {
@@ -311,7 +320,7 @@ fun CompaniesScreen(
                                     CompanyRow(company = company, onClick = { onNavigateToCompany(company.id) })
                                     if (idx < filteredCompanies.lastIndex)
                                         HorizontalDivider(
-                                            modifier  = Modifier.padding(start = 78.dp),
+                                            modifier  = Modifier.padding(start = 74.dp),
                                             color     = AppleTheme.colors.separator,
                                             thickness = 0.5.dp
                                         )
@@ -342,66 +351,71 @@ fun CompanyRow(company: Company, onClick: () -> Unit) {
     }
     val mainCity = addresses.firstOrNull { it.addressType == AddressType.OFFICE || it.addressType == AddressType.LEGAL }?.city
         ?: addresses.firstOrNull()?.city ?: ""
-    // Палитра логотипов Aurelia (малахит/терракот/слива/тил/золото).
-    val grads = listOf(
-        listOf(Color(0xFF2E8B6B), Color(0xFF155539)),
-        listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
-        listOf(Color(0xFFB58CB6), Color(0xFF7E5180)),
-        listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A)),
-        listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
-    )
-    val g = grads[kotlin.math.abs(company.id.hashCode()) % grads.size]
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 15.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
+        // Лого 46/r14 — общая палитра компаний (AureliaAvatars.companyBrushFor)
         Box(
-            modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).background(androidx.compose.ui.graphics.Brush.linearGradient(g)),
+            modifier = Modifier.size(46.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.companyBrushFor(company.id)),
             contentAlignment = Alignment.Center
         ) {
-            Text(company.name.take(1).uppercase(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Color.White)
+            Text(company.name.take(1).uppercase(), fontWeight = FontWeight.W700, fontSize = 17.sp, color = Color.White)
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(company.name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(company.name, fontSize = 16.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val sub = listOf(company.industry.label(ctxLabel), mainCity).filter { it.isNotEmpty() }.joinToString(" · ")
             if (sub.isNotEmpty())
                 Text(sub, fontSize = 13.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
         if (peopleCount > 0) {
             Box(
-                Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
-                    .background(AppleTheme.colors.brand.copy(alpha = 0.12f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
+                    .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                    .padding(horizontal = 9.dp, vertical = 4.dp)
             ) {
                 Text(
                     stringResource(R.string.comp_people_n, peopleCount),
-                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand
+                    fontSize = 12.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.brand
                 )
             }
         }
     }
 }
 
+// Чип сортировки (прототип: активный — акцент-заливка с белым 700, неактивный —
+// нейтральная заливка + tx2 600)
 @Composable
 private fun CompaniesSortChip(label: String, active: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp)).background(Color(0x1F767680)).clickable { onClick() }.padding(horizontal = 12.dp),
+        Modifier.height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp))
+            .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.neutralFill)
+            .clickable { onClick() }.padding(horizontal = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, color = if (active) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel)
+        Text(label, fontSize = 13.sp,
+            fontWeight = if (active) FontWeight.W700 else FontWeight.SemiBold,
+            color = if (active) Color.White else AppleTheme.colors.secondaryLabel)
     }
 }
 
+// Сегмент-чип (прототип: неактивный — card + inset-кольцо rgba(line,.06))
 @Composable
 private fun CompaniesSegChip(label: String, active: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.height(32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
             .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
+            .then(
+                if (!active) Modifier.border(1.dp, AppleTheme.colors.separator,
+                    androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                else Modifier
+            )
             .clickable { onClick() }.padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, fontSize = 14.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+        Text(label, fontSize = 14.sp, fontWeight = if (active) FontWeight.W700 else FontWeight.SemiBold,
             color = if (active) Color.White else AppleTheme.colors.label)
     }
 }

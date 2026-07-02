@@ -4,6 +4,7 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
@@ -55,10 +57,9 @@ fun ContactsScreen(
     var searchActive  by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
-    // ── View / sort ───────────────────────────────────────────
+    // ── View / sort (контролы теперь внутри листа «Фильтры», по макету) ──
     var isGridView    by remember { mutableStateOf(false) }
     var sortOrder     by remember { mutableStateOf(ContactSortOrder.NAME_AZ) }
-    var showSortSheet by remember { mutableStateOf(false) }
 
     // ── Active filters ────────────────────────────────────────
     var filterRelTypes    by remember { mutableStateOf(emptySet<RelationshipType>()) }
@@ -108,35 +109,7 @@ fun ContactsScreen(
         }
     }
 
-    // ── Sort bottom sheet ─────────────────────────────────────
-    if (showSortSheet) {
-        ModalBottomSheet(onDismissRequest = { showSortSheet = false }, shape = SocialShape.Sheet) {
-            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.contacts_sort_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                ContactSortOrder.values().forEach { order ->
-                    val label = when (order) {
-                        ContactSortOrder.NAME_AZ        -> stringResource(R.string.contacts_sort_name_az)
-                        ContactSortOrder.NAME_ZA        -> stringResource(R.string.contacts_sort_name_za)
-                        ContactSortOrder.RECENTLY_ADDED -> stringResource(R.string.home_recently_added)
-                        ContactSortOrder.IMPORTANCE     -> stringResource(R.string.contacts_sort_importance)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { sortOrder = order; showSortSheet = false }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
-                        if (sortOrder == order) Icon(Icons.Default.Check, null, tint = AppleTheme.colors.brand)
-                    }
-                    if (order != ContactSortOrder.values().last()) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
-                }
-                Spacer(Modifier.height(32.dp))
-            }
-        }
-    }
-
-    // ── Filter bottom sheet ───────────────────────────────────
+    // ── Filter bottom sheet (включает сортировку и вид — по макету, одна точка входа) ──
     if (showFilterSheet) {
         ContactFilterSheet(
             filterRelTypes     = filterRelTypes,
@@ -147,6 +120,9 @@ fun ContactsScreen(
             cityFilter         = cityFilter,
             tagFilter          = filterTag,
             allTags            = allTags,
+            searchQuery        = searchQuery,
+            sortOrder          = sortOrder,
+            isGridView         = isGridView,
             onRelTypesChange   = { filterRelTypes   = it },
             onImportanceChange = { filterImportance = it },
             onConnLevelChange  = { filterConnLevel  = it },
@@ -154,6 +130,8 @@ fun ContactsScreen(
             onStatusChange     = { filterStatus     = it },
             onCityChange       = { cityFilter       = it },
             onTagChange        = { filterTag        = it },
+            onSortOrderChange  = { sortOrder        = it },
+            onGridViewChange   = { isGridView       = it },
             onClear            = {
                 filterRelTypes = emptySet(); filterImportance = emptySet()
                 filterConnLevel = emptySet(); filterRhythm = emptySet()
@@ -214,12 +192,6 @@ fun ContactsScreen(
                             Icon(Icons.Default.FilterList, stringResource(R.string.contacts_filters))
                         }
                     }
-                    IconButton(onClick = { showSortSheet = true }) {
-                        Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.contacts_sort_title))
-                    }
-                    IconButton(onClick = { isGridView = !isGridView }) {
-                        Icon(if (isGridView) Icons.AutoMirrored.Filled.FormatListBulleted else Icons.Default.GridView, stringResource(R.string.contacts_view_toggle))
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
@@ -254,30 +226,6 @@ fun ContactsScreen(
                     }
                 }
             }
-            // Controls: сортировка + вид + фильтр
-            Row(
-                Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    ContactsSortChip(stringResource(R.string.contacts_sort_chip_az), sortOrder == ContactSortOrder.NAME_AZ) { sortOrder = ContactSortOrder.NAME_AZ }
-                    ContactsSortChip(stringResource(R.string.contacts_sort_chip_new), sortOrder == ContactSortOrder.RECENTLY_ADDED) { sortOrder = ContactSortOrder.RECENTLY_ADDED }
-                    ContactsSortChip(stringResource(R.string.contacts_sort_chip_importance), sortOrder == ContactSortOrder.IMPORTANCE) { sortOrder = ContactSortOrder.IMPORTANCE }
-                }
-                Row(Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp)).background(Color(0x1F767680)).padding(2.dp)) {
-                    Box(Modifier.size(width = 30.dp, height = 26.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(7.dp)).background(if (!isGridView) AppleTheme.colors.card else Color.Transparent).clickable { isGridView = false }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.AutoMirrored.Filled.FormatListBulleted, null, Modifier.size(16.dp), tint = if (!isGridView) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel)
-                    }
-                    Box(Modifier.size(width = 30.dp, height = 26.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(7.dp)).background(if (isGridView) AppleTheme.colors.card else Color.Transparent).clickable { isGridView = true }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.GridView, null, Modifier.size(16.dp), tint = if (isGridView) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel)
-                    }
-                }
-                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x1F767680)).clickable { showFilterSheet = true }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Tune, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
-                    if (hasActiveFilters) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.red))
-                }
-            }
-
             // ── Active filter chips strip ─────────────────────
             val activeChips = buildList {
                 filterRelTypes.forEach  { add(it.label(ctxLabel) to { filterRelTypes   = filterRelTypes   - it }) }
@@ -300,29 +248,47 @@ fun ContactsScreen(
                             onClick   = remove,
                             label     = { Text(label, fontSize = 12.sp) },
                             trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(14.dp)) },
-                            shape     = SocialShape.Full
+                            shape     = SocialShape.Full,
+                            colors    = InputChipDefaults.inputChipColors(
+                                selectedContainerColor = AppleTheme.colors.brand.copy(alpha = 0.12f),
+                                selectedLabelColor     = AppleTheme.colors.brand,
+                                selectedTrailingIconColor = AppleTheme.colors.brand
+                            )
                         )
                     }
                 }
             }
 
-            // Сегментные чипы по макету: Все · N / Ключевые / Клиенты / Семья
+            // Сегментные чипы + фильтр — одна строка по макету: Все · N / Ключевые / Клиенты / Семья + ⚙
             Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 14.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                val noQuick = filterImportance.isEmpty() && !filterRelTypes.contains(RelationshipType.CLIENT) && !filterRelTypes.contains(RelationshipType.FAMILY)
-                ContactsSegChip(stringResource(R.string.contacts_seg_all) + " · " + AppStateStore.contacts.size, noQuick) {
-                    filterImportance = emptySet(); filterRelTypes = emptySet()
+                Row(
+                    modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val noQuick = filterImportance.isEmpty() && !filterRelTypes.contains(RelationshipType.CLIENT) && !filterRelTypes.contains(RelationshipType.FAMILY)
+                    ContactsSegChip(stringResource(R.string.contacts_seg_all) + " · " + AppStateStore.contacts.size, noQuick) {
+                        filterImportance = emptySet(); filterRelTypes = emptySet()
+                    }
+                    ContactsSegChip(stringResource(R.string.contacts_seg_key), filterImportance.contains(ImportanceLevel.KEY)) {
+                        filterImportance = if (filterImportance.contains(ImportanceLevel.KEY)) emptySet() else setOf(ImportanceLevel.KEY)
+                    }
+                    ContactsSegChip(stringResource(R.string.contacts_seg_clients), filterRelTypes.contains(RelationshipType.CLIENT)) {
+                        filterRelTypes = if (filterRelTypes.contains(RelationshipType.CLIENT)) emptySet() else setOf(RelationshipType.CLIENT)
+                    }
+                    ContactsSegChip(stringResource(R.string.contacts_seg_family), filterRelTypes.contains(RelationshipType.FAMILY)) {
+                        filterRelTypes = if (filterRelTypes.contains(RelationshipType.FAMILY)) emptySet() else setOf(RelationshipType.FAMILY)
+                    }
                 }
-                ContactsSegChip(stringResource(R.string.contacts_seg_key), filterImportance.contains(ImportanceLevel.KEY)) {
-                    filterImportance = if (filterImportance.contains(ImportanceLevel.KEY)) emptySet() else setOf(ImportanceLevel.KEY)
-                }
-                ContactsSegChip(stringResource(R.string.contacts_seg_clients), filterRelTypes.contains(RelationshipType.CLIENT)) {
-                    filterRelTypes = if (filterRelTypes.contains(RelationshipType.CLIENT)) emptySet() else setOf(RelationshipType.CLIENT)
-                }
-                ContactsSegChip(stringResource(R.string.contacts_seg_family), filterRelTypes.contains(RelationshipType.FAMILY)) {
-                    filterRelTypes = if (filterRelTypes.contains(RelationshipType.FAMILY)) emptySet() else setOf(RelationshipType.FAMILY)
+                Box(
+                    Modifier.size(34.dp).clip(CircleShape).background(Color(0x1F767680)).clickable { showFilterSheet = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Tune, stringResource(R.string.contacts_filters), Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                    if (hasActiveFilters) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(7.dp).clip(CircleShape).background(AppleTheme.colors.red))
                 }
             }
 
@@ -445,6 +411,9 @@ private fun ContactFilterSheet(
     cityFilter: String,
     tagFilter: String = "",
     allTags: List<String> = emptyList(),
+    searchQuery: String = "",
+    sortOrder: ContactSortOrder,
+    isGridView: Boolean,
     onRelTypesChange: (Set<RelationshipType>) -> Unit,
     onImportanceChange: (Set<ImportanceLevel>) -> Unit,
     onConnLevelChange: (Set<ConnectionLevel>) -> Unit,
@@ -452,6 +421,8 @@ private fun ContactFilterSheet(
     onStatusChange: (Set<ContactStatus>) -> Unit = {},
     onCityChange: (String) -> Unit,
     onTagChange: (String) -> Unit = {},
+    onSortOrderChange: (ContactSortOrder) -> Unit,
+    onGridViewChange: (Boolean) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -466,6 +437,17 @@ private fun ContactFilterSheet(
     var lStatus     by remember { mutableStateOf(filterStatus) }
     var lCity       by remember { mutableStateOf(cityFilter) }
     var lTag        by remember { mutableStateOf(tagFilter) }
+    // Живой счётчик результатов на кнопке «Применить» (по макету) — сортировка
+    // и вид списка не влияют на количество, применяются сразу, без буфера.
+    val previewCount by remember {
+        derivedStateOf {
+            AppStateStore.contacts.applyContactFilters(
+                query = searchQuery, relationshipTypes = lRelTypes, importanceLevels = lImportance,
+                connectionLevels = lConnLevel, communicationRhythms = lRhythm, contactStatuses = lStatus,
+                cityFilter = lCity, tagFilter = lTag, sortOrder = sortOrder
+            ).size
+        }
+    }
     fun pushAndClose() {
         onStatusChange(lStatus); onRelTypesChange(lRelTypes); onImportanceChange(lImportance)
         onConnLevelChange(lConnLevel); onRhythmChange(lRhythm); onCityChange(lCity); onTagChange(lTag)
@@ -480,11 +462,35 @@ private fun ContactFilterSheet(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text(stringResource(R.string.contacts_filters), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(R.string.contacts_filters),
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label
+                )
                 TextButton(onClick = {
                     lRelTypes = emptySet(); lImportance = emptySet(); lConnLevel = emptySet()
                     lRhythm = emptySet(); lStatus = emptySet(); lCity = ""; lTag = ""
-                }) { Text(stringResource(R.string.contacts_reset_all)) }
+                }) { Text(stringResource(R.string.contacts_reset_all), color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold) }
+            }
+
+            // Сортировка (была отдельным рядом чипов над списком — перенесена
+            // сюда, в один узел контролов вместе с фильтрами, по макету)
+            FilterSection(stringResource(R.string.contacts_sort_title)) {
+                ContactSortOrder.values().forEach { order ->
+                    val label = when (order) {
+                        ContactSortOrder.NAME_AZ        -> stringResource(R.string.contacts_sort_name_az)
+                        ContactSortOrder.NAME_ZA        -> stringResource(R.string.contacts_sort_name_za)
+                        ContactSortOrder.RECENTLY_ADDED -> stringResource(R.string.home_recently_added)
+                        ContactSortOrder.IMPORTANCE     -> stringResource(R.string.contacts_sort_importance)
+                    }
+                    MultiSelectChip(label, sortOrder == order) { onSortOrderChange(order) }
+                }
+            }
+
+            // Вид списка
+            FilterSection(stringResource(R.string.contacts_view_toggle)) {
+                MultiSelectChip(stringResource(R.string.view_mode_list), !isGridView) { onGridViewChange(false) }
+                MultiSelectChip(stringResource(R.string.view_mode_grid), isGridView) { onGridViewChange(true) }
             }
 
             // Status
@@ -506,10 +512,15 @@ private fun ContactFilterSheet(
                 }
             }
 
-            // Importance
+            // Importance — «Ключевой»/«Важный» выделены золотом (по макету), как
+            // и везде в приложении, где orange == gold в палитре Aurelia.
             FilterSection(stringResource(R.string.filter_importance)) {
                 ImportanceLevel.values().forEach { level ->
-                    MultiSelectChip(level.label(ctxLabel), level in lImportance) {
+                    MultiSelectChip(
+                        label = level.label(ctxLabel),
+                        selected = level in lImportance,
+                        gold = level != ImportanceLevel.NORMAL
+                    ) {
                         lImportance = if (level in lImportance) lImportance - level else lImportance + level
                     }
                 }
@@ -571,26 +582,34 @@ private fun ContactFilterSheet(
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         allTags.take(8).forEach { tag ->
-                            FilterChip(
-                                selected = tag.equals(lTag, ignoreCase = true),
-                                onClick  = { lTag = if (tag.equals(lTag, ignoreCase = true)) "" else tag },
-                                label    = { Text(tag, fontSize = 12.sp) },
-                                shape    = SocialShape.Full
-                            )
+                            MultiSelectChip(tag, tag.equals(lTag, ignoreCase = true)) {
+                                lTag = if (tag.equals(lTag, ignoreCase = true)) "" else tag
+                            }
                         }
                     }
                 }
             }
 
-            Button(onClick = { pushAndClose() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.common_apply)) }
+            Button(
+                onClick = { pushAndClose() },
+                colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) { Text("${stringResource(R.string.common_apply)} · $previewCount", fontWeight = FontWeight.Bold) }
         }
     }
 }
 
+// Приглушённое золото подписей — теперь темозависимый токен
+// AppleTheme.colors.goldLabel (тёмное золото на светлом, светлое на тёмном).
+
 @Composable
 private fun FilterSection(title: String, content: @Composable FlowRowScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
+        Text(
+            title.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold,
+            letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel
+        )
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             content()
@@ -598,9 +617,26 @@ private fun FilterSection(title: String, content: @Composable FlowRowScope.() ->
     }
 }
 
+// Свой Row вместо M3 FilterChip: у FilterChip нет заданной цветовой схемы
+// (MaterialTheme без colorScheme, см. §12 KNOWLEDGE.md), поэтому selected-
+// состояние рендерилось дефолтным Material You, а не малахитом.
 @Composable
-private fun MultiSelectChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(selected = selected, onClick = onClick, label = { Text(label, fontSize = 13.sp) }, shape = SocialShape.Full)
+private fun MultiSelectChip(label: String, selected: Boolean, gold: Boolean = false, onClick: () -> Unit) {
+    val bg = when { selected && gold -> AureliaTheme.colors.gold.copy(alpha = 0.18f); selected -> AppleTheme.colors.brand; else -> AppleTheme.colors.card }
+    val border = when { selected && gold -> AppleTheme.colors.goldLabel; selected -> AppleTheme.colors.brand; else -> AppleTheme.colors.separator }
+    val fg = when { selected && gold -> AppleTheme.colors.goldLabel; selected -> Color.White; else -> AppleTheme.colors.secondaryLabel }
+    Row(
+        modifier = Modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold, color = fg)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -613,16 +649,6 @@ private fun getContactVisuals(contact: Contact): Triple<String, String, String> 
     val position = compRel?.position ?: ""
     val city     = AppStateStore.addresses.find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }?.city ?: ""
     return Triple(company, position, city)
-}
-
-@Composable
-private fun ContactsSortChip(label: String, active: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp)).background(Color(0x1F767680)).clickable { onClick() }.padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, color = if (active) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel)
-    }
 }
 
 @Composable

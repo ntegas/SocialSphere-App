@@ -27,6 +27,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif
+import com.aistudio.socialsphere.crmlxb.ui.theme.aureliaPress
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.effectiveDate
@@ -107,7 +110,8 @@ fun CalendarScreen(
             }
             // Сегмент-контрол видов (спека Aurelia: трек fill r11 pad3, активный card r8 вес700)
             Row(
-                modifier = Modifier.fillMaxWidth().height(36.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(AppleTheme.colors.fill).padding(3.dp)
+                // Трек — нейтрально-серый rgba(120,120,128,.10), как в прототипе
+                modifier = Modifier.fillMaxWidth().height(36.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(AppleTheme.colors.neutralFill).padding(3.dp)
             ) {
                 val orderedModes = listOf(CalendarViewMode.LIST, CalendarViewMode.WEEK, CalendarViewMode.MONTH)
                 orderedModes.forEach { mode ->
@@ -153,27 +157,41 @@ fun CalendarScreen(
             // чтобы смена языка пересчитала группировку.
             // Группировка нужна только «Ленте» (LIST): «Неделя» — сетка-полоса,
             // «Месяц» — сетка месяца, обе рендерят visibleEvents напрямую.
+            // По прототипу: «Сегодня · 27 июня» / «Завтра · 28 июня» / далее —
+            // каждая дата своей группой («2 июля»), а не скопом «Позже».
             val strToday      = stringResource(R.string.cal_today)
             val strTomorrow   = stringResource(R.string.cal_tomorrow)
-            val strLater      = stringResource(R.string.cal_later)
+            val dayFmt        = remember { java.time.format.DateTimeFormatter.ofPattern("d MMMM", java.util.Locale.getDefault()) }
+            val todayHeader   = "$strToday · ${java.time.LocalDate.now().format(dayFmt)}"
 
             // Пересчёт только при изменении фильтра, режима, данных или языка —
             // не на каждой рекомпозиции (derivedStateOf отслеживает snapshot-состояния)
-            val groupedEvents by remember(strToday, strTomorrow, strLater) {
+            val groupedEvents by remember(strToday, strTomorrow) {
                 derivedStateOf {
                     val filteredEvents = visibleEvents
 
-                    val todayDate    = java.time.LocalDate.now().toString()
-                    val tomorrowDate = java.time.LocalDate.now().plusDays(1).toString()
+                    val todayLd      = java.time.LocalDate.now()
+                    val todayDate    = todayLd.toString()
+                    val tomorrowDate = todayLd.plusDays(1).toString()
 
                     val grouped = mutableMapOf<String, List<CalendarItem>>()
                     if (selectedMode == CalendarViewMode.LIST) {
                         val today    = filteredEvents.filter { it.effectiveDate() == todayDate }
                         val tomorrow = filteredEvents.filter { it.effectiveDate() == tomorrowDate }
-                        val later    = filteredEvents.filter { it.effectiveDate() > tomorrowDate }.sortedBy { it.effectiveDate() }
-                        if (today.isNotEmpty())    grouped[strToday] = today
-                        if (tomorrow.isNotEmpty()) grouped[strTomorrow] = tomorrow
-                        if (later.isNotEmpty())    grouped[strLater] = later
+                        if (today.isNotEmpty())    grouped[todayHeader] = today
+                        if (tomorrow.isNotEmpty())
+                            grouped["$strTomorrow · ${todayLd.plusDays(1).format(dayFmt)}"] = tomorrow
+                        // Далее — по датам, каждая дата своей группой
+                        filteredEvents
+                            .filter { it.effectiveDate() > tomorrowDate }
+                            .sortedBy { it.effectiveDate() }
+                            .groupBy { it.effectiveDate() }
+                            .forEach { (date, evs) ->
+                                val label = try {
+                                    java.time.LocalDate.parse(date).format(dayFmt)
+                                } catch (e: Exception) { date }
+                                grouped[label] = evs
+                            }
                     }
                     grouped
                 }
@@ -200,9 +218,14 @@ fun CalendarScreen(
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize().weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
                     groupedEvents.forEach { (header, evItems) ->
+                        val isTodayGroup = header == todayHeader
                         item(key = "h_$header") {
-                            Text(header.uppercase(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel,
-                                modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 8.dp))
+                            // Caps-заголовок группы: «Сегодня» — акцентом (прототип)
+                            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel(
+                                header,
+                                color = if (isTodayGroup) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel,
+                                modifier = Modifier.padding(start = 34.dp, end = 6.dp, top = 10.dp, bottom = 10.dp)
+                            )
                         }
                         item(key = "c_$header") {
                             // Таймлайн-лента по макету: вертикальная линия + цветная
@@ -212,6 +235,7 @@ fun CalendarScreen(
                                     CalendarTimelineRow(
                                         event   = event,
                                         isLast  = i == evItems.lastIndex,
+                                        isToday = isTodayGroup,
                                         onClick = { onNavigateToCalendarItem(event.id) }
                                     )
                                 }
@@ -268,32 +292,31 @@ fun MonthGridView(
     )
 
     Column(modifier = modifier) {
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-            elevation = CardDefaults.cardElevation(1.dp)
-        ) {
-          Column(Modifier.padding(horizontal = 14.dp, vertical = 16.dp)) {
-        // ── Шапка: ← Месяц Год → ──
+      // Сетка месяца — прямо на фоне экрана, без карточки-обёртки (прототип)
+      Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp)) {
+        // ── Шапка: «Июнь 2026» Playfair слева + стрелки справа (прототип) ──
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { month = month.minusMonths(1) }) {
-                Icon(Icons.Default.ChevronLeft, stringResource(R.string.cal_prev_month), tint = AppleTheme.colors.brand)
-            }
             Text(
                 "${monthNames[month.monthValue - 1]} ${month.year}",
+                fontFamily = AureliaSerif,
                 fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.W700,
                 color = AppleTheme.colors.label
             )
-            IconButton(onClick = { month = month.plusMonths(1) }) {
-                Icon(Icons.Default.ChevronRight, stringResource(R.string.cal_next_month), tint = AppleTheme.colors.brand)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.ChevronLeft, stringResource(R.string.cal_prev_month),
+                    Modifier.size(22.dp).aureliaPress { month = month.minusMonths(1) },
+                    tint = AppleTheme.colors.secondaryLabel)
+                Icon(Icons.Default.ChevronRight, stringResource(R.string.cal_next_month),
+                    Modifier.size(22.dp).aureliaPress { month = month.plusMonths(1) },
+                    tint = AppleTheme.colors.secondaryLabel)
             }
         }
+        Spacer(Modifier.height(10.dp))
 
         // ── Дни недели ──
         val dow = if (firstDayMonday)
@@ -306,8 +329,9 @@ fun MonthGridView(
                     d,
                     modifier = Modifier.weight(1f),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppleTheme.colors.secondaryLabel
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.W700,
+                    color = AppleTheme.colors.tertiaryLabel
                 )
             }
         }
@@ -324,7 +348,7 @@ fun MonthGridView(
                 for (c in 0 until 7) {
                     val dayNum = r * 7 + c - offset + 1
                     Box(
-                        modifier = Modifier.weight(1f).height(46.dp),
+                        modifier = Modifier.weight(1f).height(40.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         if (dayNum in 1..daysInMonth) {
@@ -370,19 +394,17 @@ fun MonthGridView(
                 }
             }
         }
-          }
-        }
+      }
 
         Spacer(Modifier.height(16.dp))
 
         // ── События выбранного дня ──
         val selEvents = eventsByDay[selectedDay.toString()].orEmpty()
-        Text(
-            "${selectedDay.dayOfMonth} ${monthNames[selectedDay.monthValue - 1].lowercase()}" +
+        val mDayHeaderFmt = remember { java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM", java.util.Locale.getDefault()) }
+        AureliaCapsLabel(
+            selectedDay.format(mDayHeaderFmt) +
                 if (selEvents.isEmpty()) " " + stringResource(R.string.cal_no_events_day) else "",
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
-            color = AppleTheme.colors.label,
+            color = AppleTheme.colors.secondaryLabel,
             modifier = Modifier.padding(horizontal = 4.dp)
         )
         Spacer(Modifier.height(10.dp))
@@ -463,99 +485,128 @@ fun WeekStripView(
         "${first.dayOfMonth} ${monthNames[first.monthValue - 1]} – ${last.dayOfMonth} ${monthNames[last.monthValue - 1]}"
 
     Column(modifier = modifier) {
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-            elevation = CardDefaults.cardElevation(1.dp)
+        // ── Шапка: диапазон Playfair 16 + стрелки (без карточки-обёртки, прототип) ──
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.padding(horizontal = 10.dp, vertical = 14.dp)) {
-                // ── Шапка: ← диапазон → ──
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Text(rangeLabel, fontFamily = AureliaSerif, fontWeight = FontWeight.W700,
+                fontSize = 16.sp, color = AppleTheme.colors.label)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.ChevronLeft, stringResource(R.string.cal_prev_month),
+                    Modifier.size(22.dp).aureliaPress { weekStart = weekStart.minusWeeks(1); selectedDay = weekStart },
+                    tint = AppleTheme.colors.secondaryLabel)
+                Icon(Icons.Default.ChevronRight, stringResource(R.string.cal_next_month),
+                    Modifier.size(22.dp).aureliaPress { weekStart = weekStart.plusWeeks(1); selectedDay = weekStart },
+                    tint = AppleTheme.colors.secondaryLabel)
+            }
+        }
+        // ── Полоса дней: плитки h44/r12, выбранный — акцент-заливка (прототип) ──
+        val ringAlpha = if (AppleTheme.colors.isDark) 0.10f else 0.05f
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            days.forEachIndexed { i, date ->
+                val isToday = date == today
+                val isSel   = date == selectedDay
+                val firstEv = eventsOn(date).firstOrNull()
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    IconButton(onClick = { weekStart = weekStart.minusWeeks(1); selectedDay = weekStart }) {
-                        Icon(Icons.Default.ChevronLeft, stringResource(R.string.cal_prev_month), tint = AppleTheme.colors.brand)
-                    }
-                    Text(rangeLabel, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
-                    IconButton(onClick = { weekStart = weekStart.plusWeeks(1); selectedDay = weekStart }) {
-                        Icon(Icons.Default.ChevronRight, stringResource(R.string.cal_next_month), tint = AppleTheme.colors.brand)
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                // ── Полоса дней ──
-                Row(Modifier.fillMaxWidth()) {
-                    days.forEachIndexed { i, date ->
-                        val isToday = date == today
-                        val isSel   = date == selectedDay
-                        val dayEvts = eventsOn(date)
-                        Column(
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { selectedDay = date }.padding(vertical = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(dowLetters[i], style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel)
-                            Box(
-                                modifier = Modifier.size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(when {
-                                        isSel   -> AppleTheme.colors.brand
-                                        isToday -> AppleTheme.colors.brand.copy(alpha = 0.15f)
-                                        else    -> Color.Transparent
-                                    }),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "${date.dayOfMonth}",
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isSel || isToday) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSel) Color.White else AppleTheme.colors.label
-                                )
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.height(5.dp)) {
-                                dayEvts.take(3).forEach { ev ->
-                                    Box(Modifier.size(5.dp).clip(CircleShape).background(eventTypeColor(ev.type)))
+                    Text(dowLetters[i], fontSize = 10.sp,
+                        fontWeight = if (isSel) FontWeight.W700 else FontWeight.W600,
+                        color = if (isSel) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel)
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSel) AppleTheme.colors.brand else AppleTheme.colors.card)
+                            .then(if (!isSel) Modifier.border(1.dp, AppleTheme.colors.label.copy(alpha = ringAlpha), RoundedCornerShape(12.dp)) else Modifier)
+                            .aureliaPress { selectedDay = date },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                "${date.dayOfMonth}",
+                                fontSize = 14.sp, fontWeight = FontWeight.W700,
+                                color = when {
+                                    isSel   -> Color.White
+                                    isToday -> AppleTheme.colors.brand
+                                    else    -> AppleTheme.colors.label
                                 }
-                            }
+                            )
+                            if (firstEv != null)
+                                Box(Modifier.size(4.dp).clip(CircleShape)
+                                    .background(if (isSel) AppleTheme.colors.card else eventTypeColor(firstEv.type)))
                         }
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        // ── События выбранного дня ──
+        // ── События выбранного дня: caps-дата + время в гаттере + карточка с бортом ──
         val selEvents = eventsOn(selectedDay).sortedBy { it.startTime ?: "" }
-        Text(
-            "${selectedDay.dayOfMonth} ${monthNames[selectedDay.monthValue - 1].lowercase()}" +
-                if (selEvents.isEmpty()) " " + stringResource(R.string.cal_no_events_day) else "",
-            fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label,
-            modifier = Modifier.padding(horizontal = 4.dp)
+        val dayHeaderFmt = remember { java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM", java.util.Locale.getDefault()) }
+        AureliaCapsLabel(
+            selectedDay.format(dayHeaderFmt),
+            color = AppleTheme.colors.secondaryLabel,
+            modifier = Modifier.padding(start = 2.dp, top = 18.dp, bottom = 10.dp)
         )
-        Spacer(Modifier.height(10.dp))
         if (selEvents.isNotEmpty()) {
-            LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-                        elevation = CardDefaults.cardElevation(1.dp)
-                    ) {
-                        Column {
-                            selEvents.forEachIndexed { i, event ->
-                                CalendarEventItem(event = event, onClick = { onEventClick(event.id) })
-                                if (i < selEvents.lastIndex) com.aistudio.socialsphere.crmlxb.ui.theme.AppleDivider(70.dp)
-                            }
-                        }
-                    }
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(selEvents, key = { it.id }) { event ->
+                    WeekEventRow(event) { onEventClick(event.id) }
                 }
             }
         } else {
+            Text(stringResource(R.string.cal_no_events_found),
+                fontSize = 14.sp, color = AppleTheme.colors.secondaryLabel,
+                modifier = Modifier.padding(start = 2.dp))
             Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+/**
+ * Строка события «Недели» (прототип): время в левом гаттере 40px (12 W600, tx3) +
+ * карточка r12 с цветным левым бортом 3px по типу события.
+ */
+@Composable
+private fun WeekEventRow(event: CalendarItem, onClick: () -> Unit) {
+    val ctxLabel = LocalContext.current
+    val typeColor = eventTypeColor(event.type)
+    val time = event.startTime.orEmpty()
+    val names = event.links.mapNotNull { link ->
+        when (link.targetType) {
+            CalendarTargetType.CONTACT -> AppStateStore.getContact(link.targetId)?.let { "${it.firstName} ${it.lastName}".trim() }
+            CalendarTargetType.COMPANY -> AppStateStore.getCompany(link.targetId)?.name
+            else -> null
+        }
+    }.joinToString(", ")
+    val timeRange = if (time.isNotEmpty())
+        time + (if (!event.endTime.isNullOrEmpty()) " – ${event.endTime}" else "") else ""
+    val sub = listOf(timeRange, names).filter { it.isNotEmpty() }.joinToString(" · ")
+
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).aureliaPress(onClick = onClick),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(time, fontSize = 12.sp, fontWeight = FontWeight.W600,
+            color = AppleTheme.colors.tertiaryLabel,
+            modifier = Modifier.width(40.dp).padding(top = 12.dp))
+        Row(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(AppleTheme.colors.card)) {
+            Box(Modifier.width(3.dp).fillMaxHeight().background(typeColor))
+            Column(Modifier.padding(horizontal = 13.dp, vertical = 11.dp)) {
+                Text(com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel),
+                    fontSize = 14.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (sub.isNotEmpty())
+                    Text(sub, fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp))
+            }
         }
     }
 }
@@ -601,14 +652,7 @@ fun CalendarEventItem(
     }
 }
 
-// Палитра аватаров Aurelia для участника события на таймлайне.
-private val calAvatarGrads = listOf(
-    listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
-    listOf(Color(0xFF9DBE92), Color(0xFF5E8C66)),
-    listOf(Color(0xFFB58CB6), Color(0xFF7E5180)),
-    listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A)),
-    listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
-)
+// Палитра аватаров — общая AureliaAvatars (ui/theme/AureliaComponents.kt).
 
 // Цвет точки фильтр-чипа = цвет типа события (как в макете). «Все» — без точки.
 private fun calFilterDot(f: CalendarEventFilter): Color? = when (f) {
@@ -626,7 +670,7 @@ private fun calFilterDot(f: CalendarEventFilter): Color? = when (f) {
  * заголовок, аватар+имя участника). Линии соседних строк визуально соединяются.
  */
 @Composable
-fun CalendarTimelineRow(event: CalendarItem, isLast: Boolean, onClick: () -> Unit) {
+fun CalendarTimelineRow(event: CalendarItem, isLast: Boolean, isToday: Boolean = false, onClick: () -> Unit) {
     val ctxLabel = LocalContext.current
     val typeColor = eventTypeColor(event.type)
     val firstContact = event.links.firstOrNull { it.targetType == CalendarTargetType.CONTACT }
@@ -644,13 +688,25 @@ fun CalendarTimelineRow(event: CalendarItem, isLast: Boolean, onClick: () -> Uni
 
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         // Гуттер 36px (точно по макету): вертикальная линия + точка типа 14px
-        // с кольцом 4px цвета фона (точка «сидит» на линии).
+        // с кольцом 4px цвета фона. Линия по прототипу — градиент акцент→золото:
+        // сегодняшняя группа тонируется акцентом, дальше — приглушённое золото.
+        val lineColor = if (isToday) AppleTheme.colors.brand.copy(alpha = 0.55f)
+                        else AppleTheme.colors.orange.copy(alpha = 0.30f)
         Box(Modifier.width(36.dp).fillMaxHeight()) {
             Box(Modifier.align(Alignment.TopCenter).width(2.dp).fillMaxHeight()
-                .background(AppleTheme.colors.separator))
-            Box(Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(14.dp)
-                .clip(CircleShape).background(typeColor)
-                .border(4.dp, AppleTheme.colors.groupedBackground, CircleShape))
+                .background(lineColor))
+            if (isToday) {
+                // Сегодня: пульс (au-pulse 2.6s) + второе кольцо-ореол
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPulseDot(
+                    color = typeColor, size = 14.dp,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp)
+                        .border(1.dp, typeColor.copy(alpha = 0.18f), CircleShape)
+                )
+            } else {
+                Box(Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(14.dp)
+                    .clip(CircleShape).background(typeColor)
+                    .border(4.dp, AppleTheme.colors.groupedBackground, CircleShape))
+            }
         }
         Card(
             onClick   = onClick,
@@ -675,9 +731,8 @@ fun CalendarTimelineRow(event: CalendarItem, isLast: Boolean, onClick: () -> Uni
                     Spacer(Modifier.height(9.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         if (firstContact != null) {
-                            val g = calAvatarGrads[kotlin.math.abs(firstContact.id.hashCode()) % calAvatarGrads.size]
                             Box(Modifier.size(24.dp).clip(CircleShape)
-                                .background(androidx.compose.ui.graphics.Brush.linearGradient(g)),
+                                .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(firstContact.id)),
                                 contentAlignment = Alignment.Center) {
                                 Text((firstContact.firstName.firstOrNull()?.toString() ?: "") +
                                      (firstContact.lastName.firstOrNull()?.toString() ?: ""),

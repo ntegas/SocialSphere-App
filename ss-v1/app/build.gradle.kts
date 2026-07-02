@@ -92,12 +92,14 @@ secrets {
 dependencies {
   coreLibraryDesugaring(libs.android.tools.desugar)
   implementation(platform(libs.androidx.compose.bom))
-  // implementation(libs.accompanist.permissions)
+  implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
-  // implementation(libs.androidx.camera.camera2)
-  // implementation(libs.androidx.camera.core)
-  // implementation(libs.androidx.camera.lifecycle)
-  // implementation(libs.androidx.camera.view)
+  // Камера-сканер визитки (CameraX) + OCR (Tesseract4Android)
+  implementation(libs.androidx.camera.camera2)
+  implementation(libs.androidx.camera.core)
+  implementation(libs.androidx.camera.lifecycle)
+  implementation(libs.androidx.camera.view)
+  implementation(libs.tesseract4android)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
@@ -139,3 +141,30 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+// ── Языковые данные Tesseract для сканера визиток ────────────────────────────
+// Тянем fast-модели (eng/rus/ell, Apache-2.0) в assets/tessdata, чтобы они
+// вшивались в APK. Файлы крупные (~10–15 МБ) — держим вне git (.gitignore),
+// задача докачивает их при сборке, если отсутствуют. Идемпотентно.
+val tessLangs = listOf("eng", "rus", "ell")
+val downloadTessData = tasks.register("downloadTessData") {
+  val outDir = layout.projectDirectory.dir("src/main/assets/tessdata").asFile
+  outputs.dir(outDir)
+  doLast {
+    outDir.mkdirs()
+    tessLangs.forEach { lang ->
+      val out = File(outDir, "$lang.traineddata")
+      if (!out.exists() || out.length() == 0L) {
+        val url = "https://github.com/tesseract-ocr/tessdata_fast/raw/main/$lang.traineddata"
+        logger.lifecycle("Tesseract: скачиваю $lang.traineddata …")
+        uri(url).toURL().openStream().use { input ->
+          out.outputStream().use { output -> input.copyTo(output) }
+        }
+      }
+    }
+  }
+}
+// Данные должны существовать до слияния assets (и до preBuild как страховка).
+tasks.named("preBuild") { dependsOn(downloadTessData) }
+tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
+  .configureEach { dependsOn(downloadTessData) }

@@ -32,8 +32,8 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
-import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -41,41 +41,30 @@ import com.aistudio.socialsphere.crmlxb.utils.*
 // TAB 2 — СВЯЗЬ (каналы коммуникации)
 // ═══════════════════════════════════════════════════════════════
 fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Contact, ctxLabel: android.content.Context, editing: Boolean = false, onEditingChange: (Boolean) -> Unit = {}) {
-    item {
-        TabEditBar(isEditing = editing, onEdit = { onEditingChange(true) }, onDone = { onEditingChange(false) })
-    }
-    // Phones
+    // Кнопка «Изменить»/«Готово» этой вкладки убрана — режим правки теперь
+    // включается ОДНОЙ кнопкой в шапке карточки контакта, общей на все вкладки.
+    // Каналы связи — телефон/email/мессенджеры объединены в одну карточку
+    // (как в макете), а не 3 отдельные. Логика/диалоги/состояния каждого типа
+    // не менялись — изменилась только визуальная группировка.
     item {
         val ctx = androidx.compose.ui.platform.LocalContext.current
         val phones = contact.phones.distinctBy { it.number.filter(Char::isDigit).takeLast(10) }
-        if (phones.isNotEmpty() || editing) {
-            CardBlock(title = stringResource(R.string.cd_phones)) {
+        if (phones.isNotEmpty() || contact.emails.isNotEmpty() || contact.messengers.isNotEmpty() || editing) {
+            CardBlock(title = stringResource(R.string.cd_comm_channels)) {
                 var editPhone by remember { mutableStateOf<ContactPhone?>(null) }
                 var showPhoneDialog by remember { mutableStateOf(false) }
                 var pendingRemovePhone by remember { mutableStateOf<ContactPhone?>(null) }
 
                 phones.forEach { phone ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .then(if (editing) Modifier.clickable { editPhone = phone; showPhoneDialog = true } else Modifier)
-                            .padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    ChannelRow(
+                        icon = Icons.Outlined.Phone, iconTint = AppleTheme.colors.brand, iconBg = AppleTheme.colors.brand.copy(alpha = 0.10f),
+                        value = phone.number, subtitle = phone.type.label(ctxLabel), isPrimary = phone.isPrimary,
+                        editing = editing,
+                        onClick = { editPhone = phone; showPhoneDialog = true },
+                        onRemove = { pendingRemovePhone = phone }
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(phone.number, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(phone.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
-                        }
-                        if (editing) {
-                            IconButton(onClick = { pendingRemovePhone = phone }) {
-                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
-                            }
-                        } else {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ActionSquare(Icons.Outlined.Phone, stringResource(R.string.cd_call)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(ctx, phone.number) }
-                                ActionSquare(Icons.Default.Sms, stringResource(R.string.cd_write)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(ctx, phone.number) }
-                            }
-                        }
+                        ActionSquare(Icons.Outlined.Phone, stringResource(R.string.cd_call)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(ctx, phone.number) }
+                        ActionSquare(Icons.Default.Sms, stringResource(R.string.cd_write)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(ctx, phone.number) }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
@@ -129,38 +118,20 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                         dismissButton = { TextButton(onClick = { pendingRemovePhone = null }) { Text(stringResource(R.string.common_cancel)) } }
                     )
                 }
-            }
-        }
-    }
 
-    // Emails
-    item {
-        val ctx = androidx.compose.ui.platform.LocalContext.current
-        if (contact.emails.isNotEmpty() || editing) {
-            CardBlock(title = stringResource(R.string.cd_email_action)) {
                 var editEmail by remember { mutableStateOf<ContactEmail?>(null) }
                 var showEmailDialog by remember { mutableStateOf(false) }
                 var pendingRemoveEmail by remember { mutableStateOf<ContactEmail?>(null) }
 
                 contact.emails.forEach { email ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .then(if (editing) Modifier.clickable { editEmail = email; showEmailDialog = true } else Modifier)
-                            .padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    ChannelRow(
+                        icon = Icons.Outlined.Email, iconTint = AureliaTheme.colors.gold, iconBg = AureliaTheme.colors.gold.copy(alpha = 0.14f),
+                        value = email.email, subtitle = email.type.label(ctxLabel), isPrimary = email.isPrimary,
+                        editing = editing,
+                        onClick = { editEmail = email; showEmailDialog = true },
+                        onRemove = { pendingRemoveEmail = email }
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(email.email, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(email.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
-                        }
-                        if (editing) {
-                            IconButton(onClick = { pendingRemoveEmail = email }) {
-                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
-                            }
-                        } else {
-                            ActionSquare(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(ctx, email.email) }
-                        }
+                        ActionSquare(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(ctx, email.email) }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
@@ -214,41 +185,22 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                         dismissButton = { TextButton(onClick = { pendingRemoveEmail = null }) { Text(stringResource(R.string.common_cancel)) } }
                     )
                 }
-            }
-        }
-    }
 
-    // Messengers
-    item {
-        val ctx = androidx.compose.ui.platform.LocalContext.current
-        if (contact.messengers.isNotEmpty() || editing) {
-            CardBlock(title = stringResource(R.string.cd_messengers)) {
                 var editMsg by remember { mutableStateOf<Messenger?>(null) }
                 var showMsgDialog by remember { mutableStateOf(false) }
                 var pendingRemoveMsg by remember { mutableStateOf<Messenger?>(null) }
 
                 contact.messengers.forEach { m ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .then(if (editing) Modifier.clickable { editMsg = m; showMsgDialog = true } else Modifier)
-                            .padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    ChannelRow(
+                        icon = Icons.AutoMirrored.Filled.Send, iconTint = AppleTheme.colors.red, iconBg = AppleTheme.colors.red.copy(alpha = 0.10f),
+                        value = m.value,
+                        subtitle = m.type.label(ctxLabel) + (m.comment?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
+                        isPrimary = m.isPrimary,
+                        editing = editing,
+                        onClick = { editMsg = m; showMsgDialog = true },
+                        onRemove = { pendingRemoveMsg = m }
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(m.value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(m.type.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
-                            val c = m.comment
-                            if (!c.isNullOrBlank())
-                                Text(c, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.separator)
-                        }
-                        if (editing) {
-                            IconButton(onClick = { pendingRemoveMsg = m }) {
-                                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
-                            }
-                        } else {
-                            ActionSquare(Icons.AutoMirrored.Filled.Chat, stringResource(R.string.cd_write)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(ctx, m) }
-                        }
+                        ActionSquare(Icons.AutoMirrored.Filled.Chat, stringResource(R.string.cd_write)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(ctx, m) }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
@@ -557,6 +509,65 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                 confirmButton = {},
                 dismissButton = { TextButton(onClick = { showLink = false; search = "" }) { Text(stringResource(R.string.common_cancel)) } }
             )
+        }
+    }
+}
+
+/**
+ * Строка канала связи с иконкой-плиткой (как в макете «Каналы связи»).
+ * Просмотр: значение + подпись слева, действия (позвонить/написать) справа,
+ * бейдж «Основной» если это главный контакт. Изменить: тап открывает диалог
+ * правки, справа — кнопка удаления. Поведение идентично прежнему, изменена
+ * только визуальная обёртка (иконка-плитка вместо голого текста).
+ */
+@Composable
+private fun ChannelRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    iconBg: Color,
+    value: String,
+    subtitle: String,
+    isPrimary: Boolean,
+    editing: Boolean,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    actions: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .then(if (editing) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(iconBg),
+            contentAlignment = Alignment.Center
+        ) { Icon(icon, null, Modifier.size(18.dp), tint = iconTint) }
+        Column(Modifier.weight(1f)) {
+            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+        }
+        if (editing) {
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
+            }
+        } else {
+            if (isPrimary) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(percent = 50))
+                        .background(AureliaTheme.colors.gold.copy(alpha = 0.16f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.cd_primary_badge),
+                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                        color = AureliaTheme.colors.gold
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), content = actions)
         }
     }
 }

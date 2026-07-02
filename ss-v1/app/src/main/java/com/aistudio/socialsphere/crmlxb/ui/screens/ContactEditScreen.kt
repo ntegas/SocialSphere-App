@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.launch
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,6 +39,7 @@ import java.util.UUID
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -452,135 +455,171 @@ fun ContactEditScreen(
                     onClick = ::buildAndSave,
                     enabled = firstName.isNotBlank(),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
-                    shape = RoundedCornerShape(11.dp),
+                    shape = RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
                     modifier = Modifier.height(34.dp)
                 ) { Text(stringResource(R.string.common_done), fontWeight = FontWeight.Bold) }
             }
 
-            // ── Name & photo ──────────────────────────────────────────
-            SectionCard(stringResource(R.string.ce_basic)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Box(contentAlignment = Alignment.BottomEnd) {
-                        Box(
-                            modifier = Modifier.size(64.dp).clip(CircleShape).background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val initial = (firstName.firstOrNull() ?: lastName.firstOrNull() ?: '?').uppercaseChar()
-                            Text(initial.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand)
+            // ── Фото по центру (как в макете) ─────────────────────────
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(
+                        modifier = Modifier.size(76.dp).clip(CircleShape).background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val initial = (firstName.firstOrNull() ?: lastName.firstOrNull())?.uppercaseChar()
+                        if (initial != null) {
+                            Text(initial.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand)
+                        } else {
+                            Icon(Icons.Default.Person, null, Modifier.size(36.dp), tint = AppleTheme.colors.brand.copy(alpha = 0.6f))
                         }
-                        Box(
-                            modifier = Modifier.size(22.dp).clip(CircleShape).background(AppleTheme.colors.brand),
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.CameraAlt, null, Modifier.size(12.dp), tint = Color.White) }
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(value = firstName, onValueChange = { firstName = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_name_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
-                        OutlinedTextField(value = lastName,  onValueChange = { lastName  = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_surname)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
-                        OutlinedTextField(value = nickname,  onValueChange = { nickname  = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_nickname)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
+                    Box(
+                        modifier = Modifier.size(24.dp).clip(CircleShape).background(AppleTheme.colors.brand),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Default.Add, null, Modifier.size(14.dp), tint = Color.White) }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.ce_add_photo),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = AppleTheme.colors.brand
+                )
+            }
+
+            // ── Имя/фамилия (парная карточка) + прозвище ──────────────
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth()) {
+                        BareFieldColumn(
+                            label = stringResource(R.string.ce_name_req), value = firstName,
+                            onValueChange = { firstName = it }, keyboardOptions = CapWords,
+                            modifier = Modifier.weight(1f).padding(12.dp)
+                        )
+                        Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(AppleTheme.colors.separator))
+                        BareFieldColumn(
+                            label = stringResource(R.string.ce_surname), value = lastName,
+                            onValueChange = { lastName = it }, keyboardOptions = CapWords,
+                            modifier = Modifier.weight(1f).padding(12.dp)
+                        )
                     }
+                }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    BareFieldColumn(
+                        label = stringResource(R.string.ce_nickname), value = nickname,
+                        onValueChange = { nickname = it }, keyboardOptions = CapWords,
+                        placeholder = stringResource(R.string.ce_nickname_hint),
+                        modifier = Modifier.fillMaxWidth().padding(12.dp)
+                    )
                 }
             }
 
-            // ── Phones ────────────────────────────────────────────────
-            SectionCard(stringResource(R.string.ce_phones)) {
+            // ── Тип отношений (пилюли, как в макете) ──────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AureliaCaption(stringResource(R.string.ce_relation_type))
+                PillChoiceRow(
+                    options = RelationshipType.values().map { it.label(ctxLabel) },
+                    selected = relationshipType.label(ctxLabel),
+                    onSelect = { v -> relationshipType = RelationshipType.values().firstOrNull { it.label(ctxLabel) == v } ?: relationshipType }
+                )
+            }
+
+            // ── Важность (пилюли, ключевой — золотом) ─────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AureliaCaption(stringResource(R.string.ce_importance))
+                PillChoiceRow(
+                    options = ImportanceLevel.values().map { it.label(ctxLabel) },
+                    selected = importanceLevel.label(ctxLabel),
+                    onSelect = { v -> importanceLevel = ImportanceLevel.values().firstOrNull { it.label(ctxLabel) == v } ?: importanceLevel },
+                    goldFor = setOf(ImportanceLevel.KEY.label(ctxLabel))
+                )
+            }
+
+            // ── Телефон ───────────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    AureliaCaption(stringResource(R.string.ce_phones))
+                    Text(
+                        "+ " + stringResource(R.string.common_add), color = AppleTheme.colors.brand,
+                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                        modifier = Modifier.clickable { showAddPhone = true }
+                    )
+                }
                 if (phones.isEmpty()) {
                     Text(stringResource(R.string.ce_no_phones), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        phones.forEachIndexed { idx, phone ->
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = phone.number, onValueChange = { num -> phones = phones.toMutableList().also { it[idx] = phone.copy(number = num) } },
-                                    keyboardOptions = PhoneKeyboard,
-                                    label = { Text(phone.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small,
-                                    leadingIcon = {
-                                        IconButton(
-                                            onClick = { phones = phones.mapIndexed { i, p -> p.copy(isPrimary = i == idx) } },
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Icon(
-                                                if (phone.isPrimary) Icons.Default.Star else Icons.Default.StarBorder,
-                                                contentDescription = stringResource(R.string.ce_make_primary),
-                                                modifier = Modifier.size(18.dp),
-                                                tint = if (phone.isPrimary) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel
-                                            )
-                                        }
-                                    }
-                                )
-                                IconButton(onClick = { phones = phones.toMutableList().also { it.removeAt(idx) } }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = AppleTheme.colors.red)
-                                }
-                            }
-                        }
+                    phones.forEachIndexed { idx, phone ->
+                        ContactItemRow(
+                            icon = Icons.Default.Call, iconTint = AppleTheme.colors.brand, iconBg = AppleTheme.colors.brand.copy(alpha = 0.10f),
+                            value = phone.number, onValueChange = { num -> phones = phones.toMutableList().also { it[idx] = phone.copy(number = num) } },
+                            keyboardOptions = PhoneKeyboard, label = phone.type.label(ctxLabel),
+                            isPrimary = phone.isPrimary, onTogglePrimary = { phones = phones.mapIndexed { i, p -> p.copy(isPrimary = i == idx) } },
+                            onDelete = { phones = phones.toMutableList().also { it.removeAt(idx) } }
+                        )
                     }
-                }
-                TextButton(onClick = { showAddPhone = true }, modifier = Modifier.align(Alignment.Start)) {
-                    Icon(Icons.Default.Add, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.ce_add_phone))
                 }
             }
 
-            // ── Emails ────────────────────────────────────────────────
-            SectionCard("Email") {
+            // ── Email ─────────────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    AureliaCaption("Email")
+                    Text(
+                        "+ " + stringResource(R.string.common_add), color = AppleTheme.colors.brand,
+                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                        modifier = Modifier.clickable { showAddEmail = true }
+                    )
+                }
                 if (emails.isEmpty()) {
                     Text(stringResource(R.string.ce_no_email), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        emails.forEachIndexed { idx, email ->
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = email.email, onValueChange = { v -> emails = emails.toMutableList().also { it[idx] = email.copy(email = v) } },
-                                    keyboardOptions = EmailKeyboard,
-                                    label = { Text(email.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small,
-                                    leadingIcon = {
-                                        IconButton(
-                                            onClick = { emails = emails.mapIndexed { i, e -> e.copy(isPrimary = i == idx) } },
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Icon(
-                                                if (email.isPrimary) Icons.Default.Star else Icons.Default.StarBorder,
-                                                contentDescription = stringResource(R.string.ce_make_primary),
-                                                modifier = Modifier.size(18.dp),
-                                                tint = if (email.isPrimary) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel
-                                            )
-                                        }
-                                    }
-                                )
-                                IconButton(onClick = { emails = emails.toMutableList().also { it.removeAt(idx) } }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = AppleTheme.colors.red)
-                                }
-                            }
-                        }
+                    emails.forEachIndexed { idx, email ->
+                        ContactItemRow(
+                            icon = Icons.Default.Email, iconTint = AureliaTheme.colors.gold, iconBg = AureliaTheme.colors.gold.copy(alpha = 0.14f),
+                            value = email.email, onValueChange = { v -> emails = emails.toMutableList().also { it[idx] = email.copy(email = v) } },
+                            keyboardOptions = EmailKeyboard, label = email.type.label(ctxLabel),
+                            isPrimary = email.isPrimary, onTogglePrimary = { emails = emails.mapIndexed { i, e -> e.copy(isPrimary = i == idx) } },
+                            onDelete = { emails = emails.toMutableList().also { it.removeAt(idx) } }
+                        )
                     }
-                }
-                TextButton(onClick = { showAddEmail = true }, modifier = Modifier.align(Alignment.Start)) {
-                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.ce_add_email))
                 }
             }
 
-            // ── Messengers ────────────────────────────────────────────
-            SectionCard(stringResource(R.string.ce_messengers)) {
+            // ── Мессенджеры ───────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    AureliaCaption(stringResource(R.string.ce_messengers))
+                    Text(
+                        "+ " + stringResource(R.string.common_add), color = AppleTheme.colors.brand,
+                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                        modifier = Modifier.clickable { showAddMessenger = true }
+                    )
+                }
                 if (messengers.isEmpty()) {
                     Text(stringResource(R.string.ce_no_messengers), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        messengers.forEachIndexed { idx, m ->
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = m.value, onValueChange = { v -> messengers = messengers.toMutableList().also { it[idx] = m.copy(value = v) } },
-                                    label = { Text(m.type.label(ctxLabel)) }, modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small
-                                )
-                                IconButton(onClick = { messengers = messengers.toMutableList().also { it.removeAt(idx) } }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(18.dp), tint = AppleTheme.colors.red)
-                                }
-                            }
-                        }
+                    messengers.forEachIndexed { idx, m ->
+                        ContactItemRow(
+                            icon = Icons.AutoMirrored.Filled.Send, iconTint = AppleTheme.colors.red, iconBg = AppleTheme.colors.red.copy(alpha = 0.10f),
+                            value = m.value, onValueChange = { v -> messengers = messengers.toMutableList().also { it[idx] = m.copy(value = v) } },
+                            label = m.type.label(ctxLabel),
+                            onDelete = { messengers = messengers.toMutableList().also { it.removeAt(idx) } }
+                        )
                     }
-                }
-                TextButton(onClick = { showAddMessenger = true }, modifier = Modifier.align(Alignment.Start)) {
-                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.ce_add_messenger))
                 }
             }
 
@@ -992,32 +1031,40 @@ fun ContactEditScreen(
                 )
             }
 
-            // ── Classification ────────────────────────────────────────
-            SectionCard(stringResource(R.string.ce_classification)) {
-                DropdownField(stringResource(R.string.ce_status), contactStatus.label(ctxLabel), ContactStatus.values().map { it.label(ctxLabel) }) {
-                    contactStatus = ContactStatus.values().firstOrNull { s -> s.label(ctxLabel) == it } ?: ContactStatus.ACTIVE
+            // ── Классификация (тип отношений/важность — пилюлями наверху экрана) ──
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AureliaCaption(stringResource(R.string.ce_status))
+                    PillChoiceRow(
+                        options = ContactStatus.values().map { it.label(ctxLabel) },
+                        selected = contactStatus.label(ctxLabel),
+                        onSelect = { v -> contactStatus = ContactStatus.values().firstOrNull { it.label(ctxLabel) == v } ?: contactStatus }
+                    )
                 }
-                Spacer(Modifier.height(10.dp))
-                DropdownField(stringResource(R.string.ce_relation_type), relationshipType.label(ctxLabel), RelationshipType.values().map { it.label(ctxLabel) }) {
-                    relationshipType = RelationshipType.values().firstOrNull { r -> r.label(ctxLabel) == it } ?: relationshipType
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AureliaCaption(stringResource(R.string.ce_connection_level))
+                    PillChoiceRow(
+                        options = ConnectionLevel.values().map { it.label(ctxLabel) },
+                        selected = connectionLevel.label(ctxLabel),
+                        onSelect = { v -> connectionLevel = ConnectionLevel.values().firstOrNull { it.label(ctxLabel) == v } ?: connectionLevel }
+                    )
                 }
-                Spacer(Modifier.height(10.dp))
-                DropdownField(stringResource(R.string.ce_connection_level), connectionLevel.label(ctxLabel), ConnectionLevel.values().map { it.label(ctxLabel) }) {
-                    connectionLevel = ConnectionLevel.values().firstOrNull { l -> l.label(ctxLabel) == it } ?: connectionLevel
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AureliaCaption(stringResource(R.string.ce_social_role))
+                    PillChoiceRow(
+                        options = SocialRole.values().map { it.label(ctxLabel) },
+                        selected = socialRole.label(ctxLabel),
+                        onSelect = { v -> socialRole = SocialRole.values().firstOrNull { it.label(ctxLabel) == v } ?: socialRole }
+                    )
                 }
-                Spacer(Modifier.height(10.dp))
-                DropdownField(stringResource(R.string.ce_importance), importanceLevel.label(ctxLabel), ImportanceLevel.values().map { it.label(ctxLabel) }) {
-                    importanceLevel = ImportanceLevel.values().firstOrNull { l -> l.label(ctxLabel) == it } ?: importanceLevel
-                }
-                Spacer(Modifier.height(10.dp))
-                DropdownField(stringResource(R.string.ce_social_role), socialRole.label(ctxLabel), SocialRole.values().map { it.label(ctxLabel) }) {
-                    socialRole = SocialRole.values().firstOrNull { r -> r.label(ctxLabel) == it } ?: socialRole
-                }
-                Spacer(Modifier.height(10.dp))
-                // CUSTOM исключён: у контакта нет поля своих дней — выбор молча отключал бы отслеживание
-                DropdownField(stringResource(R.string.ce_rhythm), communicationRhythm.label(ctxLabel),
-                    CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) }) {
-                    communicationRhythm = CommunicationRhythm.values().firstOrNull { r -> r.label(ctxLabel) == it } ?: communicationRhythm
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AureliaCaption(stringResource(R.string.ce_rhythm))
+                    // CUSTOM исключён: у контакта нет поля своих дней — выбор молча отключал бы отслеживание
+                    PillChoiceRow(
+                        options = CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) },
+                        selected = communicationRhythm.label(ctxLabel),
+                        onSelect = { v -> communicationRhythm = CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == v } ?: communicationRhythm }
+                    )
                 }
             }
 
@@ -1038,6 +1085,137 @@ fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
             HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
             content()
+        }
+    }
+}
+
+/** Подпись-капс над секцией (как в макете: «ТЕЛЕФОН», «EMAIL»). */
+@Composable
+fun AureliaCaption(text: String) {
+    // Тонкий алиас канонической caps-подписи из общего слоя
+    // (ui/theme/AureliaComponents.kt) — единая реализация на всё приложение.
+    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel(
+        text, color = AppleTheme.colors.secondaryLabel
+    )
+}
+
+/** Поле без рамки внутри общей карточки (для парных имя/фамилия и прозвища). */
+@Composable
+fun BareFieldColumn(
+    label: String, value: String, onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default,
+    placeholder: String? = null,
+) {
+    Column(modifier) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel)
+        Spacer(Modifier.height(2.dp))
+        androidx.compose.foundation.text.BasicTextField(
+            value = value, onValueChange = onValueChange, keyboardOptions = keyboardOptions,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = AppleTheme.colors.label, fontWeight = FontWeight.SemiBold),
+            singleLine = true,
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(AppleTheme.colors.brand),
+            decorationBox = { inner ->
+                if (value.isEmpty() && placeholder != null) {
+                    Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = AppleTheme.colors.tertiaryLabel)
+                }
+                inner()
+            }
+        )
+    }
+}
+
+/**
+ * Ряд-пилюли для короткого enum-выбора (тип отношений, важность, ритм и т.п.).
+ * [goldFor] — набор лейблов, которые при выборе подсвечиваются золотом+звездой
+ * (используется для верхнего уровня важности «Ключевой»), остальные — заливка брендом.
+ */
+@Composable
+fun PillChoiceRow(
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    goldFor: Set<String> = emptySet(),
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { opt ->
+            val isSel = opt == selected
+            val isGold = isSel && opt in goldFor
+            val bg = when { isGold -> AureliaTheme.colors.gold.copy(alpha = 0.14f); isSel -> AppleTheme.colors.brand; else -> AppleTheme.colors.card }
+            val borderColor = when { isGold -> AureliaTheme.colors.gold; isSel -> AppleTheme.colors.brand; else -> AppleTheme.colors.separator }
+            val textColor = when { isGold -> AureliaTheme.colors.gold; isSel -> Color.White; else -> AppleTheme.colors.label }
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(bg)
+                    .border(1.dp, borderColor, RoundedCornerShape(percent = 50))
+                    .clickable { onSelect(opt) }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (isGold) Icon(Icons.Default.Star, null, Modifier.size(14.dp), tint = AureliaTheme.colors.gold)
+                Text(opt, fontSize = 13.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.SemiBold, color = textColor)
+            }
+        }
+    }
+}
+
+/**
+ * Строка контактного метода (телефон/email/мессенджер) с иконкой-плиткой —
+ * как в макете. Сохраняет прежнее поведение: инлайн-правка значения,
+ * необязательный переключатель «основной» (звезда) и удаление.
+ */
+@Composable
+fun ContactItemRow(
+    icon: ImageVector,
+    iconTint: Color,
+    iconBg: Color,
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default,
+    isPrimary: Boolean? = null,
+    onTogglePrimary: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(AppleTheme.colors.card)
+            .padding(horizontal = 10.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(iconBg),
+            contentAlignment = Alignment.Center
+        ) { Icon(icon, null, Modifier.size(18.dp), tint = iconTint) }
+        OutlinedTextField(
+            value = value, onValueChange = onValueChange, keyboardOptions = keyboardOptions,
+            label = { Text(label) }, modifier = Modifier.weight(1f), singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent, focusedContainerColor = Color.Transparent
+            )
+        )
+        if (isPrimary == true && onTogglePrimary == null) {
+            // Статичный индикатор «основной» без возможности переключить (как было раньше)
+            Icon(Icons.Default.Star, contentDescription = stringResource(R.string.ce_make_primary),
+                modifier = Modifier.size(16.dp).padding(end = 6.dp), tint = AppleTheme.colors.brand)
+        } else if (isPrimary != null && onTogglePrimary != null) {
+            IconButton(onClick = onTogglePrimary, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    if (isPrimary) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = stringResource(R.string.ce_make_primary),
+                    modifier = Modifier.size(16.dp),
+                    tint = if (isPrimary) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel
+                )
+            }
+        }
+        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Close, stringResource(R.string.common_delete), Modifier.size(16.dp), tint = AppleTheme.colors.red)
         }
     }
 }

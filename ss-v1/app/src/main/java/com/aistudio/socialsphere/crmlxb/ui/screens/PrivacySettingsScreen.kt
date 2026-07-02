@@ -53,13 +53,8 @@ fun PrivacySettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(AppleTheme.colors.fill).clickable { onNavigateBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back), Modifier.size(20.dp), tint = AppleTheme.colors.label)
-                }
-                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.priv_title))
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(stringResource(R.string.common_back)) { onNavigateBack() }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.priv_title), fontSize = 28.sp)
             }
 
             // ── Локальное хранение — акцент-карта ──
@@ -67,6 +62,7 @@ fun PrivacySettingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
                     .clip(RoundedCornerShape(18.dp))
                     .background(AppleTheme.colors.brand.copy(alpha = 0.08f))
+                    .border(1.dp, AppleTheme.colors.brand.copy(alpha = 0.16f), RoundedCornerShape(18.dp))
                     .padding(16.dp)
             ) {
                 Column {
@@ -111,15 +107,15 @@ fun PrivacySettingsScreen(
 
             // ── Опасная зона ──
             Spacer(Modifier.height(22.dp))
-            SectionCaps(stringResource(R.string.priv_danger_zone), AppleTheme.colors.red)
+            SectionCaps(stringResource(R.string.priv_danger_zone), AppleTheme.colors.alarmRed)
             Box(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
                     .clip(RoundedCornerShape(18.dp)).background(AppleTheme.colors.card)
-                    .border(1.dp, AppleTheme.colors.red.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
+                    .border(1.dp, AppleTheme.colors.alarmRed.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
             ) {
                 PrivacyRow(
                     icon = Icons.Default.DeleteForever,
-                    iconTint = AppleTheme.colors.red,
+                    iconTint = AppleTheme.colors.alarmRed,
                     title = stringResource(R.string.priv_delete_all),
                     subtitle = stringResource(R.string.priv_delete_all_sub),
                     danger = true,
@@ -162,10 +158,9 @@ fun PrivacySettingsScreen(
 
 @Composable
 private fun SectionCaps(text: String, color: Color = AppleTheme.colors.tertiaryLabel) {
-    Text(
-        text.uppercase(),
-        fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-        color = color,
+    // Тонкая обёртка канонической caps-подписи (ui/theme/AureliaComponents.kt)
+    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel(
+        text, color = color,
         modifier = Modifier.padding(start = 22.dp, bottom = 9.dp)
     )
 }
@@ -190,7 +185,7 @@ private fun PrivacyRow(
             contentAlignment = Alignment.Center
         ) { Icon(icon, null, Modifier.size(16.dp), tint = iconTint) }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (danger) AppleTheme.colors.red else AppleTheme.colors.label)
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (danger) AppleTheme.colors.alarmRed else AppleTheme.colors.label)
             Text(subtitle, fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel)
         }
         if (chevron) Icon(Icons.Default.ChevronRight, null, Modifier.size(20.dp), tint = AppleTheme.colors.tertiaryLabel)

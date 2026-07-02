@@ -146,18 +146,17 @@ fun CheatSheetScreen(
                     }
                     Button(
                         onClick = {
-                            val m = contact.messengers.firstOrNull()
-                            if (m != null) ExternalActionHandler.openMessenger(ctx, m)
+                            if (primaryMessenger != null) ExternalActionHandler.openMessenger(ctx, primaryMessenger)
                             else ExternalActionHandler.openSms(ctx, contact.phones.firstOrNull()?.number)
                         },
-                        enabled  = contact.messengers.isNotEmpty() || contact.phones.isNotEmpty(),
+                        enabled  = primaryMessenger != null || contact.phones.isNotEmpty(),
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape    = RoundedCornerShape(15.dp),
                         colors   = ButtonDefaults.buttonColors(containerColor = CsChip, contentColor = CsTx)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Chat, null, Modifier.size(18.dp))
+                        Icon(Icons.AutoMirrored.Filled.Send, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.cs_write), fontWeight = FontWeight.Bold)
+                        Text(primaryMessenger?.type?.label(ctxLabel) ?: stringResource(R.string.cs_write), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -193,7 +192,7 @@ fun CheatSheetScreen(
 
             // ── Важно помнить (золотая карта) ──
             if (impNotes.isNotEmpty()) item {
-                CsBlock(stringResource(R.string.cs_remember), CsGold, Icons.Default.Star, gold = true) {
+                CsBlock(stringResource(R.string.cs_remember), CsGold, Icons.Default.Bolt, gold = true) {
                     impNotes.forEach { note ->
                         Text(note.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CsTx, lineHeight = 21.sp)
                         Spacer(Modifier.height(4.dp))
@@ -252,7 +251,7 @@ fun CheatSheetScreen(
 
             // ── Интересы и вкусы (чипы) ──
             if (interests.isNotEmpty()) item {
-                CsBlock(stringResource(R.string.cs_interests), CsTerra, Icons.Default.Favorite) {
+                CsBlock(stringResource(R.string.cs_interests), CsTerra, Icons.Default.TrackChanges) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         interests.forEach { CsTag(it.value) }
                     }

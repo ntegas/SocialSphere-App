@@ -41,14 +41,8 @@ fun LanguageSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(AppleTheme.colors.fill).clickable { onNavigateBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back),
-                        Modifier.size(20.dp), tint = AppleTheme.colors.label)
-                }
-                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.settings_language))
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(stringResource(R.string.common_back)) { onNavigateBack() }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.settings_language), fontSize = 28.sp)
             }
 
             InsetGroup {
@@ -81,7 +75,7 @@ private fun LanguageRow(badge: String, title: String, selected: Boolean, onClick
     ) {
         Box(
             modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
-                .background(if (selected) AppleTheme.colors.brand.copy(alpha = 0.12f) else AppleTheme.colors.fill),
+                .background(if (selected) AppleTheme.colors.brand.copy(alpha = 0.12f) else AppleTheme.colors.neutralFill),
             contentAlignment = Alignment.Center
         ) {
             Text(badge, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,

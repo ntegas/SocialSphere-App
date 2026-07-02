@@ -239,7 +239,7 @@ fun CompanyHero(company: Company, ctxLabel: android.content.Context) {
             }
             if (mainCity.isNotEmpty()) {
                 Box(
-                    Modifier.clip(RoundedCornerShape(13.dp)).background(AppleTheme.colors.fill)
+                    Modifier.clip(RoundedCornerShape(13.dp)).background(AppleTheme.colors.secondaryLabel.copy(alpha = 0.12f))
                         .padding(horizontal = 11.dp, vertical = 5.dp)
                 ) {
                     Text(mainCity, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.secondaryLabel)
@@ -597,6 +597,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyAddressesTab(
     } else {
         items(addresses, key = { it.id }) { address ->
             val context = LocalContext.current
+            val isBranchLike = address.addressType == AddressType.BRANCH || address.addressType == AddressType.OTHER
+            val addrTint = if (isBranchLike) AppleTheme.colors.orange else AppleTheme.colors.brand
+            val addrIcon = if (isBranchLike) Icons.Default.Business else Icons.Default.LocationOn
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -609,9 +612,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyAddressesTab(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Box(
-                        Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(AppleTheme.colors.brand.copy(alpha = 0.12f)),
+                        Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(addrTint.copy(alpha = if (isBranchLike) 0.16f else 0.12f)),
                         contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Default.LocationOn, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand) }
+                    ) { Icon(addrIcon, null, Modifier.size(16.dp), tint = addrTint) }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(address.addressType.label(ctxLabel), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
                         Text(

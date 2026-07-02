@@ -17,6 +17,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Tesseract4Android (tesseract4android-openmp) публикуется только на JitPack.
+        maven { url = uri("https://jitpack.io") }
     }
 }
 

@@ -27,16 +27,15 @@ import androidx.compose.ui.unit.sp
  * FontFamily(Font(R.font.manrope)) — это единственное место правки.
  */
 
-// ── Палитра (из макета Aurelia) ──────────────────────────────────────────
-private val Malachite   = Color(0xFF1C6B4C) // бренд / действия
+// ── Палитра 1:1 из живого прототипа («Socialsphere Прототип.dc.html», themeVars) ──
+private val Malachite   = Color(0xFF1C6B4C) // бренд / действия (--ac)
 private val Gold        = Color(0xFFB68A36) // редкий акцент: статус, ключевые
-private val Paper       = Color(0xFFF1EDE6) // фон экрана
-private val Card        = Color(0xFFFCFBF8) // карточки
-private val Ink         = Color(0xFF1B1A16) // основной текст
-private val Charcoal    = Color(0xFF0E0D0A) // тёмные плашки
-private val InkSoft     = Color(0xFF6F685B) // вторичный текст
-private val InkMuted    = Color(0xFF807A6E) // подписи
-private val InkFaint    = Color(0xFF9A9284) // совсем тихий
+private val Paper       = Color(0xFFF1EDE6) // фон экрана (--bg)
+private val Card        = Color(0xFFFCFBF8) // карточки (--card)
+private val Ink         = Color(0xFF1B1A16) // основной текст (--tx)
+private val Charcoal    = Color(0xFF100E0A) // тёмные плашки (= dark --bg)
+private val InkSoft     = Color(0xFF807A6E) // вторичный текст (--tx2)
+private val InkFaint    = Color(0xFFA79F90) // совсем тихий (--tx3)
 private val Divider     = Color(0x14232018) // rgba(35,32,24,.08)
 private val Fill        = Color(0x0F232018) // лёгкая заливка-подложка
 
@@ -75,16 +74,16 @@ val AureliaLightColors = AureliaColors(
     isDark = false,
 )
 
-// Тёмная палитра Aurelia (из тёмных экранов макета): тёплый уголь-фон,
-// осветлённые малахит/золото для контраста на тёмном.
+// Тёмная палитра Aurelia 1:1 из живого прототипа (themeVars, dark):
+// --bg:#100E0A --card:#1B1813 --tx2:#A39B8C --tx3:#7A7264
 val AureliaDarkColors = AureliaColors(
     brand = Color(0xFF5FB894),            // осветлённый малахит
     gold = Color(0xFFD7B468),
-    background = Color(0xFF0E0D0A),
-    card = Color(0xFF1A1813),
+    background = Color(0xFF100E0A),
+    card = Color(0xFF1B1813),
     label = Color(0xFFF3EFE8),
-    secondaryLabel = Color(0xFF8E877A),
-    tertiaryLabel = Color(0xFF6B655A),
+    secondaryLabel = Color(0xFFA39B8C),
+    tertiaryLabel = Color(0xFF7A7264),
     charcoal = Color(0xFF26221A),
     divider = Color(0x14FFFFFF),          // rgba(255,255,255,.08)
     fill = Color(0x0DFFFFFF),             // rgba(255,255,255,.05)
@@ -160,21 +159,23 @@ object AureliaTheme {
 }
 
 /**
- * Крупный заголовок экрана как в макете: Playfair (serif) 34sp, уголь.
- * Используется в шапках списков (Контакты, Компании, Календарь, Настройки…).
+ * Крупный заголовок экрана как в макете: Playfair (serif), уголь.
+ * Корневые вкладки (Контакты, Компании, Календарь) — 34sp (по умолчанию);
+ * push-экраны (Настройки и вложенные) — 28sp (прототип: font:800 28px).
  */
 @Composable
 fun AureliaScreenTitle(
     text: String,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
     color: Color = AureliaTheme.colors.label,
+    fontSize: androidx.compose.ui.unit.TextUnit = 34.sp,
 ) {
     androidx.compose.material3.Text(
         text = text,
         fontFamily = AureliaSerif,
         fontWeight = FontWeight.W800,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
+        fontSize = fontSize,
+        lineHeight = fontSize * 1.18f,
         letterSpacing = (-0.01).em,
         color = color,
         modifier = modifier,

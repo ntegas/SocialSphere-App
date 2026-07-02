@@ -9,12 +9,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Merge
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,7 @@ import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.Contact
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 
 /** «Полнота» контакта — чтобы при слиянии оставлять более заполненного. */
 private fun contactScore(c: Contact): Int =
@@ -61,13 +63,8 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(AppleTheme.colors.fill).clickable { onNavigateBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back), Modifier.size(20.dp), tint = AppleTheme.colors.label)
-                }
-                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.dup_title))
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(stringResource(R.string.common_back)) { onNavigateBack() }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.dup_title), fontSize = 28.sp)
             }
 
             Text(
@@ -86,11 +83,32 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                     val drop = if (keep.id == a.id) b else a
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                         elevation = CardDefaults.cardElevation(1.dp)
                     ) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            // ── Шапка пары: два аватара + разделитель + имя/кол-во записей (по макету) ──
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                DuplicateAvatar(a)
+                                Icon(Icons.Default.Sync, null, Modifier.size(16.dp), tint = AureliaTheme.colors.gold)
+                                DuplicateAvatar(b)
+                                Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
+                                    Text(
+                                        "${keep.firstName} ${keep.lastName}".trim(),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        stringResource(R.string.dup_two_records),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = AppleTheme.colors.secondaryLabel
+                                    )
+                                }
+                            }
                             DuplicateContactLine(a)
                             HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                             DuplicateContactLine(b)
@@ -101,11 +119,14 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                             )
                             Button(
                                 onClick = { pendingMerge = keep to drop },
-                                modifier = Modifier.fillMaxWidth()
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = AppleTheme.colors.brand,
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier.fillMaxWidth().height(42.dp)
                             ) {
-                                Icon(Icons.Default.Merge, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource(R.string.dup_merge))
+                                Text(stringResource(R.string.dup_merge), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -126,10 +147,13 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                     ))
                 },
                 confirmButton = {
-                    Button(onClick = {
-                        AppStateStore.mergeContacts(keep.id, drop.id)
-                        pendingMerge = null
-                    }) { Text(stringResource(R.string.dup_merge)) }
+                    Button(
+                        onClick = {
+                            AppStateStore.mergeContacts(keep.id, drop.id)
+                            pendingMerge = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White)
+                    ) { Text(stringResource(R.string.dup_merge)) }
                 },
                 dismissButton = {
                     TextButton(onClick = { pendingMerge = null }) { Text(stringResource(R.string.common_cancel)) }
@@ -146,5 +170,20 @@ private fun DuplicateContactLine(c: Contact) {
         val sub = contactSubtitle(c)
         if (sub.isNotEmpty())
             Text(sub, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+    }
+}
+
+@Composable
+private fun DuplicateAvatar(c: Contact) {
+    Box(
+        modifier = Modifier.size(40.dp).clip(CircleShape).background(AureliaTheme.colors.avatarTerracotta),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            (c.firstName.firstOrNull()?.toString() ?: "") + (c.lastName.firstOrNull()?.toString() ?: ""),
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp
+        )
     }
 }

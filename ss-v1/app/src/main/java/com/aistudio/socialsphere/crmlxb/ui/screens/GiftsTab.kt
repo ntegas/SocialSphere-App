@@ -31,8 +31,8 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
-import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 
@@ -253,48 +253,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                     color = AppleTheme.colors.secondaryLabel
                 )
             } else {
-                ideas.forEach { gift ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.Top,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("✨", fontSize = 14.sp)
-                            Column {
-                                Text(
-                                    gift.title,
-                                    style      = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                if (!gift.note.isNullOrBlank())
-                                    Text(
-                                        gift.note,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppleTheme.colors.secondaryLabel
-                                    )
-                                if (!gift.link.isNullOrBlank())
-                                    Text(
-                                        gift.link,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppleTheme.colors.brand
-                                    )
-                            }
-                        }
-                        // Кнопка перехода в статус BOUGHT
-                        TextButton(
-                            onClick = { AppStateStore.updateGift(gift.copy(status = GiftStatus.BOUGHT)) },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(stringResource(R.string.cd_gift_buy), fontSize = 11.sp, color = AppleTheme.colors.brand)
-                        }
-                        GiftMenu(onEdit = { onEditGift(gift) }, onDelete = { onDeleteGift(gift) })
-                    }
-                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                ideas.forEachIndexed { i, gift ->
+                    GiftRow(
+                        gift = gift,
+                        actionLabel = stringResource(R.string.cd_gift_buy),
+                        onAction = { AppStateStore.updateGift(gift.copy(status = GiftStatus.BOUGHT)) },
+                        onEdit = { onEditGift(gift) },
+                        onDelete = { onDeleteGift(gift) }
+                    )
+                    if (i < ideas.lastIndex) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
             }
         }
@@ -303,27 +270,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
         if (bought.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             CardBlock(title = stringResource(R.string.cd_gift_bought)) {
-                bought.forEach { gift ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            gift.title,
-                            style      = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            modifier   = Modifier.weight(1f)
-                        )
-                        TextButton(
-                            onClick = { AppStateStore.updateGift(gift.copy(status = GiftStatus.GIVEN)) },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(stringResource(R.string.cd_gift_give), fontSize = 11.sp, color = AppleTheme.colors.brand)
-                        }
-                        GiftMenu(onEdit = { onEditGift(gift) }, onDelete = { onDeleteGift(gift) })
-                    }
-                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                bought.forEachIndexed { i, gift ->
+                    GiftRow(
+                        gift = gift,
+                        actionLabel = stringResource(R.string.cd_gift_give),
+                        onAction = { AppStateStore.updateGift(gift.copy(status = GiftStatus.GIVEN)) },
+                        onEdit = { onEditGift(gift) },
+                        onDelete = { onDeleteGift(gift) }
+                    )
+                    if (i < bought.lastIndex) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
             }
         }
@@ -332,19 +287,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
         if (given.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             CardBlock(title = stringResource(R.string.cd_gift_given_before)) {
-                given.forEach { gift ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("• ${gift.title}", style = MaterialTheme.typography.bodyMedium)
-                        if (!gift.date.isNullOrBlank())
-                            Text(
-                                gift.date,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleTheme.colors.secondaryLabel
-                            )
-                    }
+                given.forEachIndexed { i, gift ->
+                    GiftRow(
+                        gift = gift,
+                        actionLabel = null,
+                        onAction = null,
+                        onEdit = { onEditGift(gift) },
+                        onDelete = { onDeleteGift(gift) }
+                    )
+                    if (i < given.lastIndex) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
             }
         }
@@ -444,5 +395,64 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GiftRow(
+    gift: GiftIdea,
+    actionLabel: String?,
+    onAction: (() -> Unit)?,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(AureliaTheme.colors.gold.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.CardGiftcard, null, Modifier.size(20.dp), tint = AureliaTheme.colors.gold)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(gift.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            if (!gift.note.isNullOrBlank())
+                Text(gift.note, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+            else if (!gift.link.isNullOrBlank())
+                Text(gift.link, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand)
+            else if (!gift.date.isNullOrBlank())
+                Text(gift.date, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+        }
+        GiftStatusPill(gift.status)
+        if (actionLabel != null && onAction != null) {
+            TextButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                Text(actionLabel, fontSize = 11.sp, color = AppleTheme.colors.brand)
+            }
+        }
+        GiftMenu(onEdit = onEdit, onDelete = onDelete)
+    }
+}
+
+@Composable
+private fun GiftStatusPill(status: GiftStatus) {
+    val ctx = LocalContext.current
+    val (bg, fg) = when (status) {
+        GiftStatus.IDEA   -> AureliaTheme.colors.gold.copy(alpha = 0.14f) to AureliaTheme.colors.gold
+        GiftStatus.BOUGHT -> AppleTheme.colors.brand.copy(alpha = 0.12f) to AppleTheme.colors.brand
+        GiftStatus.GIVEN  -> AppleTheme.colors.fill to AppleTheme.colors.secondaryLabel
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(13.dp))
+            .background(bg)
+            .padding(horizontal = 11.dp, vertical = 4.dp)
+    ) {
+        Text(status.label(ctx), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = fg)
     }
 }

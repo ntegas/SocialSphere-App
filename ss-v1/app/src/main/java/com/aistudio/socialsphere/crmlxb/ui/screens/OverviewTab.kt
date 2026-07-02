@@ -32,10 +32,11 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
-import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
+
+// Приглушённое золото подписей — темозависимый токен AppleTheme.colors.goldLabel.
 
 fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     contact: Contact,
@@ -44,9 +45,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     onNavigateToContact: (String) -> Unit = {},
     onNavigateToCompany: (String) -> Unit = {}
 , ctxLabel: android.content.Context, editing: Boolean = false, onEditingChange: (Boolean) -> Unit = {}, onDelete: () -> Unit = {}) {
-    item {
-        TabEditBar(isEditing = editing, onEdit = { onEditingChange(true) }, onDone = { onEditingChange(false) })
-    }
+    // Кнопка «Изменить»/«Готово» этой вкладки убрана — режим правки теперь
+    // включается ОДНОЙ кнопкой в шапке карточки контакта (см. ContactDetailScreen.kt),
+    // общей на все вкладки с инлайн-редактированием.
 
     // ── Следующий шаг — золотая карточка-акцент (спека Aurelia) ──
     val nextStepText = contact.nextStep?.takeIf { it.isNotBlank() }
@@ -97,6 +98,18 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         }
     }
 
+    // ── «ДОСЬЕ · FORD» — заголовок группы (по макету Aurelia; сами блоки
+    // оставлены в полную длину, а не сжаты в сетку 2×2 — по решению владельца).
+    // Без своего padding: родительский LazyColumn уже даёт spacedBy(12dp) между
+    // ВСЕМИ item — добавление собственных отступов здесь удваивало зазор.
+    item {
+        Text(
+            stringResource(R.string.cd_dossier).uppercase(),
+            fontSize = 11.sp, fontWeight = FontWeight.Bold,
+            letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel
+        )
+    }
+
     // ── F — FAMILY / Семья ──────────────────────────────────
     item {
         val relations = AppStateStore.contactRelations.filter {
@@ -113,6 +126,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         var famSelected   by remember { mutableStateOf<Contact?>(null) }
         var famOtherRole  by remember { mutableStateOf("Жена") }
         var famMyRole     by remember { mutableStateOf("Муж") }
+        var famNote       by remember { mutableStateOf("") }
         val famRoles = listOf("Жена", "Муж", "Партнёр", "Мать", "Отец", "Сын", "Дочь", "Брат", "Сестра", "Родственник")
         var pendingRemoveFamily by remember { mutableStateOf<ContactRelation?>(null) }
         pendingRemoveFamily?.let { rel ->
@@ -202,15 +216,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
-                if (editing) {
-                    Spacer(Modifier.height(4.dp))
-                    TextButton(onClick = { showAddFamily = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_family))
-                    }
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = { showAddFamily = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_family))
                 }
             } else {
-                if (editing) TextButton(onClick = { showAddFamily = true }) {
+                TextButton(onClick = { showAddFamily = true }) {
                     Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.cd_add_family))
                 }
@@ -222,7 +234,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 "${it.firstName} ${it.lastName}".contains(famSearch, ignoreCase = true)
             }
             AlertDialog(
-                onDismissRequest = { showAddFamily = false; famSelected = null; famSearch = "" },
+                onDismissRequest = { showAddFamily = false; famSelected = null; famSearch = ""; famNote = "" },
                 title = { Text(stringResource(R.string.cd_add_family), fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -258,6 +270,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                             }
                             DropdownField(stringResource(R.string.ce_who_relation), famOtherRole, famRoles) { v -> famOtherRole = v }
                             DropdownField(stringResource(R.string.ce_who_am_i), famMyRole, famRoles) { v -> famMyRole = v }
+                            OutlinedTextField(
+                                value = famNote, onValueChange = { famNote = it }, keyboardOptions = CapSentences,
+                                label = { Text(stringResource(R.string.cd_fact_note_optional)) },
+                                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
+                            )
                         }
                     }
                 },
@@ -271,11 +288,24 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                 firstRole = famMyRole,
                                 secondRole = famOtherRole
                             ))
+                            if (famNote.isNotBlank()) {
+                                val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                AppStateStore.addNote(Note(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    contactId = contact.id,
+                                    companyId = null, calendarItemId = null, giftId = null,
+                                    type = NoteType.GENERAL,
+                                    text = famNote.trim(),
+                                    date = java.time.LocalDate.now().toString(),
+                                    isImportant = false,
+                                    createdAt = now, updatedAt = now
+                                ))
+                            }
                         }
-                        famSelected = null; famSearch = ""; showAddFamily = false
+                        famSelected = null; famSearch = ""; famNote = ""; showAddFamily = false
                     }) { Text(stringResource(R.string.common_add)) }
                 },
-                dismissButton = { TextButton(onClick = { showAddFamily = false; famSelected = null; famSearch = "" }) { Text(stringResource(R.string.common_cancel)) } }
+                dismissButton = { TextButton(onClick = { showAddFamily = false; famSelected = null; famSearch = ""; famNote = "" }) { Text(stringResource(R.string.common_cancel)) } }
             )
         }
     }
@@ -289,6 +319,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         var compSearch   by remember { mutableStateOf("") }
         var compSelected by remember { mutableStateOf<Company?>(null) }
         var compPosition by remember { mutableStateOf("") }
+        var compNote     by remember { mutableStateOf("") }
         var pendingRemoveCompany by remember { mutableStateOf<ContactCompanyRelation?>(null) }
         pendingRemoveCompany?.let { rel ->
             AlertDialog(
@@ -329,19 +360,17 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     Text("• ${n.text}", style = MaterialTheme.typography.bodySmall,
                         color = AppleTheme.colors.secondaryLabel)
                 }
-                if (editing) {
-                    Spacer(Modifier.height(4.dp))
-                    TextButton(onClick = { showAddCompany = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_company))
-                    }
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = { showAddCompany = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_company))
                 }
                 if (editing) TextButton(onClick = { pendingRemoveCompany = compRel }) {
                     Icon(Icons.Default.Close, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.cd_remove_company))
                 }
             } else {
-                if (editing) TextButton(onClick = { showAddCompany = true }) {
+                TextButton(onClick = { showAddCompany = true }) {
                     Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.cd_add_company))
                 }
@@ -352,7 +381,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 it.name.contains(compSearch, ignoreCase = true)
             }
             AlertDialog(
-                onDismissRequest = { showAddCompany = false; compSelected = null; compSearch = ""; compPosition = "" },
+                onDismissRequest = { showAddCompany = false; compSelected = null; compSearch = ""; compPosition = ""; compNote = "" },
                 title = { Text(stringResource(R.string.cd_add_company), fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -385,6 +414,11 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                 label = { Text(stringResource(R.string.cd_position)) },
                                 modifier = Modifier.fillMaxWidth(), singleLine = true
                             )
+                            OutlinedTextField(
+                                value = compNote, onValueChange = { compNote = it }, keyboardOptions = CapSentences,
+                                label = { Text(stringResource(R.string.cd_fact_note_optional)) },
+                                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
+                            )
                         }
                     }
                 },
@@ -401,11 +435,24 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                     isPrimary = contact.companyRelations.isEmpty()
                                 )
                             ))
+                            if (compNote.isNotBlank()) {
+                                val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                AppStateStore.addNote(Note(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    contactId = contact.id,
+                                    companyId = null, calendarItemId = null, giftId = null,
+                                    type = NoteType.WORK,
+                                    text = compNote.trim(),
+                                    date = java.time.LocalDate.now().toString(),
+                                    isImportant = false,
+                                    createdAt = now, updatedAt = now
+                                ))
+                            }
                         }
-                        compSelected = null; compSearch = ""; compPosition = ""; showAddCompany = false
+                        compSelected = null; compSearch = ""; compPosition = ""; compNote = ""; showAddCompany = false
                     }) { Text(stringResource(R.string.common_add)) }
                 },
-                dismissButton = { TextButton(onClick = { showAddCompany = false; compSelected = null; compSearch = ""; compPosition = "" }) { Text(stringResource(R.string.common_cancel)) } }
+                dismissButton = { TextButton(onClick = { showAddCompany = false; compSelected = null; compSearch = ""; compPosition = ""; compNote = "" }) { Text(stringResource(R.string.common_cancel)) } }
             )
         }
     }
@@ -480,15 +527,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         }
                     }
                 }
-                if (editing) {
-                    Spacer(Modifier.height(4.dp))
-                    TextButton(onClick = { showAddInterest = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_interest))
-                    }
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = { showAddInterest = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_interest))
                 }
             } else {
-                if (editing) TextButton(onClick = { showAddInterest = true }) {
+                TextButton(onClick = { showAddInterest = true }) {
                     Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.cd_add_interest))
                 }
@@ -608,12 +653,10 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     }
                 }
             }
-            if (editing) {
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { showAddDream = true }) {
-                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.cd_add_dream))
-                }
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = { showAddDream = true }) {
+                Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.cd_add_dream))
             }
         }
         if (showAddDream) {
@@ -943,9 +986,11 @@ private fun FordBlock(
 
 @Composable
 private fun FordEmptyHint(text: String) {
+    // Раньше был AppleTheme.colors.separator — это цвет волосяных линий (~8%
+    // альфа), как текст подсказки он был практически невидим.
     Text(
         text,
         style    = MaterialTheme.typography.bodySmall,
-        color    = AppleTheme.colors.separator
+        color    = AppleTheme.colors.secondaryLabel
     )
 }

@@ -46,6 +46,7 @@ fun SettingsScreen(
 
     // Цвета иконок-плиток по макету Aurelia
     val cAppearance = Color(0xFF7E5180) // аметист
+    val cNotif      = AppleTheme.colors.alarmRed // тревожный красный (НЕ терракот)
     val cImport     = Color(0xFF3E7E7A) // тил
     val cLanguage   = Color(0xFF5E78C4) // синий
 
@@ -61,31 +62,26 @@ fun SettingsScreen(
                 .verticalScroll(scrollState)
                 .padding(bottom = 28.dp)
         ) {
-            // ── Шапка: круглая кнопка назад + заголовок (по макету) ──
+            // ── Шапка push-экрана (прототип): нейтральная круглая «назад» + Playfair 28 ──
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp).clip(CircleShape).background(AppleTheme.colors.fill)
-                        .clickable { onNavigateBack() }
-                        .testTag("settings_back_btn"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back),
-                        Modifier.size(20.dp), tint = AppleTheme.colors.label)
-                }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(
+                    contentDescription = stringResource(R.string.common_back),
+                    testTag = "settings_back_btn"
+                ) { onNavigateBack() }
                 com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(
-                    text = stringResource(R.string.settings_title)
+                    text = stringResource(R.string.settings_title),
+                    fontSize = 28.sp
                 )
             }
 
             InsetGroup {
                 SettingsRow(cAppearance, Icons.Default.Palette, stringResource(R.string.settings_appearance), stringResource(R.string.settings_appearance_sub), "setting_appearance", onNavigateToAppearance)
                 AppleDivider()
-                SettingsRow(AppleTheme.colors.red, Icons.Default.Notifications, stringResource(R.string.settings_notifications), stringResource(R.string.settings_notifications_sub), "setting_notif", onNavigateToNotifications)
+                SettingsRow(cNotif, Icons.Default.Notifications, stringResource(R.string.settings_notifications), stringResource(R.string.settings_notifications_sub), "setting_notif", onNavigateToNotifications)
                 AppleDivider()
                 SettingsRow(cImport, Icons.Default.SwapVert, stringResource(R.string.settings_import_export), stringResource(R.string.settings_import_export_sub), "setting_import_export", onNavigateToImportExport)
                 AppleDivider()
@@ -131,9 +127,10 @@ private fun SettingsRow(
     ) {
         IconTile(tile) { Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp)) }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.label)
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label)
             Text(subtitle, fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel)
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AppleTheme.colors.tertiaryLabel, modifier = Modifier.size(20.dp))
+        // Шеврон — самый тихий тон tx4, 17dp (прототип)
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AppleTheme.colors.quaternaryLabel, modifier = Modifier.size(17.dp))
     }
 }

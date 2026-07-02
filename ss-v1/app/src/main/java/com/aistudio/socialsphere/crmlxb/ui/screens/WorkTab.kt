@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.border
@@ -29,7 +31,6 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
-import com.aistudio.socialsphere.crmlxb.ui.components.TabEditBar
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
@@ -38,22 +39,54 @@ import com.aistudio.socialsphere.crmlxb.utils.*
 // TAB 1 — РАБОТА
 // ═══════════════════════════════════════════════════════════════
 fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onNavigateToCompany: (String) -> Unit = {}, ctxLabel: android.content.Context, editing: Boolean = false, onEditingChange: (Boolean) -> Unit = {}) {
-    item {
-        TabEditBar(isEditing = editing, onEdit = { onEditingChange(true) }, onDone = { onEditingChange(false) })
-    }
+    // Кнопка «Изменить»/«Готово» этой вкладки убрана — режим правки теперь
+    // включается ОДНОЙ кнопкой в шапке карточки контакта, общей на все вкладки.
     item {
         val compRels = contact.companyRelations
         if (compRels.isEmpty()) return@item
         compRels.forEach { rel ->
             val company = AppStateStore.getCompany(rel.companyId)
             CardBlock(title = if (rel.isPrimary) stringResource(R.string.cd_main_workplace) else stringResource(R.string.cd_more)) {
-                if (company != null) InfoRow(stringResource(R.string.cd_company), "${company.name} ›",
-                    onClick = { onNavigateToCompany(company.id) })
-                if (!rel.position.isNullOrBlank())       InfoRow(stringResource(R.string.cd_position),   rel.position)
-                if (!rel.department.isNullOrBlank())     InfoRow(stringResource(R.string.cd_department),       rel.department)
-                if (!rel.role.isNullOrBlank())           InfoRow(stringResource(R.string.cd_role),        rel.role)
-                if (!rel.responsibilities.isNullOrBlank()) InfoRow(stringResource(R.string.cd_tasks),    rel.responsibilities)
-                InfoRow(stringResource(R.string.common_status), rel.employmentStatus.label(ctxLabel))
+                if (company != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { onNavigateToCompany(company.id) },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(AppleTheme.colors.brand),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(company.name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(company.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                listOf(company.industry.label(ctxLabel), company.addresses.firstOrNull()?.city.orEmpty())
+                                    .filter { it.isNotBlank() }.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel
+                            )
+                        }
+                        Box(
+                            Modifier.clip(RoundedCornerShape(percent = 50)).background(AppleTheme.colors.brand.copy(alpha = 0.12f))
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(rel.employmentStatus.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
+                        }
+                    }
+                    if (!rel.position.isNullOrBlank() || !rel.department.isNullOrBlank() || !rel.startDate.isNullOrBlank()) {
+                        HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 12.dp))
+                    }
+                }
+                // Должность / Отдел / С года — три колонки, как в макете
+                if (!rel.position.isNullOrBlank() || !rel.department.isNullOrBlank() || !rel.startDate.isNullOrBlank()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        if (!rel.position.isNullOrBlank()) MiniField(stringResource(R.string.cd_position), rel.position, Modifier.weight(1f))
+                        if (!rel.department.isNullOrBlank()) MiniField(stringResource(R.string.cd_department), rel.department, Modifier.weight(1f))
+                        if (!rel.startDate.isNullOrBlank()) MiniField(stringResource(R.string.cd_since_year), rel.startDate.take(4), Modifier.weight(1f))
+                    }
+                }
+                if (!rel.role.isNullOrBlank()) InfoRow(stringResource(R.string.cd_role), rel.role)
                 if (!rel.workNote.isNullOrBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -61,6 +94,23 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                         style = MaterialTheme.typography.bodySmall,
                         color = AppleTheme.colors.secondaryLabel
                     )
+                }
+            }
+            if (!rel.managedAccounts.isNullOrBlank()) {
+                CardBlock(title = stringResource(R.string.cd_key_accounts)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        rel.managedAccounts.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { acc ->
+                            Box(
+                                Modifier.clip(RoundedCornerShape(percent = 50)).background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) { Text(acc, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand, fontWeight = FontWeight.Medium) }
+                        }
+                    }
+                }
+            }
+            if (!rel.responsibilities.isNullOrBlank()) {
+                CardBlock(title = stringResource(R.string.cd_responsibility_zone)) {
+                    Text(rel.responsibilities, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -224,5 +274,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                 }
             }
         }
+    }
+}
+
+/** Подписанное read-only мини-поле в сетке (Должность/Отдел/С года — как в макете). */
+@Composable
+private fun MiniField(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel)
+        Spacer(Modifier.height(2.dp))
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
     }
 }

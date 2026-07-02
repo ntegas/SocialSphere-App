@@ -90,7 +90,6 @@ fun CalendarItemEditScreen(
     var showCompanyDropdown by remember { mutableStateOf(false) }
     var showRecurrenceDropdown by remember { mutableStateOf(false) }
     var contactQuery by remember { mutableStateOf("") }
-    var showTypeSheet by remember { mutableStateOf(false) }
     var showImportanceMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
     var showReminderSheet by remember { mutableStateOf(false) }
@@ -216,7 +215,7 @@ fun CalendarItemEditScreen(
                             onNavigateBack()
                         },
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(11.dp),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = androidx.compose.ui.graphics.Color.White),
                     modifier = Modifier.height(34.dp)
                 ) {
@@ -225,21 +224,32 @@ fun CalendarItemEditScreen(
             }
             // ── Основное: название · тип · важность ──
             SectionCard(stringResource(R.string.cie_basic)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cie_title)) },
-                    placeholder = { Text(type.label(ctxLabel)) },
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                // Тип — одна строка с цветной точкой → пикер
-                EventListRow(
-                    label = stringResource(R.string.cie_event_type),
-                    value = type.label(ctxLabel),
-                    leadingDot = eventTypeColor(type),
-                    onClick = { showTypeSheet = true }
-                )
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    BareFieldColumn(
+                        label = stringResource(R.string.cie_title), value = title,
+                        onValueChange = { title = it }, keyboardOptions = CapSentences,
+                        placeholder = type.label(ctxLabel),
+                        modifier = Modifier.fillMaxWidth().padding(12.dp)
+                    )
+                }
+                // Тип — пилюли (как в макете), вместо листа
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AureliaCaption(stringResource(R.string.cie_event_type))
+                    PillChoiceRow(
+                        options = CalendarItemType.values().map { it.label(ctxLabel) },
+                        selected = type.label(ctxLabel),
+                        onSelect = { v ->
+                            val picked = CalendarItemType.values().firstOrNull { it.label(ctxLabel) == v } ?: return@PillChoiceRow
+                            type = picked
+                            if (picked == CalendarItemType.BIRTHDAY) { isAllDay = true; recurrenceMode = RecurrenceMode.YEARLY }
+                        }
+                    )
+                }
                 // Важность — компактная строка
                 Box {
                     EventListRow(
@@ -319,6 +329,7 @@ fun CalendarItemEditScreen(
                     EventListRow(
                         label = stringResource(R.string.cie_recurrence),
                         value = recurLabel,
+                        leadingIcon = Icons.Default.Autorenew,
                         onClick = { showRecurrenceDropdown = true }
                     )
                     DropdownMenu(expanded = showRecurrenceDropdown, onDismissRequest = { showRecurrenceDropdown = false }) {
@@ -437,18 +448,6 @@ fun CalendarItemEditScreen(
                 )
             }
 
-            if (showTypeSheet) {
-                EventTypePickerSheet(
-                    current = type,
-                    onPick = { t ->
-                        type = t
-                        if (t == CalendarItemType.BIRTHDAY) { isAllDay = true; recurrenceMode = RecurrenceMode.YEARLY }
-                        showTypeSheet = false
-                    },
-                    onDismiss = { showTypeSheet = false }
-                )
-            }
-
             if (showReminderSheet) {
                 ReminderPickerSheet(
                     selected = selectedReminders,
@@ -531,31 +530,6 @@ private fun EventListRow(
         Spacer(Modifier.width(6.dp))
         if (trailing != null) trailing()
         else Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EventTypePickerSheet(
-    current: CalendarItemType,
-    onPick: (CalendarItemType) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val ctx = LocalContext.current
-    ModalBottomSheet(onDismissRequest = onDismiss, shape = SocialShape.Sheet) {
-        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-            CalendarItemType.values().forEach { t ->
-                Row(
-                    Modifier.fillMaxWidth().clickable { onPick(t) }.padding(horizontal = 24.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(Modifier.size(12.dp).clip(CircleShape).background(eventTypeColor(t)))
-                    Spacer(Modifier.width(14.dp))
-                    Text(t.label(ctx), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    if (t == current) Icon(Icons.Default.Check, null, tint = AppleTheme.colors.brand)
-                }
-            }
-        }
     }
 }
 

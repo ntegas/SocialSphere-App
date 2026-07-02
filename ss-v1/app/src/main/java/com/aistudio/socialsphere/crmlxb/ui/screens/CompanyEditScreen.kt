@@ -27,6 +27,7 @@ import com.aistudio.socialsphere.crmlxb.utils.label
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,7 +221,7 @@ fun CompanyEditScreen(
                             onNavigateBack()
                         },
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
-                    shape = RoundedCornerShape(11.dp),
+                    shape = RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
                     modifier = Modifier.height(34.dp)
                 ) {
@@ -234,10 +235,10 @@ fun CompanyEditScreen(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(AppleTheme.colors.card),
+                            .background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(36.dp), tint = AppleTheme.colors.secondaryLabel)
+                        Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(36.dp), tint = AppleTheme.colors.brand)
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
@@ -257,9 +258,16 @@ fun CompanyEditScreen(
                         singleLine = true
                     )
                 }
-                
-                DropdownField(stringResource(R.string.cce_industry), industry.label(ctxLabel), Industry.values().map { it.label(ctxLabel) }) { selected -> industry = Industry.values().firstOrNull { it.label(ctxLabel) == selected } ?: industry }
-                
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AureliaCaption(stringResource(R.string.cce_industry))
+                    PillChoiceRow(
+                        options = Industry.values().map { it.label(ctxLabel) },
+                        selected = industry.label(ctxLabel),
+                        onSelect = { v -> industry = Industry.values().firstOrNull { it.label(ctxLabel) == v } ?: industry }
+                    )
+                }
+
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it }, keyboardOptions = CapSentences,
@@ -279,9 +287,7 @@ fun CompanyEditScreen(
 
             // Contact Data
             SectionCard(stringResource(R.string.cce_contacts)) {
-                Text(stringResource(R.string.cce_phones), style = MaterialTheme.typography.labelMedium,
-                    color = AppleTheme.colors.brand)
-                Spacer(Modifier.height(6.dp))
+                AureliaCaption(stringResource(R.string.cce_phones))
 
                 if (phones.isEmpty()) {
                     Text(stringResource(R.string.cce_no_phones),
@@ -290,40 +296,14 @@ fun CompanyEditScreen(
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         phones.forEachIndexed { idx, phone ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = phone.number,
-                                    onValueChange = { num ->
-                                        phones = phones.toMutableList().also { list ->
-                                            list[idx] = phone.copy(number = num)
-                                        }
-                                    },
-                                    keyboardOptions = PhoneKeyboard,
-                                    label = { Text(phone.type.label(ctxLabel)) },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(12.dp),
-                                    leadingIcon = {
-                                        if (phone.isPrimary)
-                                            Icon(Icons.Default.Star, null,
-                                                Modifier.size(16.dp),
-                                                tint = AppleTheme.colors.brand)
-                                    }
-                                )
-                                IconButton(
-                                    onClick = {
-                                        phones = phones.toMutableList().also { it.removeAt(idx) }
-                                    },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete),
-                                        Modifier.size(18.dp),
-                                        tint = AppleTheme.colors.red)
-                                }
-                            }
+                            ContactItemRow(
+                                icon = Icons.Default.Call, iconTint = AppleTheme.colors.brand, iconBg = AppleTheme.colors.brand.copy(alpha = 0.10f),
+                                value = phone.number,
+                                onValueChange = { num -> phones = phones.toMutableList().also { it[idx] = phone.copy(number = num) } },
+                                keyboardOptions = PhoneKeyboard, label = phone.type.label(ctxLabel),
+                                isPrimary = phone.isPrimary,
+                                onDelete = { phones = phones.toMutableList().also { it.removeAt(idx) } }
+                            )
                         }
                     }
                 }
@@ -337,11 +317,9 @@ fun CompanyEditScreen(
                     Text(stringResource(R.string.cce_add_phone))
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
 
-                Text("Email", style = MaterialTheme.typography.labelMedium,
-                    color = AppleTheme.colors.brand)
-                Spacer(Modifier.height(6.dp))
+                AureliaCaption("Email")
 
                 if (emails.isEmpty()) {
                     Text(stringResource(R.string.cce_no_email),
@@ -350,40 +328,14 @@ fun CompanyEditScreen(
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         emails.forEachIndexed { idx, email ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = email.email,
-                                    onValueChange = { addr ->
-                                        emails = emails.toMutableList().also { list ->
-                                            list[idx] = email.copy(email = addr)
-                                        }
-                                    },
-                                    keyboardOptions = EmailKeyboard,
-                                    label = { Text(email.type.label(ctxLabel)) },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(12.dp),
-                                    leadingIcon = {
-                                        if (email.isPrimary)
-                                            Icon(Icons.Default.Star, null,
-                                                Modifier.size(16.dp),
-                                                tint = AppleTheme.colors.brand)
-                                    }
-                                )
-                                IconButton(
-                                    onClick = {
-                                        emails = emails.toMutableList().also { it.removeAt(idx) }
-                                    },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete),
-                                        Modifier.size(18.dp),
-                                        tint = AppleTheme.colors.red)
-                                }
-                            }
+                            ContactItemRow(
+                                icon = Icons.Default.Email, iconTint = AureliaTheme.colors.gold, iconBg = AureliaTheme.colors.gold.copy(alpha = 0.14f),
+                                value = email.email,
+                                onValueChange = { addr -> emails = emails.toMutableList().also { it[idx] = email.copy(email = addr) } },
+                                keyboardOptions = EmailKeyboard, label = email.type.label(ctxLabel),
+                                isPrimary = email.isPrimary,
+                                onDelete = { emails = emails.toMutableList().also { it.removeAt(idx) } }
+                            )
                         }
                     }
                 }

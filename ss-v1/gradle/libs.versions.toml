@@ -25,10 +25,10 @@ kotlinxCoroutinesAndroid = "1.10.2"
 kotlinxCoroutinesCore = "1.10.2"
 accompanistPermissions = "0.37.3"
 playServicesLocation = "21.3.0"
-cameraCamera2 = "1.5.0"
-cameraLifecycle = "1.5.0"
-cameraView = "1.5.0"
-cameraCore = "1.5.0"
+cameraCamera2 = "1.4.2"
+cameraLifecycle = "1.4.2"
+cameraView = "1.4.2"
+cameraCore = "1.4.2"
 loggingInterceptor = "4.10.0"
 okhttp = "4.10.0"
 moshiKotlin = "1.15.2"
@@ -39,6 +39,7 @@ secretsGradlePlugin = "2.0.1"
 mapsCompose = "4.4.1"
 playServicesMaps = "19.0.0"
 desugarJdkLibs = "2.0.4"
+tesseract4android = "4.9.0"
 
 [libraries]
 android-tools-desugar = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
@@ -88,6 +89,9 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 
 maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
 play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
+
+# OCR-движок сканера визиток (Apache-2.0, форк tess-two, Tesseract 5.x, openmp-вариант)
+tesseract4android = { group = "cz.adaptech.tesseract4android", name = "tesseract4android-openmp", version.ref = "tesseract4android" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,13 +61,8 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.fill).clickable { onNavigateBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back), Modifier.size(20.dp), tint = AppleTheme.colors.label)
-                }
-                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.notif_title))
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(stringResource(R.string.common_back)) { onNavigateBack() }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.notif_title), fontSize = 28.sp)
             }
 
             // ── Общие ─────────────────────────────────────────
@@ -74,6 +70,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                 SwitchRow(
                     label   = stringResource(R.string.notif_enable),
                     checked = notificationsEnabled,
+                    icon    = Icons.Default.Notifications,
                     onCheckedChange = { notificationsEnabled = it }
                 )
 
@@ -251,10 +248,8 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
 private fun NotifCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     // По макету: капс-заголовок секции над плоской inset-картой.
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        Text(
-            title.uppercase(),
-            fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-            color = AppleTheme.colors.tertiaryLabel,
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel(
+            title,
             modifier = Modifier.padding(start = 6.dp)
         )
         Card(
@@ -270,13 +265,30 @@ private fun NotifCard(title: String, content: @Composable ColumnScope.() -> Unit
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SwitchRow(
+    label: String,
+    checked: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    tile: androidx.compose.ui.graphics.Color = AppleTheme.colors.alarmRed,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(label, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = AppleTheme.colors.label, modifier = Modifier.weight(1f))
+        // Опциональная плитка-иконка 30/r8 (прототип: мастер-переключатель с колокольчиком)
+        if (icon != null) {
+            Box(
+                Modifier.size(30.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .background(tile),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, Modifier.size(16.dp), tint = androidx.compose.ui.graphics.Color.White)
+            }
+        }
+        Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label, modifier = Modifier.weight(1f))
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,

@@ -4,3 +4,7 @@ keystore.properties
 *.jks
 *.keystore
 !debug.keystore
+
+# Языковые данные Tesseract — крупные бинарники, докачиваются задачей
+# downloadTessData при сборке (см. app/build.gradle.kts)
+ss-v1/app/src/main/assets/tessdata/*.traineddata

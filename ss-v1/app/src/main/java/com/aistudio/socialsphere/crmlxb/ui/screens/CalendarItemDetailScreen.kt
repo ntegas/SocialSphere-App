@@ -235,9 +235,11 @@ fun CalendarItemDetailScreen(
                 }
             }
 
-            item {
-                CardBlock(title = stringResource(R.string.cid_reminders)) {
-                    if (event.reminders.isNotEmpty()) {
+            // Просмотр показывает только заполненные поля (по макету) — секция
+            // напоминаний видна только если напоминания реально заданы.
+            if (event.reminders.isNotEmpty()) {
+                item {
+                    CardBlock(title = stringResource(R.string.cid_reminders)) {
                         event.reminders.forEach { reminder ->
                             val unitStr = when (reminder.offsetUnit) {
                                 ReminderOffsetUnit.MINUTES -> stringResource(R.string.unit_minutes)
@@ -257,24 +259,25 @@ fun CalendarItemDetailScreen(
                             val statusStr = if (isPastApprox) stringResource(R.string.cid_status_past) else stringResource(R.string.cid_status_scheduled)
                             Text("• $text$statusStr", style = MaterialTheme.typography.bodyMedium)
                         }
-                    } else {
-                        Text(stringResource(R.string.cid_no_reminders), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                     }
                 }
             }
 
-            item {
-                CardBlock(title = stringResource(R.string.cid_recurrence)) {
-                    // Показываем человекочитаемый русский лейбл, а не сырой RRULE
-                    // («FREQ=YEARLY» выглядело как английское «frequency»).
-                    val recurText = when (RecurrenceMode.fromRule(event.recurrenceRule)) {
-                        RecurrenceMode.NONE    -> stringResource(R.string.cid_no_recurrence)
-                        RecurrenceMode.DAILY   -> stringResource(R.string.rec_daily)
-                        RecurrenceMode.WEEKLY  -> stringResource(R.string.rec_weekly)
-                        RecurrenceMode.MONTHLY -> stringResource(R.string.rec_monthly)
-                        RecurrenceMode.YEARLY  -> stringResource(R.string.rec_yearly)
+            // Секция повтора видна только если повтор реально задан (не NONE).
+            if (RecurrenceMode.fromRule(event.recurrenceRule) != RecurrenceMode.NONE) {
+                item {
+                    CardBlock(title = stringResource(R.string.cid_recurrence)) {
+                        // Показываем человекочитаемый русский лейбл, а не сырой RRULE
+                        // («FREQ=YEARLY» выглядело как английское «frequency»).
+                        val recurText = when (RecurrenceMode.fromRule(event.recurrenceRule)) {
+                            RecurrenceMode.NONE    -> stringResource(R.string.cid_no_recurrence)
+                            RecurrenceMode.DAILY   -> stringResource(R.string.rec_daily)
+                            RecurrenceMode.WEEKLY  -> stringResource(R.string.rec_weekly)
+                            RecurrenceMode.MONTHLY -> stringResource(R.string.rec_monthly)
+                            RecurrenceMode.YEARLY  -> stringResource(R.string.rec_yearly)
+                        }
+                        Text(recurText, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text(recurText, style = MaterialTheme.typography.bodyMedium)
                 }
             }
 
@@ -315,11 +318,9 @@ fun CalendarItemDetailScreen(
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppleTheme.colors.card,
-                            contentColor   = AppleTheme.colors.secondaryLabel
+                            contentColor   = AppleTheme.colors.label
                         )
                     ) {
-                        Icon(Icons.Default.Schedule, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.cid_reschedule_short))
                     }
                 }
@@ -428,7 +429,7 @@ fun RelatedContactCard(contact: Contact, onClick: () -> Unit) {
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(AppleTheme.colors.brand),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme.colors.avatarTerracotta),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
