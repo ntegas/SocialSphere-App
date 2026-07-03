@@ -228,6 +228,18 @@ fun Industry.label(context: android.content.Context): String = when (this) {
     Industry.REAL_ESTATE -> context.getString(R.string.lbl_industry_real_estate)
     Industry.RETAIL -> context.getString(R.string.lbl_industry_retail)
     Industry.GOVERNMENT -> context.getString(R.string.lbl_industry_government)
+    Industry.CONSTRUCTION -> context.getString(R.string.lbl_industry_construction)
+    Industry.LOGISTICS -> context.getString(R.string.lbl_industry_logistics)
+    Industry.MANUFACTURING -> context.getString(R.string.lbl_industry_manufacturing)
+    Industry.HORECA -> context.getString(R.string.lbl_industry_horeca)
+    Industry.LEGAL -> context.getString(R.string.lbl_industry_legal)
+    Industry.MARKETING -> context.getString(R.string.lbl_industry_marketing)
+    Industry.MEDIA -> context.getString(R.string.lbl_industry_media)
+    Industry.BEAUTY -> context.getString(R.string.lbl_industry_beauty)
+    Industry.SPORT -> context.getString(R.string.lbl_industry_sport)
+    Industry.TOURISM -> context.getString(R.string.lbl_industry_tourism)
+    Industry.ENERGY -> context.getString(R.string.lbl_industry_energy)
+    Industry.AGRICULTURE -> context.getString(R.string.lbl_industry_agriculture)
     Industry.OTHER -> context.getString(R.string.lbl_industry_other)
 }
 
@@ -240,6 +252,18 @@ fun Industry.labelKey(): String = when (this) {
     Industry.REAL_ESTATE -> "Недвижимость"
     Industry.RETAIL -> "Розница"
     Industry.GOVERNMENT -> "Государство"
+    Industry.CONSTRUCTION -> "Строительство"
+    Industry.LOGISTICS -> "Логистика"
+    Industry.MANUFACTURING -> "Производство"
+    Industry.HORECA -> "Рестораны и отели"
+    Industry.LEGAL -> "Юриспруденция"
+    Industry.MARKETING -> "Маркетинг"
+    Industry.MEDIA -> "Медиа"
+    Industry.BEAUTY -> "Красота и мода"
+    Industry.SPORT -> "Спорт"
+    Industry.TOURISM -> "Туризм"
+    Industry.ENERGY -> "Энергетика"
+    Industry.AGRICULTURE -> "Сельское хозяйство"
     Industry.OTHER -> "Другое"
 }
 
@@ -334,6 +358,9 @@ fun ContactStatus.label(context: android.content.Context): String = when (this) 
     ContactStatus.ACTIVE -> context.getString(R.string.lbl_contact_status_active)
     ContactStatus.MAINTAIN -> context.getString(R.string.lbl_contact_status_maintain)
     ContactStatus.ARCHIVED -> context.getString(R.string.lbl_contact_status_archived)
+    // Объединённый статус: Близкий/Слабый пришли из ConnectionLevel — строки те же
+    ContactStatus.CLOSE -> context.getString(R.string.lbl_connection_level_close)
+    ContactStatus.WEAK -> context.getString(R.string.lbl_connection_level_weak)
 }
 
 fun ContactStatus.labelKey(): String = when (this) {
@@ -341,6 +368,8 @@ fun ContactStatus.labelKey(): String = when (this) {
     ContactStatus.ACTIVE -> "Активный"
     ContactStatus.MAINTAIN -> "Поддерживать"
     ContactStatus.ARCHIVED -> "Архив"
+    ContactStatus.CLOSE -> "Близкий"
+    ContactStatus.WEAK -> "Слабый"
 }
 
 fun AddressType.label(context: android.content.Context): String = when (this) {

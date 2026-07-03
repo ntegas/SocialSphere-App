@@ -117,10 +117,41 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
     }
 
 
-    // Чем может помочь / Чем я могу помочь
+    // Чем может помочь / Чем я могу помочь. В режиме «Изменить» блок ВИДЕН
+    // даже пустым и даёт текстовые поля (фидбэк владельца 2026-07-02: поля
+    // были скрыты — заполнить «чем помочь» было негде).
     item {
         val hasMB = !contact.canHelpWith.isNullOrBlank() || !contact.iCanHelpWith.isNullOrBlank() || !contact.talkingPoints.isNullOrBlank()
-        if (hasMB) CardBlock(title = stringResource(R.string.cd_mutual_value)) {
+        if (editing) CardBlock(title = stringResource(R.string.cd_mutual_value)) {
+            var canHelp   by remember(contact.id) { mutableStateOf(contact.canHelpWith ?: "") }
+            var iCanHelp  by remember(contact.id) { mutableStateOf(contact.iCanHelpWith ?: "") }
+            var talking   by remember(contact.id) { mutableStateOf(contact.talkingPoints ?: "") }
+            OutlinedTextField(value = canHelp, onValueChange = { canHelp = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_can_help)) },
+                modifier = Modifier.fillMaxWidth(), minLines = 2)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(value = iCanHelp, onValueChange = { iCanHelp = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_i_can_help)) },
+                modifier = Modifier.fillMaxWidth(), minLines = 2)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(value = talking, onValueChange = { talking = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_talking_points)) },
+                modifier = Modifier.fillMaxWidth(), minLines = 2)
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = {
+                    AppStateStore.updateContact(contact.copy(
+                        canHelpWith   = canHelp.trim().ifBlank { null },
+                        iCanHelpWith  = iCanHelp.trim().ifBlank { null },
+                        talkingPoints = talking.trim().ifBlank { null }
+                    ))
+                    onEditingChange(false)
+                },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(42.dp)
+            ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
+        }
+        else if (hasMB) CardBlock(title = stringResource(R.string.cd_mutual_value)) {
             if (!contact.canHelpWith.isNullOrBlank()) {
                 Text(
                     stringResource(R.string.cd_can_help),

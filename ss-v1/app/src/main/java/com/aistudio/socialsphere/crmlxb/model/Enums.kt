@@ -1,7 +1,10 @@
 package com.aistudio.socialsphere.crmlxb.model
 
+// Объединённый статус (решение владельца 2026-07-02): прежние ContactStatus
+// (Новый/Активный/Поддерживать/Архив) + Близкий/Слабый из ConnectionLevel.
+// ConnectionLevel как отдельное поле из UI убран (колонка в БД остаётся).
 enum class ContactStatus {
-    NEW, ACTIVE, MAINTAIN, ARCHIVED
+    NEW, ACTIVE, MAINTAIN, ARCHIVED, CLOSE, WEAK
 }
 
 enum class RelationshipType {
@@ -29,7 +32,12 @@ enum class MessengerType {
     TELEGRAM, WHATSAPP, VIBER, SIGNAL, MESSENGER, OTHER
 }
 enum class Industry {
-    IT, AUTO, FINANCE, MEDICINE, EDUCATION, REAL_ESTATE, RETAIL, GOVERNMENT, OTHER
+    // Расширено 2026-07-02 по фидбэку владельца (хранится name-строкой,
+    // safeEnum-фолбэк — добавление значений безопасно, миграция не нужна).
+    IT, AUTO, FINANCE, MEDICINE, EDUCATION, REAL_ESTATE, RETAIL, GOVERNMENT,
+    CONSTRUCTION, LOGISTICS, MANUFACTURING, HORECA, LEGAL, MARKETING,
+    MEDIA, BEAUTY, SPORT, TOURISM, ENERGY, AGRICULTURE,
+    OTHER
 }
 enum class EmploymentStatus {
     CURRENT, FORMER, UNKNOWN

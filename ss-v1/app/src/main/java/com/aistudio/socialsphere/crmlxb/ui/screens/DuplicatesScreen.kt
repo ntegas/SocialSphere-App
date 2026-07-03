@@ -40,10 +40,18 @@ private fun contactSubtitle(c: Contact): String =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DuplicatesScreen(onNavigateBack: () -> Unit) {
+fun DuplicatesScreen(
+    onNavigateBack: () -> Unit,
+    // «Объединить и править»: после слияния открываем форму итогового контакта
+    onNavigateToEditContact: (String) -> Unit = {}
+) {
     val pairs by remember { derivedStateOf { AppStateStore.findDuplicatePairs() } }
     // Слияние — деструктив (удаляет один контакт), поэтому через подтверждение.
     var pendingMerge by remember { mutableStateOf<Pair<Contact, Contact>?>(null) }
+    // Ручное объединение (фидбэк владельца): два слота + пикер-шторка
+    var manualA by remember { mutableStateOf<Contact?>(null) }
+    var manualB by remember { mutableStateOf<Contact?>(null) }
+    var pickingSlot by remember { mutableStateOf<Int?>(null) } // 1 или 2
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
@@ -72,6 +80,36 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = AppleTheme.colors.secondaryLabel
             )
+
+            // ── Ручное объединение: выбрать два любых контакта ──
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                elevation = CardDefaults.cardElevation(1.dp)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.dup_manual_title),
+                        style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    ManualPickRow(stringResource(R.string.dup_pick_a), manualA) { pickingSlot = 1 }
+                    ManualPickRow(stringResource(R.string.dup_pick_b), manualB) { pickingSlot = 2 }
+                    val a = manualA; val b = manualB
+                    Button(
+                        enabled = a != null && b != null && a.id != b.id,
+                        onClick = {
+                            if (a != null && b != null) {
+                                val keep = if (contactScore(a) >= contactScore(b)) a else b
+                                val drop = if (keep.id == a.id) b else a
+                                pendingMerge = keep to drop
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AppleTheme.colors.brand, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().height(42.dp)
+                    ) { Text(stringResource(R.string.dup_merge), fontWeight = FontWeight.Bold) }
+                }
+            }
 
             if (pairs.isEmpty()) {
                 Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
@@ -147,19 +185,96 @@ fun DuplicatesScreen(onNavigateBack: () -> Unit) {
                     ))
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(
+                            onClick = {
+                                AppStateStore.mergeContacts(keep.id, drop.id)
+                                pendingMerge = null
+                                manualA = null; manualB = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White)
+                        ) { Text(stringResource(R.string.dup_merge)) }
+                        // «Объединить и править» — сразу открывает форму итога (фидбэк владельца)
+                        TextButton(onClick = {
                             AppStateStore.mergeContacts(keep.id, drop.id)
                             pendingMerge = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White)
-                    ) { Text(stringResource(R.string.dup_merge)) }
+                            manualA = null; manualB = null
+                            onNavigateToEditContact(keep.id)
+                        }) { Text(stringResource(R.string.dup_merge_edit)) }
+                    }
                 },
                 dismissButton = {
                     TextButton(onClick = { pendingMerge = null }) { Text(stringResource(R.string.common_cancel)) }
                 }
             )
         }
+
+        // ── Пикер контакта для ручного объединения (шторка с поиском) ──
+        if (pickingSlot != null) {
+            var pickQuery by remember { mutableStateOf("") }
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { pickingSlot = null }) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = pickQuery, onValueChange = { pickQuery = it },
+                        placeholder = { Text(stringResource(R.string.contacts_search_placeholder)) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                    val q = pickQuery.trim().lowercase()
+                    val matches = AppStateStore.contacts
+                        .filter { q.isBlank() || "${it.firstName} ${it.lastName} ${it.nickname.orEmpty()}".lowercase().contains(q) }
+                        .sortedBy { "${it.firstName} ${it.lastName}".lowercase() }
+                        .take(30)
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)
+                    ) {
+                        items(matches.size) { i ->
+                            val c = matches[i]
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clickable {
+                                        if (pickingSlot == 1) manualA = c else manualB = c
+                                        pickingSlot = null
+                                    }
+                                    .padding(vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(11.dp)
+                            ) {
+                                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatar(
+                                    c.id, "${c.firstName} ${c.lastName}".trim(), size = 36.dp, fontSize = 13.sp)
+                                Text("${c.firstName} ${c.lastName}".trim(),
+                                    style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Слот выбора контакта для ручного объединения
+@Composable
+private fun ManualPickRow(label: String, picked: Contact?, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(AppleTheme.colors.neutralFill)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (picked != null) {
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatar(
+                picked.id, "${picked.firstName} ${picked.lastName}".trim(), size = 30.dp, fontSize = 11.sp)
+            Text("${picked.firstName} ${picked.lastName}".trim(),
+                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f))
+        } else {
+            Text(label, style = MaterialTheme.typography.bodyMedium,
+                color = AppleTheme.colors.secondaryLabel, modifier = Modifier.weight(1f))
+        }
+        Icon(Icons.Default.Sync, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand)
     }
 }
 

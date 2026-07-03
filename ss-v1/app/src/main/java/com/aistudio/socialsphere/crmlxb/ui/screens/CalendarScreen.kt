@@ -139,6 +139,9 @@ fun CalendarScreen(
                 derivedStateOf {
                     val hiddenTypes = AppSettings.calendarHiddenTypes.value
                     allEvents.filter { event ->
+                        // Выполненные уходят из всех видов календаря (фидбэк владельца:
+                        // «выполнено, а из списка не уходит» — фильтра по статусу не было)
+                        if (event.status != CalendarItemStatus.ACTIVE) return@filter false
                         if (event.type.name in hiddenTypes) return@filter false
                         when (selectedFilter) {
                             CalendarEventFilter.BIRTHDAYS -> event.type == CalendarItemType.BIRTHDAY
@@ -648,7 +651,7 @@ fun CalendarEventItem(
             if (sub.isNotEmpty())
                 Text(sub, fontSize = 13.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
-        Text(event.startDate, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (event.type == CalendarItemType.BIRTHDAY) typeColor else AppleTheme.colors.secondaryLabel)
+        Text(com.aistudio.socialsphere.crmlxb.utils.displayEventDate(event.startDate), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (event.type == CalendarItemType.BIRTHDAY) typeColor else AppleTheme.colors.secondaryLabel)
     }
 }
 

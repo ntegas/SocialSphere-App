@@ -427,24 +427,40 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                 val list = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     ContactImporter.getDeviceContacts(ctx)
                 }
-                val dev = list.firstOrNull { it.id == id } ?: return@launch
+                val dev = list.firstOrNull { it.id == id }
+                if (dev == null) {
+                    // Связанный контакт исчез из телефонной книги — говорим, а не молчим
+                    android.widget.Toast.makeText(ctx, ctx.getString(R.string.sync_pull_gone), android.widget.Toast.LENGTH_LONG).show()
+                    return@launch
+                }
                 fun digits(s: String) = s.filter { it.isDigit() }
-                val mergedPhones = contact.phones + dev.phones
+                val newPhones = dev.phones
                     .filter { d -> contact.phones.none { digits(it.number) == digits(d.number) } }
                     .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = contact.id) }
-                val mergedEmails = contact.emails + dev.emails
+                val newEmails = dev.emails
                     .filter { d -> contact.emails.none { it.email.equals(d.email, ignoreCase = true) } }
                     .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = contact.id) }
-                val mergedAddrs = contact.addresses + dev.addresses
+                val newAddrs = dev.addresses
                     .filter { d -> contact.addresses.none { it.addressLine == d.addressLine && it.city == d.city } }
                     .map { it.copy(id = java.util.UUID.randomUUID().toString(), ownerId = contact.id, ownerType = AddressOwnerType.CONTACT) }
+                if (newPhones.isEmpty() && newEmails.isEmpty() && newAddrs.isEmpty()) {
+                    // Раньше кнопка молчала и казалась неработающей — теперь честный ответ
+                    android.widget.Toast.makeText(ctx, ctx.getString(R.string.sync_pull_nothing), android.widget.Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
                 AppStateStore.updateContact(contact.copy(
-                    firstName = contact.firstName.ifBlank { dev.firstName },
-                    lastName  = contact.lastName.ifBlank { dev.lastName },
-                    phones    = mergedPhones,
-                    emails    = mergedEmails,
-                    addresses = mergedAddrs
+                    firstName  = contact.firstName.ifBlank { dev.firstName },
+                    lastName   = contact.lastName.ifBlank { dev.lastName },
+                    middleName = contact.middleName ?: dev.middleName.ifBlank { null },
+                    phones     = contact.phones + newPhones,
+                    emails     = contact.emails + newEmails,
+                    addresses  = contact.addresses + newAddrs
                 ))
+                android.widget.Toast.makeText(
+                    ctx,
+                    ctx.getString(R.string.sync_pull_result, newPhones.size, newEmails.size, newAddrs.size),
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
             }
         }
 
@@ -545,28 +561,34 @@ private fun ChannelRow(
             contentAlignment = Alignment.Center
         ) { Icon(icon, null, Modifier.size(18.dp), tint = iconTint) }
         Column(Modifier.weight(1f)) {
-            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+            // Одна строка всегда: раньше капсула «Основной» справа отжимала ширину
+            // и длинный номер переносился на 2 строки — теперь признак «основной»
+            // живёт в подписи («Мобильный · Основной»), номер получает всю ширину.
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+                if (isPrimary) {
+                    Text(" · ", style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+                    Text(
+                        stringResource(R.string.cd_primary_badge),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AureliaTheme.colors.gold
+                    )
+                }
+            }
         }
         if (editing) {
             IconButton(onClick = onRemove) {
                 Icon(Icons.Default.RemoveCircle, stringResource(R.string.common_delete), Modifier.size(20.dp), tint = AppleTheme.colors.red)
             }
         } else {
-            if (isPrimary) {
-                Box(
-                    Modifier.clip(RoundedCornerShape(percent = 50))
-                        .background(AureliaTheme.colors.gold.copy(alpha = 0.16f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        stringResource(R.string.cd_primary_badge),
-                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                        color = AureliaTheme.colors.gold
-                    )
-                }
-                Spacer(Modifier.width(4.dp))
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), content = actions)
         }
     }

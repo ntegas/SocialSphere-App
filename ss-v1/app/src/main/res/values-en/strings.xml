@@ -210,6 +210,12 @@
     <string name="cd_clothes_hint">Clothing (e.g. M, 48)</string>
     <string name="cd_shoes_hint">Shoes (e.g. 42)</string>
     <string name="cd_preference">Preference</string>
+    <string name="cd_goes_to_gifts">Will appear in: Gifts → Preferences · Cheat sheet</string>
+    <string name="cd_goes_general">Will appear in: Notes tab (monthly feed)</string>
+    <string name="cd_goes_work">Will appear in: Notes + Work tab</string>
+    <string name="cd_goes_personal">Will appear in: Goals &amp; dreams + Overview (D) + Cheat sheet</string>
+    <string name="cd_goes_important">Will appear in: Important to remember (Overview) + Cheat sheet</string>
+    <string name="cd_goes_to_allergy">Will appear in: Gifts → Allergies · Cheat sheet (with warning)</string>
     <string name="cd_category">Category</string>
     <string name="cd_dossier">Dossier · FORD</string>
     <string name="cd_restrictions">Restrictions</string>
@@ -233,6 +239,12 @@
     <string name="cd_title_req">Title*</string>
     <string name="cd_link">Link</string>
     <string name="cd_tags">Tags</string>
+    <string name="cd_add_tag">+ Tag</string>
+    <string name="cd_add_tag_title">New tag</string>
+    <string name="cd_family_note">Family without cards</string>
+    <string name="cd_family_note_hint">E.g.: son Pete (5 y.o.), mother-in-law Maria</string>
+    <string name="cd_next_step_hint">Tap to set the next step</string>
+    <string name="cd_where_met_hint">Tap to fill in</string>
     <string name="cd_no_tags">No tags</string>
     <string name="cd_tasks">Tasks</string>
     <string name="cd_past_events">Past events</string>
@@ -308,6 +320,7 @@
     <string name="cal_f_important">Important</string>
     <string name="cal_today">Today</string>
     <string name="cal_tomorrow">Tomorrow</string>
+    <string name="date_no_year">No year</string>
     <string name="cal_later">Later</string>
     <string name="cal_nearest">Upcoming</string>
     <string name="cal_next7days">Next 7 days</string>
@@ -369,6 +382,10 @@
     <string name="dup_none">No possible duplicates found</string>
     <string name="dup_two_records">2 records</string>
     <string name="dup_merge">Merge</string>
+    <string name="dup_manual_title">Merge manually</string>
+    <string name="dup_pick_a">First contact</string>
+    <string name="dup_pick_b">Second contact</string>
+    <string name="dup_merge_edit">Merge and edit</string>
     <string name="dup_will_keep">Kept: %1$s</string>
     <string name="dup_merge_confirm_title">Merge contacts?</string>
     <string name="dup_merge_confirm_text">“%2$s” will be removed and its data moved to “%1$s”. This cannot be undone.</string>
@@ -522,6 +539,7 @@
     <string name="ce_new_contact">New contact</string>
     <string name="ce_name_req">First name *</string>
     <string name="ce_surname">Last name</string>
+    <string name="ce_middle_name">Middle name</string>
     <string name="ce_nickname">Nickname / what I call them</string>
     <string name="ce_nickname_hint">what you call them…</string>
     <string name="ce_add_photo">Add photo</string>
@@ -573,6 +591,9 @@
     <string name="ce_classification">Classification</string>
     <string name="ce_status">Status</string>
     <string name="ce_relation_type">Relationship type</string>
+    <string name="ce_relation_custom_add">+ Custom</string>
+    <string name="ce_relation_custom_title">Custom relationship type</string>
+    <string name="ce_relation_custom_hint">E.g.: Godfather, Coach</string>
     <string name="ce_connection_level">Connection level</string>
     <string name="ce_importance">Importance</string>
     <string name="ce_social_role">Social role</string>
@@ -816,6 +837,18 @@
     <string name="lbl_industry_real_estate">Real estate</string>
     <string name="lbl_industry_retail">Retail</string>
     <string name="lbl_industry_government">Government</string>
+    <string name="lbl_industry_construction">Construction</string>
+    <string name="lbl_industry_logistics">Logistics</string>
+    <string name="lbl_industry_manufacturing">Manufacturing</string>
+    <string name="lbl_industry_horeca">Restaurants &amp; hotels</string>
+    <string name="lbl_industry_legal">Legal</string>
+    <string name="lbl_industry_marketing">Marketing &amp; advertising</string>
+    <string name="lbl_industry_media">Media</string>
+    <string name="lbl_industry_beauty">Beauty &amp; fashion</string>
+    <string name="lbl_industry_sport">Sports</string>
+    <string name="lbl_industry_tourism">Travel &amp; tourism</string>
+    <string name="lbl_industry_energy">Energy</string>
+    <string name="lbl_industry_agriculture">Agriculture</string>
     <string name="lbl_industry_other">Other</string>
     <string name="lbl_personal_detail_category_likes">Likes</string>
     <string name="lbl_personal_detail_category_dislikes">Dislikes</string>
@@ -930,7 +963,10 @@
     <string name="sync_change_link">Change phone link</string>
     <string name="sync_update_from_phone">Update from phone</string>
     <string name="sync_pick_contact">Pick a phone contact</string>
-    <string name="sync_linked">Linked to phone</string>
+    <string name="sync_linked">Linked to the phone book. "Update from phone" pulls new numbers, emails and addresses</string>
+    <string name="sync_pull_result">Added: %1$d phones, %2$d emails, %3$d addresses</string>
+    <string name="sync_pull_nothing">Already up to date — nothing new on the phone</string>
+    <string name="sync_pull_gone">Contact not found in the phone book (deleted?)</string>
     <string name="set_exact_alarms">Allow exact alarms</string>
     <string name="set_exact_alarms_hint">So reminders arrive exactly on time</string>
 

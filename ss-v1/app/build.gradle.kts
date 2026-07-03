@@ -92,7 +92,9 @@ secrets {
 dependencies {
   coreLibraryDesugaring(libs.android.tools.desugar)
   implementation(platform(libs.androidx.compose.bom))
-  implementation(libs.accompanist.permissions)
+  // accompanist-permissions УБРАН (2026-07-02): 0.37.x требует Compose 1.8, на
+  // BOM 2024.09 падал в рантайме (крэш сканера). Разрешения — Activity Result API.
+  // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   // Камера-сканер визитки (CameraX) + OCR (Tesseract4Android)
   implementation(libs.androidx.camera.camera2)

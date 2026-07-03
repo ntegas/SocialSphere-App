@@ -104,6 +104,11 @@ fun SocialsphereApp() {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        // ФИКС «слишком большой отступ сверху на всех экранах»: внешний Scaffold
+        // по умолчанию добавлял инсет статус-бара в innerPadding, а Scaffold КАЖДОГО
+        // экрана внутри NavHost добавлял его ещё раз — отступ удваивался. Внешний
+        // не должен трогать верх: статус-бар обрабатывают сами экраны.
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentDestination = navBackStackEntry?.destination
@@ -262,7 +267,10 @@ fun SocialsphereApp() {
                 )
             }
             composable("settings_duplicates") {
-                DuplicatesScreen(onNavigateBack = { navController.popBackStack() })
+                DuplicatesScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToEditContact = { id -> navController.navigate("contact_edit/$id") }
+                )
             }
             composable("settings_language") {
                 LanguageSettingsScreen(onNavigateBack = { navController.popBackStack() })
@@ -334,7 +342,12 @@ fun SocialsphereApp() {
             composable("contact_create") {
                 ContactEditScreen(
                     contactId = null,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    // Созданный контакт открываем сразу (форма уходит со стека)
+                    onCreated = { id ->
+                        navController.popBackStack()
+                        navController.navigate("contact_detail/$id")
+                    }
                 )
             }
             composable("contact_edit/{contactId}") { backStackEntry ->

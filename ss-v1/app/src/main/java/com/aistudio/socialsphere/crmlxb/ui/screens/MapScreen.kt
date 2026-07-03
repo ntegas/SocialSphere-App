@@ -67,6 +67,9 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     var selectedTab    by remember { mutableIntStateOf(0) }
+    // Фильтр по типу отношений (фидбэк владельца: «показывать только семью/друзей/
+    // коллег» — до появления полноценных групп). null = все.
+    var relFilter      by remember { mutableStateOf<RelationshipType?>(null) }
     var selectedItem   by remember { mutableStateOf<MapLocationItem?>(null) }
     var showMapView    by remember { mutableStateOf(true) }
     var locationPermGranted by remember { mutableStateOf(false) }
@@ -181,7 +184,7 @@ fun MapScreen(
     val geoCache = remember { mutableStateMapOf<String, LatLng>() }
     val coordsOf: (MapLocationItem) -> LatLng? = { it.latLng ?: geoCache[it.addressId] }
 
-    val filteredList by remember(mapObjects, searchQuery, selectedTab) {
+    val filteredList by remember(mapObjects, searchQuery, selectedTab, relFilter) {
         derivedStateOf {
             mapObjects.filter { obj ->
                 val q = "${obj.title} ${obj.subtitle} ${obj.city} ${obj.addressLine}"
@@ -197,7 +200,12 @@ fun MapScreen(
                         obj.ownerType == AddressOwnerType.COMPANY
                     else -> true
                 }
-                matchSearch && matchTab
+                // Фильтр отношений: активен → только контакты выбранного типа
+                // (адреса компаний при активном фильтре скрываются — у них нет типа отношений)
+                val matchRel = relFilter == null ||
+                    (obj.ownerType == AddressOwnerType.CONTACT &&
+                        AppStateStore.getContact(obj.ownerId)?.relationshipType == relFilter)
+                matchSearch && matchTab && matchRel
             }
         }
     }
@@ -572,8 +580,38 @@ fun MapScreen(
                         }
                     }
                 }
+                // ── Чипы отношений: семья/друзья/коллеги… (только для вкладок людей) ──
+                if (selectedTab != 2) {
+                    val ctxRel = LocalContext.current
+                    Spacer(Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        MapRelChip(stringResource(R.string.map_filter_all), relFilter == null) { relFilter = null; selectedItem = null }
+                        RelationshipType.values().forEach { rel ->
+                            MapRelChip(rel.label(ctxRel), relFilter == rel) {
+                                relFilter = if (relFilter == rel) null else rel
+                                selectedItem = null
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+// Чип фильтра отношений на карте (h28/r14: активный — акцент, неактивный — card+кольцо)
+@Composable
+private fun MapRelChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.height(28.dp).clip(RoundedCornerShape(14.dp))
+            .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
+            .then(if (!active) Modifier.border(1.dp, AppleTheme.colors.separator, RoundedCornerShape(14.dp)) else Modifier)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+            color = if (active) Color.White else AppleTheme.colors.secondaryLabel)
     }
 }
 
@@ -587,29 +625,42 @@ fun MapScreen(
 private fun MapMarkerPin(obj: MapLocationItem, selected: Boolean) {
     val size = if (selected) 52.dp else 44.dp
     val ringColor = if (selected) AureliaTheme.colors.gold else AppleTheme.colors.card
-    val ringWidth = if (selected) 3.dp else 2.dp
-    if (obj.ownerType == AddressOwnerType.COMPANY) {
-        Box(
-            modifier = Modifier.size(size)
-                .clip(RoundedCornerShape(12.dp))
-                .background(AppleTheme.colors.brand)
-                .border(ringWidth, ringColor, RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Business, null, tint = Color.White, modifier = Modifier.size(size / 2))
+    val ringWidth = if (selected) 3.dp else 2.5.dp
+    // Пин по макету: круг/плитка с кольцом + ЗАОСТРЕНИЕ-хвостик вниз
+    // (фидбэк владельца: «должно быть заострение, как будто это пин»).
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (obj.ownerType == AddressOwnerType.COMPANY) {
+            Box(
+                modifier = Modifier.size(size)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AppleTheme.colors.brand)
+                    .border(ringWidth, ringColor, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Business, null, tint = Color.White, modifier = Modifier.size(size / 2))
+            }
+        } else {
+            val initials = obj.title.split(" ")
+                .mapNotNull { it.firstOrNull()?.uppercase() }
+                .take(2).joinToString("")
+            Box(
+                modifier = Modifier.size(size)
+                    .clip(CircleShape)
+                    .background(AureliaTheme.colors.avatarTerracotta)
+                    .border(ringWidth, ringColor, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size.value / 2.8).sp)
+            }
         }
-    } else {
-        val initials = obj.title.split(" ")
-            .mapNotNull { it.firstOrNull()?.uppercase() }
-            .take(2).joinToString("")
-        Box(
-            modifier = Modifier.size(size)
-                .clip(CircleShape)
-                .background(AureliaTheme.colors.avatarTerracotta)
-                .border(ringWidth, ringColor, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size.value / 2.8).sp)
+        // Хвостик-заострение цвета кольца
+        androidx.compose.foundation.Canvas(Modifier.size(14.dp, 9.dp)) {
+            val w = drawContext.size.width
+            val h = drawContext.size.height
+            val p = androidx.compose.ui.graphics.Path().apply {
+                moveTo(0f, 0f); lineTo(w, 0f); lineTo(w / 2f, h); close()
+            }
+            drawPath(p, ringColor)
         }
     }
 }

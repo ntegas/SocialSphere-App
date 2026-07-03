@@ -59,11 +59,20 @@ object SearchEngine {
         var score = 0
         var matchField = ""
 
-        val fullName = "${contact.firstName} ${contact.lastName}".trim().lowercase()
+        // Полное имя с отчеством — «Иван Петрович Сидоров» находится по любому слову
+        val fullName = listOfNotNull(
+            contact.firstName.takeIf { it.isNotBlank() },
+            contact.middleName?.takeIf { it.isNotBlank() },
+            contact.lastName.takeIf { it.isNotBlank() }
+        ).joinToString(" ").lowercase()
         if (fullName.startsWith(q))          { score += 100; matchField = "Имя" }
         else if (fullName.contains(q))       { score += 80;  matchField = "Имя" }
         else if (contact.firstName.lowercase().contains(q)) { score += 75; matchField = "Имя" }
         else if (contact.lastName.lowercase().contains(q))  { score += 75; matchField = "Фамилия" }
+        else if (contact.middleName?.lowercase()?.contains(q) == true) { score += 70; matchField = "Отчество" }
+
+        // Прозвище — вес как у имени (фидбэк владельца: «любимое» должно находиться)
+        if (contact.nickname?.lowercase()?.contains(q) == true) { score += 75; matchField = "Прозвище" }
 
         // Phone
         contact.phones.forEach { p ->
@@ -103,8 +112,22 @@ object SearchEngine {
         contact.gifts.forEach { g ->
             if (g.title.lowercase().contains(q)) { score += 20; matchField = "Подарок" }
         }
-        // Tags / relationship type
+        // Теги (фидбэк владельца: раньше не искались вообще)
+        contact.tags.forEach { t ->
+            if (t.lowercase().contains(q)) { score += 55; matchField = "Тег" }
+        }
+        // Свой тип отношений / где познакомились / следующий шаг
+        if (contact.customRelationshipType?.lowercase()?.contains(q) == true) { score += 40; matchField = "Тип" }
+        if (contact.nextStep?.lowercase()?.contains(q) == true) { score += 25; matchField = "След. шаг" }
+        // Тип отношений (стандартный лейбл)
         if (contact.relationshipType.labelKey().lowercase().contains(q)) { score += 15; matchField = "Тип" }
+
+        // Заметки контакта из общего стора (contact.notes на собранном объекте
+        // может быть пустым — заметки живут в AppStateStore.notes)
+        if (matchField.isEmpty()) {
+            AppStateStore.notes.firstOrNull { it.contactId == contact.id && it.text.lowercase().contains(q) }
+                ?.let { score += 30; matchField = "Заметка" }
+        }
 
         return if (score > 0) SearchResult.ContactResult(contact, matchField, score) else null
     }

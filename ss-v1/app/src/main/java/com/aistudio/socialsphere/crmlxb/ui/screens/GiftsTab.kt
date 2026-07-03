@@ -73,48 +73,48 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                         java.time.temporal.ChronoUnit.DAYS.between(today, next)
                     } catch (e: Exception) { null }
 
+                    // «Через N дней» — отдельной строкой ПОД названием (фидбэк владельца:
+                    // сбоку метка сжималась длинным заголовком и выглядела сбитой).
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onNavigateToCalendarItem(date.id) }
                             .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val emoji = when (date.type) {
-                                CalendarItemType.BIRTHDAY    -> "🎂"
-                                CalendarItemType.ANNIVERSARY -> "💍"
-                                else                         -> "⭐"
-                            }
-                            Text(emoji, fontSize = 16.sp)
+                        val emoji = when (date.type) {
+                            CalendarItemType.BIRTHDAY    -> "🎂"
+                            CalendarItemType.ANNIVERSARY -> "💍"
+                            else                         -> "⭐"
+                        }
+                        Text(emoji, fontSize = 16.sp)
+                        Column(Modifier.weight(1f)) {
                             Text(
                                 com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(date.title, date.type, androidx.compose.ui.platform.LocalContext.current),
                                 style      = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium
                             )
-                        }
-                        if (daysUntil != null) {
-                            // Явная не-nullable копия: K2 не делал smart-cast,
-                            // и -daysUntil давал ambiguity unaryMinus
-                            val du: Long = daysUntil
-                            Text(
-                                when {
-                                    du == 0L -> stringResource(R.string.cd_today_party)
-                                    du > 0L  -> String.format(stringResource(R.string.home_in_days), du)
-                                    else     -> String.format(stringResource(R.string.home_days_ago), -du)
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = when {
-                                    du in 0L..7L  -> AppleTheme.colors.red
-                                    du in 8L..30L -> AppleTheme.colors.orange
-                                    else          -> AppleTheme.colors.secondaryLabel
-                                },
-                                fontWeight = FontWeight.Medium
-                            )
+                            if (daysUntil != null) {
+                                // Явная не-nullable копия: K2 не делал smart-cast,
+                                // и -daysUntil давал ambiguity unaryMinus
+                                val du: Long = daysUntil
+                                Text(
+                                    when {
+                                        du == 0L -> stringResource(R.string.cd_today_party)
+                                        du > 0L  -> String.format(stringResource(R.string.home_in_days), du)
+                                        else     -> String.format(stringResource(R.string.home_days_ago), -du)
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = when {
+                                        du in 0L..7L  -> AppleTheme.colors.red
+                                        du in 8L..30L -> AppleTheme.colors.orange
+                                        else          -> AppleTheme.colors.secondaryLabel
+                                    },
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
                         }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
@@ -172,7 +172,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                             value = dDate,
                             onValueChange = { dDate = it },
                             label = stringResource(R.string.cd_date_iso),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            allowNoYear = true // ДР/годовщина без известного года — «--MM-DD»
                         )
                         Text(stringResource(R.string.cd_date_reminder), style = MaterialTheme.typography.labelMedium)
                         androidx.compose.foundation.layout.FlowRow(

@@ -37,12 +37,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import androidx.compose.material3.Icon
@@ -347,4 +350,122 @@ fun AureliaCapsLabel(
         color = color,
         modifier = modifier,
     )
+}
+
+// ── Канонический пикер: шторка + поиск + список строк (аватар/имя/подпись) ──
+// ЕДИНЫЙ компонент для всех «добавить человека/компанию» (семья, связанные,
+// сотрудник компании, место работы) — вместо разрозненных AlertDialog без
+// поиска и в старом стиле. Опциональная строка «создать нового».
+data class AureliaPickItem(
+    val id: String,
+    val title: String,
+    val subtitle: String? = null,
+    /** true — градиент лого компании, false — аватар человека. */
+    val isCompany: Boolean = false,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AureliaPickerSheet(
+    title: String,
+    items: List<AureliaPickItem>,
+    onPick: (AureliaPickItem) -> Unit,
+    onDismiss: () -> Unit,
+    searchPlaceholder: String = "",
+    emptyText: String = "",
+    createNewText: String? = null,
+    onCreateNew: (() -> Unit)? = null,
+) {
+    val search = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    val filtered = if (search.value.isBlank()) items
+        else items.filter {
+            it.title.contains(search.value, ignoreCase = true) ||
+            it.subtitle?.contains(search.value, ignoreCase = true) == true
+        }
+    AureliaSheet(onDismiss = onDismiss) {
+        Text(
+            title,
+            fontFamily = AureliaSerif, fontSize = 22.sp, fontWeight = FontWeight.W800,
+            color = AppleTheme.colors.label,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+        // Поиск — капсула как на списках (r13, нейтральная заливка)
+        androidx.compose.material3.OutlinedTextField(
+            value = search.value,
+            onValueChange = { search.value = it },
+            placeholder = { Text(searchPlaceholder, color = AppleTheme.colors.tertiaryLabel) },
+            leadingIcon = {
+                Icon(androidx.compose.material.icons.Icons.Default.Search, null,
+                    Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(13.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+        )
+        androidx.compose.foundation.lazy.LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)
+        ) {
+            if (createNewText != null && onCreateNew != null) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                            .aureliaPress { onCreateNew() }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape)
+                                .background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Add, null,
+                                Modifier.size(20.dp), tint = AppleTheme.colors.brand)
+                        }
+                        Text(createNewText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                            color = AppleTheme.colors.brand)
+                    }
+                }
+            }
+            if (filtered.isEmpty()) {
+                item {
+                    Text(
+                        emptyText, fontSize = 14.sp, color = AppleTheme.colors.secondaryLabel,
+                        modifier = Modifier.padding(vertical = 18.dp, horizontal = 4.dp)
+                    )
+                }
+            }
+            items(filtered.size, key = { filtered[it].id }) { i ->
+                val item = filtered[i]
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        .aureliaPress { onPick(item) }
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (item.isCompany) {
+                        Box(
+                            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                                .background(AureliaAvatars.companyBrushFor(item.id)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(item.title.take(1).uppercase(), color = Color.White,
+                                fontFamily = AureliaSerif, fontSize = 17.sp, fontWeight = FontWeight.W700)
+                        }
+                    } else {
+                        AureliaAvatar(id = item.id, name = item.title, size = 40.dp, fontSize = 14.sp)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                            color = AppleTheme.colors.label,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (!item.subtitle.isNullOrBlank())
+                            Text(item.subtitle, fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+    }
 }

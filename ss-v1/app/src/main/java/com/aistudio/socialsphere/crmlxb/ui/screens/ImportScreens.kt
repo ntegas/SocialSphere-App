@@ -484,6 +484,7 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
             id = contactId,
             firstName = candidate.firstName,
             lastName = candidate.lastName,
+            middleName = candidate.middleName.ifBlank { null },
             photoUri = null,
             relationshipType = RelationshipType.OTHER,
             connectionLevel = ConnectionLevel.NORMAL,

@@ -198,6 +198,16 @@ fun AppleAppTheme(
         MaterialTheme(
             colorScheme = aureliaColorScheme(colors),
             typography = AureliaTypography,
+            // КОРНЕВЫЕ формы: extraLarge задаёт форму ВСЕХ AlertDialog/ModalBottomSheet
+            // разом (r28 — радиус шторок макета), large/medium — карточкам/меню без
+            // явного shape. Одна правка меняет вид всех диалогов приложения.
+            shapes = androidx.compose.material3.Shapes(
+                extraSmall = RoundedCornerShape(9.dp),
+                small      = RoundedCornerShape(13.dp),
+                medium     = RoundedCornerShape(16.dp),
+                large      = RoundedCornerShape(22.dp),
+                extraLarge = RoundedCornerShape(28.dp),
+            ),
             content = content
         )
     }

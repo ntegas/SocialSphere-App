@@ -17,6 +17,8 @@ data class ImportContactCandidate(
     val id: String = UUID.randomUUID().toString(),
     val firstName: String = "",
     val lastName: String = "",
+    /** Отчество/среднее имя (+префикс/суффикс) — раньше отбрасывалось. */
+    val middleName: String = "",
     val phones: List<ContactPhone> = emptyList(),
     val emails: List<ContactEmail> = emptyList(),
     val companyName: String? = null,
@@ -64,16 +66,35 @@ object ContactImporter {
 
                 when (mimeType) {
                     ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE -> {
-                        val givenName = it.getString(data2Idx)
+                        // Полный StructuredName: DATA2=имя, DATA3=фамилия, DATA5=отчество,
+                        // DATA4=префикс, DATA6=суффикс. Раньше читались только имя и
+                        // фамилия — отчество из 3-4-словных имён терялось.
+                        val givenName  = it.getString(data2Idx)
                         val familyName = it.getString(data3Idx)
                         val displayName = it.getString(data1Idx)
-                        
-                        val first = givenName ?: if (!familyName.isNullOrBlank()) "" else displayName ?: ""
-                        val last = familyName ?: ""
-                        
+                        val data5Idx = it.getColumnIndex(ContactsContract.Data.DATA5)
+                        val data6Idx = it.getColumnIndex(ContactsContract.Data.DATA6)
+                        val middle = if (data5Idx >= 0) it.getString(data5Idx) ?: "" else ""
+                        val prefix = if (data4Idx >= 0) it.getString(data4Idx) ?: "" else ""
+                        val suffix = if (data6Idx >= 0) it.getString(data6Idx) ?: "" else ""
+
+                        var first  = (givenName ?: "").trim()
+                        var last   = (familyName ?: "").trim()
+                        var mid    = listOf(prefix, middle, suffix)
+                            .filter { p -> p.isNotBlank() }.joinToString(" ").trim()
+                        // Структурных полей нет — раскладываем displayName без потерь:
+                        // 1 слово → имя; 2 → имя+фамилия; 3+ → имя + середина + фамилия
+                        if (first.isBlank() && last.isBlank() && !displayName.isNullOrBlank()) {
+                            val words = displayName.trim().split(Regex("\\s+"))
+                            first = words.first()
+                            last  = if (words.size >= 2) words.last() else ""
+                            if (mid.isBlank() && words.size >= 3)
+                                mid = words.subList(1, words.size - 1).joinToString(" ")
+                        }
                         candidates[contactId] = candidate.copy(
-                            firstName = candidate.firstName.takeIf { it.isNotBlank() } ?: first.trim(),
-                            lastName = candidate.lastName.takeIf { it.isNotBlank() } ?: last.trim()
+                            firstName  = candidate.firstName.takeIf { it.isNotBlank() } ?: first,
+                            lastName   = candidate.lastName.takeIf { it.isNotBlank() } ?: last,
+                            middleName = candidate.middleName.takeIf { it.isNotBlank() } ?: mid
                         )
                     }
                     ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE -> {
@@ -180,8 +201,9 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
     // Split on BEGIN:VCARD
     val cards = content.split("BEGIN:VCARD").drop(1)
     cards.forEach { card ->
-        var firstName = ""
-        var lastName  = ""
+        var firstName  = ""
+        var lastName   = ""
+        var middleName = ""
         val phones    = mutableListOf<ContactPhone>()
         val emails    = mutableListOf<ContactEmail>()
         var company   = ""
@@ -192,17 +214,28 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
         card.lines().forEach { raw ->
             val line = raw.trim()
             when {
-                // N:LastName;FirstName;;;
-                line.startsWith("N:") -> {
-                    val parts = line.removePrefix("N:").split(";")
+                // N:Фамилия;Имя;Отчество;Префикс;Суффикс — берём ВСЕ части
+                // (раньше отчество/префикс/суффикс отбрасывались — «пропадали
+                // слова» у имён из 3-4 слов). Матчим и «N;CHARSET=…:».
+                line.startsWith("N:") || line.startsWith("N;") -> {
+                    val parts = line.substringAfter(":", "").split(";")
                     lastName  = parts.getOrElse(0) { "" }.trim()
                     firstName = parts.getOrElse(1) { "" }.trim()
+                    middleName = listOf(
+                        parts.getOrElse(3) { "" }.trim(), // префикс — перед отчеством
+                        parts.getOrElse(2) { "" }.trim(), // отчество
+                        parts.getOrElse(4) { "" }.trim()  // суффикс
+                    ).filter { it.isNotBlank() }.joinToString(" ")
                 }
-                // FN: full name fallback
-                line.startsWith("FN:") && firstName.isBlank() && lastName.isBlank() -> {
-                    val full = line.removePrefix("FN:").trim().split(" ")
+                // FN: полное имя (fallback, если N не было) — без потери слов:
+                // 3+ слова → имя + середина(отчество) + фамилия
+                (line.startsWith("FN:") || line.startsWith("FN;")) &&
+                    firstName.isBlank() && lastName.isBlank() -> {
+                    val full = line.substringAfter(":", "").trim().split(Regex("\\s+"))
                     firstName = full.firstOrNull() ?: ""
-                    lastName  = full.drop(1).joinToString(" ")
+                    lastName  = if (full.size >= 2) full.last() else ""
+                    if (full.size >= 3)
+                        middleName = full.subList(1, full.size - 1).joinToString(" ")
                 }
                 // TEL
                 line.startsWith("TEL") -> {
@@ -247,15 +280,26 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                     company = line.substringAfter(":", "").substringBefore(";").trim()
                 line.startsWith("TITLE:") || line.startsWith("TITLE;") ->
                     title = line.substringAfter(":", "").trim()
-                // BDAY: 19900312 or 1990-03-12
-                line.startsWith("BDAY:") -> {
-                    val raw = line.removePrefix("BDAY:").trim()
+                // BDAY: 19900312 / 1990-03-12 / --0312 (без года).
+                // ВАЖНО: матчим и «BDAY;…:» — телефоны экспортируют с параметрами
+                // (BDAY;VALUE=DATE:…, эппловский BDAY;X-APPLE-OMIT-YEAR=1604:…) —
+                // раньше такие строки пропускались и часть ДР не импортировалась.
+                line.startsWith("BDAY:") || line.startsWith("BDAY;") -> {
+                    val raw = line.substringAfter(":", "").trim()
                     val pre = when {
-                        raw.length == 8 && !raw.contains("-") ->
+                        raw.length == 8 && !raw.contains("-") && !raw.startsWith("--") ->
                             "${raw.take(4)}-${raw.substring(4, 6)}-${raw.takeLast(2)}"
                         else -> raw
                     }
-                    birthday = normalizeBirthday(pre) ?: ""
+                    val normalized = normalizeBirthday(pre)
+                    // X-APPLE-OMIT-YEAR: год в дате фиктивный (1604) — убираем его
+                    birthday = when {
+                        normalized == null -> ""
+                        line.contains("X-APPLE-OMIT-YEAR", ignoreCase = true) &&
+                            !normalized.startsWith("--") && normalized.length >= 10 ->
+                            "--" + normalized.substring(5, 10) // yyyy-MM-dd → --MM-DD
+                        else -> normalized
+                    }
                 }
             }
         }
@@ -268,6 +312,7 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                 id          = id,
                 firstName   = firstName,
                 lastName    = lastName,
+                middleName  = middleName,
                 phones      = phones,
                 emails      = emails,
                 companyName = company.ifBlank { null },
@@ -312,6 +357,7 @@ fun parseCsv(content: String): List<ImportContactCandidate> {
     val idxFirst   = colIdx("имя", "firstname", "first name", "given name", "name", "название",
                             exclude = listOf("org", "company", "файл", "middle"))
     val idxLast    = colIdx("фамилия", "lastname", "last name", "family name", "surname")
+    val idxMiddle  = colIdx("отчество", "middle name", "middlename", "additional name")
     val idxPhone   = colIdx("телефон", "phone", "mobile", "tel")
     val idxEmail   = colIdx("email", "почта", "e-mail")
     val idxCompany = colIdx("компания", "company", "организация", "org",
@@ -327,6 +373,7 @@ fun parseCsv(content: String): List<ImportContactCandidate> {
 
         val firstName = col(idxFirst)
         val lastName  = col(idxLast)
+        val middle    = col(idxMiddle)
         val phone     = col(idxPhone)
         val email     = col(idxEmail)
         val company   = col(idxCompany)
@@ -346,6 +393,7 @@ fun parseCsv(content: String): List<ImportContactCandidate> {
             id          = id,
             firstName   = firstName,
             lastName    = lastName,
+            middleName  = middle,
             phones      = phones,
             emails      = emails,
             companyName = company.ifBlank { null },
@@ -380,18 +428,27 @@ private fun splitCsvLine(line: String): List<String> {
 }
 
 /** Нормализация дня рождения из телефонной книги / vCard.
- *  «--MM-DD» и «--MMDD» (без года) → «1972-MM-DD» (1972 високосный —
- *  29 февраля валидно); «yyyy-MM-dd…» → первые 10 символов; иначе null. */
+ *  «--MM-DD» и «--MMDD» (без года) сохраняются КАК «--MM-DD» — год неизвестен,
+ *  и раньше подставлявшийся фиктивный 1972 показывал ложный возраст. Формат
+ *  «--MM-DD» понимают parseFlexibleDate/displayEventDate (CalendarUtils).
+ *  «yyyy-MM-dd…» → первые 10 символов; иначе null. */
 internal fun normalizeBirthday(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
-    val candidate = when {
+    val yearless = when {
         raw.startsWith("--") && raw.length >= 7 && raw[4] == '-' ->
-            "1972-" + raw.substring(2, 7)                       // --MM-DD
+            raw.substring(2, 7)                                   // --MM-DD → MM-DD
         raw.startsWith("--") && raw.length >= 6 ->
-            "1972-" + raw.substring(2, 4) + "-" + raw.substring(4, 6) // --MMDD
-        raw.length >= 10 -> raw.take(10)
-        else -> return null
+            raw.substring(2, 4) + "-" + raw.substring(4, 6)       // --MMDD → MM-DD
+        else -> null
     }
+    if (yearless != null) {
+        // Валидация через високосный год (29 февраля — валидная дата без года)
+        return try {
+            java.time.LocalDate.parse("1972-$yearless"); "--$yearless"
+        } catch (e: Exception) { null }
+    }
+    if (raw.length < 10) return null
+    val candidate = raw.take(10)
     return try {
         java.time.LocalDate.parse(candidate); candidate
     } catch (e: Exception) { null }

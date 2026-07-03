@@ -116,11 +116,13 @@ fun DatePickerField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    allowNoYear: Boolean = false
 ) {
     var show by remember { mutableStateOf(false) }
     OutlinedTextField(
-        value = value,
+        // Дата без года хранится как «--MM-DD» — в поле показываем «14 марта»
+        value = com.aistudio.socialsphere.crmlxb.utils.displayEventDate(value),
         onValueChange = {},
         label = { Text(label) },
         readOnly = true,
@@ -136,9 +138,10 @@ fun DatePickerField(
     )
     if (show) {
         WheelDateSheet(
-            value     = value,
-            onConfirm = { onValueChange(it) },
-            onDismiss = { show = false }
+            value       = value,
+            onConfirm   = { onValueChange(it) },
+            onDismiss   = { show = false },
+            allowNoYear = allowNoYear
         )
     }
 }
@@ -272,16 +275,18 @@ private fun <T> WheelPicker(
 private fun WheelDateSheet(
     value: String,
     onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    allowNoYear: Boolean = false
 ) {
     val today = java.time.LocalDate.now()
+    // Дата без года хранится как «--MM-DD» (vCard) — parseFlexibleDate её понимает
     val initial = remember(value) {
-        try { if (value.isNotBlank()) java.time.LocalDate.parse(value.take(10)) else today }
-        catch (e: Exception) { today }
+        com.aistudio.socialsphere.crmlxb.utils.parseFlexibleDate(value) ?: today
     }
-    var year  by remember { mutableStateOf(initial.year) }
-    var month by remember { mutableStateOf(initial.monthValue) }
-    var day   by remember { mutableStateOf(initial.dayOfMonth) }
+    var year   by remember { mutableStateOf(initial.year) }
+    var month  by remember { mutableStateOf(initial.monthValue) }
+    var day    by remember { mutableStateOf(initial.dayOfMonth) }
+    var noYear by remember { mutableStateOf(allowNoYear && value.trim().startsWith("--")) }
 
     val monthNames = listOf(
         stringResource(R.string.month_1), stringResource(R.string.month_2),
@@ -293,11 +298,13 @@ private fun WheelDateSheet(
     )
     val years  = remember { (1920..today.year + 5).toList() }
     val months = (1..12).toList()
-    val daysInMonth = java.time.YearMonth.of(year, month).lengthOfMonth()
+    // Пока год неизвестен, дни месяца считаем по високосному году —
+    // чтобы 29 февраля было доступно для ДР без года
+    val daysInMonth = java.time.YearMonth.of(if (noYear) 2024 else year, month).lengthOfMonth()
     if (day > daysInMonth) day = daysInMonth
     val days = (1..daysInMonth).toList()
 
-    fun setDate(d: java.time.LocalDate) { year = d.year; month = d.monthValue; day = d.dayOfMonth }
+    fun setDate(d: java.time.LocalDate) { year = d.year; month = d.monthValue; day = d.dayOfMonth; noYear = false }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -305,7 +312,7 @@ private fun WheelDateSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                "$day ${monthNames[month - 1]} $year",
+                if (noYear) "$day ${monthNames[month - 1]}" else "$day ${monthNames[month - 1]} $year",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -314,19 +321,33 @@ private fun WheelDateSheet(
                 AssistChip(onClick = { setDate(today) }, label = { Text(stringResource(R.string.cal_today)) })
                 AssistChip(onClick = { setDate(today.plusDays(1)) }, label = { Text(stringResource(R.string.cal_tomorrow)) })
                 AssistChip(onClick = { setDate(today.plusWeeks(1)) }, label = { Text("+7") })
+                if (allowNoYear) {
+                    // «Без года» — для дней рождения, когда год неизвестен
+                    FilterChip(
+                        selected = noYear,
+                        onClick  = { noYear = !noYear },
+                        label    = { Text(stringResource(R.string.date_no_year)) }
+                    )
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WheelPicker(days, days.indexOf(day).coerceAtLeast(0),
                     { day = days[it] }, Modifier.weight(1f)) { it.toString() }
                 WheelPicker(months, month - 1,
                     { month = it + 1 }, Modifier.weight(1.5f)) { monthNames[it - 1] }
-                WheelPicker(years, years.indexOf(year).coerceAtLeast(0),
-                    { year = years[it] }, Modifier.weight(1f)) { it.toString() }
+                if (!noYear) {
+                    WheelPicker(years, years.indexOf(year).coerceAtLeast(0),
+                        { year = years[it] }, Modifier.weight(1f)) { it.toString() }
+                }
             }
             Button(
                 onClick = {
-                    val safeDay = day.coerceAtMost(java.time.YearMonth.of(year, month).lengthOfMonth())
-                    onConfirm(java.time.LocalDate.of(year, month, safeDay).toString())
+                    if (noYear) {
+                        onConfirm(String.format("--%02d-%02d", month, day))
+                    } else {
+                        val safeDay = day.coerceAtMost(java.time.YearMonth.of(year, month).lengthOfMonth())
+                        onConfirm(java.time.LocalDate.of(year, month, safeDay).toString())
+                    }
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth()

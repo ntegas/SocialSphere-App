@@ -49,11 +49,14 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     // включается ОДНОЙ кнопкой в шапке карточки контакта (см. ContactDetailScreen.kt),
     // общей на все вкладки с инлайн-редактированием.
 
-    // ── Следующий шаг — золотая карточка-акцент (спека Aurelia) ──
+    // ── Следующий шаг — золотая карточка-акцент (спека Aurelia).
+    // В режиме правки редактируется тапом; пустой — виден ТОЛЬКО в правке
+    // (принцип: просмотр показывает заполненное, правка открывает все поля).
     val nextStepText = contact.nextStep?.takeIf { it.isNotBlank() }
-    if (nextStepText != null) {
+    if (nextStepText != null || editing) {
         item {
             val gold = AppleTheme.colors.orange
+            var showNextStepDialog by remember { mutableStateOf(false) }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -64,6 +67,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         )
                     )
                     .border(1.dp, gold.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
+                    .then(if (editing) Modifier.clickable { showNextStepDialog = true } else Modifier)
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 Column {
@@ -73,11 +77,77 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         letterSpacing = 0.14.em, color = gold
                     )
                     Text(
-                        nextStepText,
+                        nextStepText ?: stringResource(R.string.cd_next_step_hint),
                         fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                        lineHeight = 22.sp, color = AppleTheme.colors.label,
+                        lineHeight = 22.sp,
+                        color = if (nextStepText != null) AppleTheme.colors.label
+                                else AppleTheme.colors.secondaryLabel,
                         modifier = Modifier.padding(top = 5.dp)
                     )
+                }
+            }
+            if (showNextStepDialog) {
+                var draft by remember { mutableStateOf(contact.nextStep ?: "") }
+                AlertDialog(
+                    onDismissRequest = { showNextStepDialog = false },
+                    title = { Text(stringResource(R.string.ce_next_step), fontWeight = FontWeight.Bold) },
+                    text = {
+                        OutlinedTextField(
+                            value = draft, onValueChange = { draft = it }, keyboardOptions = CapSentences,
+                            modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            AppStateStore.updateContact(contact.copy(nextStep = draft.trim().ifBlank { null }))
+                            showNextStepDialog = false
+                        }) { Text(stringResource(R.string.common_save)) }
+                    },
+                    dismissButton = { TextButton(onClick = { showNextStepDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+                )
+            }
+        }
+    }
+
+    // ── Ближайшие события контакта (фидбэк владельца 2026-07-02: событие,
+    // созданное из карточки, было невозможно открыть/править из карточки —
+    // блока не существовало; редактирование было только через Календарь) ──
+    val upcomingItems = AppStateStore.calendarItems
+        .filter { ev ->
+            ev.status == CalendarItemStatus.ACTIVE &&
+            ev.links.any { it.targetId == contact.id } &&
+            ev.effectiveDate() >= java.time.LocalDate.now().toString()
+        }
+        .sortedBy { it.effectiveDate() }
+        .take(5)
+    if (upcomingItems.isNotEmpty()) {
+        item {
+            CardBlock(title = stringResource(R.string.home_upcoming)) {
+                upcomingItems.forEachIndexed { i, ev ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToCalendarItem(ev.id) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(eventTypeColor(ev.type)))
+                        Text(
+                            com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(ev.title, ev.type, ctxLabel),
+                            fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                            color = AppleTheme.colors.label,
+                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            ev.effectiveDate(),
+                            fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            color = AppleTheme.colors.secondaryLabel
+                        )
+                    }
+                    if (i < upcomingItems.lastIndex)
+                        HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
             }
         }
@@ -216,58 +286,81 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { showAddFamily = true }) {
-                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.cd_add_family))
+                // Кнопка добавления — только в режиме правки (карандаш в шапке);
+                // в просмотре вкладка чистая (решение владельца 2026-07-02)
+                if (editing) {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = { showAddFamily = true }) {
+                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.cd_add_family))
+                    }
                 }
             } else {
-                TextButton(onClick = { showAddFamily = true }) {
+                if (editing) TextButton(onClick = { showAddFamily = true }) {
                     Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.cd_add_family))
                 }
+            }
+
+            // Семья без карточек контактов («сын Петя, телефона нет») — свободный
+            // текст под списком. Просмотр: только если заполнен; правка: поле ввода,
+            // сохранение при выходе из правки / уходе с экрана.
+            if (editing) {
+                var familyNoteDraft by remember(contact.id) { mutableStateOf(contact.familyNote ?: "") }
+                fun commitFamilyNote() {
+                    val trimmed = familyNoteDraft.trim().ifBlank { null }
+                    val current = AppStateStore.getContact(contact.id) ?: return
+                    if (current.familyNote != trimmed)
+                        AppStateStore.updateContact(current.copy(familyNote = trimmed))
+                }
+                DisposableEffect(Unit) { onDispose { commitFamilyNote() } }
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = familyNoteDraft,
+                    onValueChange = { familyNoteDraft = it },
+                    keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_family_note)) },
+                    placeholder = { Text(stringResource(R.string.cd_family_note_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2, maxLines = 4
+                )
+            } else if (!contact.familyNote.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    contact.familyNote,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppleTheme.colors.secondaryLabel
+                )
             }
         }
         if (showAddFamily) {
-            val candidates = AppStateStore.contacts.filter {
-                it.id != contact.id &&
-                "${it.firstName} ${it.lastName}".contains(famSearch, ignoreCase = true)
-            }
-            AlertDialog(
-                onDismissRequest = { showAddFamily = false; famSelected = null; famSearch = ""; famNote = "" },
-                title = { Text(stringResource(R.string.cd_add_family), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val sel = famSelected
-                        if (sel == null) {
-                            OutlinedTextField(
-                                value = famSearch, onValueChange = { famSearch = it },
-                                label = { Text(stringResource(R.string.ce_search_contact)) },
-                                modifier = Modifier.fillMaxWidth(), singleLine = true
+            // Шаг 1: канонический пикер (шторка + поиск + аватары) — единый
+            // дизайн для всех «добавить человека» вместо старых AlertDialog
+            if (famSelected == null) {
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                    title = stringResource(R.string.cd_add_family),
+                    items = AppStateStore.contacts
+                        .filter { it.id != contact.id }
+                        .map { c ->
+                            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                                id = c.id,
+                                title = "${c.firstName} ${c.lastName}".trim(),
+                                subtitle = c.customRelationshipType?.takeIf { it.isNotBlank() }
+                                    ?: c.relationshipType.label(ctxLabel)
                             )
-                            candidates.take(8).forEach { c ->
-                                Text(
-                                    "${c.firstName} ${c.lastName}".trim(),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { famSelected = c }
-                                        .padding(vertical = 8.dp)
-                                )
-                            }
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    "${sel.firstName} ${sel.lastName}".trim(),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                TextButton(onClick = { famSelected = null }) { Text(stringResource(R.string.ce_change)) }
-                            }
+                        },
+                    onPick = { picked -> famSelected = AppStateStore.getContact(picked.id) },
+                    onDismiss = { showAddFamily = false; famSearch = ""; famNote = "" },
+                    searchPlaceholder = stringResource(R.string.ce_search_contact),
+                    emptyText = stringResource(R.string.compd_no_candidates)
+                )
+            } else famSelected?.let { sel ->
+                // Шаг 2: роли + необязательная заметка
+                AlertDialog(
+                    onDismissRequest = { showAddFamily = false; famSelected = null; famNote = "" },
+                    title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             DropdownField(stringResource(R.string.ce_who_relation), famOtherRole, famRoles) { v -> famOtherRole = v }
                             DropdownField(stringResource(R.string.ce_who_am_i), famMyRole, famRoles) { v -> famMyRole = v }
                             OutlinedTextField(
@@ -276,15 +369,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                 modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
                             )
                         }
-                    }
-                },
-                confirmButton = {
-                    Button(enabled = famSelected != null, onClick = {
-                        famSelected?.let { other ->
+                    },
+                    confirmButton = {
+                        Button(onClick = {
                             AppStateStore.addContactRelation(ContactRelation(
                                 id = java.util.UUID.randomUUID().toString(),
                                 firstContactId = contact.id,
-                                secondContactId = other.id,
+                                secondContactId = sel.id,
                                 firstRole = famMyRole,
                                 secondRole = famOtherRole
                             ))
@@ -301,12 +392,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                     createdAt = now, updatedAt = now
                                 ))
                             }
-                        }
-                        famSelected = null; famSearch = ""; famNote = ""; showAddFamily = false
-                    }) { Text(stringResource(R.string.common_add)) }
-                },
-                dismissButton = { TextButton(onClick = { showAddFamily = false; famSelected = null; famSearch = ""; famNote = "" }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                            famSelected = null; famSearch = ""; famNote = ""; showAddFamily = false
+                        }) { Text(stringResource(R.string.common_add)) }
+                    },
+                    dismissButton = { TextButton(onClick = { famSelected = null }) { Text(stringResource(R.string.common_back)) } }
+                )
+            }
         }
     }
 
@@ -360,55 +451,49 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     Text("• ${n.text}", style = MaterialTheme.typography.bodySmall,
                         color = AppleTheme.colors.secondaryLabel)
                 }
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { showAddCompany = true }) {
-                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.cd_add_company))
+                if (editing) {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = { showAddCompany = true }) {
+                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.cd_add_company))
+                    }
                 }
                 if (editing) TextButton(onClick = { pendingRemoveCompany = compRel }) {
                     Icon(Icons.Default.Close, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.cd_remove_company))
                 }
             } else {
-                TextButton(onClick = { showAddCompany = true }) {
+                if (editing) TextButton(onClick = { showAddCompany = true }) {
                     Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.cd_add_company))
                 }
             }
         }
         if (showAddCompany) {
-            val comps = AppStateStore.companies.filter {
-                it.name.contains(compSearch, ignoreCase = true)
-            }
-            AlertDialog(
-                onDismissRequest = { showAddCompany = false; compSelected = null; compSearch = ""; compPosition = ""; compNote = "" },
-                title = { Text(stringResource(R.string.cd_add_company), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val sel = compSelected
-                        if (sel == null) {
-                            OutlinedTextField(
-                                value = compSearch, onValueChange = { compSearch = it },
-                                label = { Text(stringResource(R.string.ce_search_company)) },
-                                modifier = Modifier.fillMaxWidth(), singleLine = true
-                            )
-                            comps.take(8).forEach { c ->
-                                Text(
-                                    c.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.fillMaxWidth().clickable { compSelected = c }.padding(vertical = 8.dp)
-                                )
-                            }
-                            if (comps.isEmpty()) {
-                                Text(stringResource(R.string.cd_company_none_hint),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AppleTheme.colors.secondaryLabel)
-                            }
-                        } else {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(sel.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                TextButton(onClick = { compSelected = null }) { Text(stringResource(R.string.ce_change)) }
-                            }
+            // Шаг 1: канонический пикер компаний (поиск + лого-градиенты)
+            if (compSelected == null) {
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                    title = stringResource(R.string.cd_add_company),
+                    items = AppStateStore.companies.map { c ->
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                            id = c.id,
+                            title = c.name,
+                            subtitle = c.industry.label(ctxLabel),
+                            isCompany = true
+                        )
+                    },
+                    onPick = { picked -> compSelected = AppStateStore.companies.firstOrNull { it.id == picked.id } },
+                    onDismiss = { showAddCompany = false; compSearch = ""; compPosition = ""; compNote = "" },
+                    searchPlaceholder = stringResource(R.string.ce_search_company),
+                    emptyText = stringResource(R.string.cd_company_none_hint)
+                )
+            } else compSelected?.let { sel ->
+                // Шаг 2: должность + необязательная заметка
+                AlertDialog(
+                    onDismissRequest = { showAddCompany = false; compSelected = null; compPosition = ""; compNote = "" },
+                    title = { Text(sel.name, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             OutlinedTextField(
                                 value = compPosition, onValueChange = { compPosition = it }, keyboardOptions = CapSentences,
                                 label = { Text(stringResource(R.string.cd_position)) },
@@ -420,16 +505,14 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                 modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
                             )
                         }
-                    }
-                },
-                confirmButton = {
-                    Button(enabled = compSelected != null, onClick = {
-                        compSelected?.let { comp ->
+                    },
+                    confirmButton = {
+                        Button(onClick = {
                             AppStateStore.updateContact(contact.copy(
                                 companyRelations = contact.companyRelations + ContactCompanyRelation(
                                     id = java.util.UUID.randomUUID().toString(),
                                     contactId = contact.id,
-                                    companyId = comp.id,
+                                    companyId = sel.id,
                                     position = compPosition.ifBlank { null },
                                     employmentStatus = EmploymentStatus.CURRENT,
                                     isPrimary = contact.companyRelations.isEmpty()
@@ -448,12 +531,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                     createdAt = now, updatedAt = now
                                 ))
                             }
-                        }
-                        compSelected = null; compSearch = ""; compPosition = ""; compNote = ""; showAddCompany = false
-                    }) { Text(stringResource(R.string.common_add)) }
-                },
-                dismissButton = { TextButton(onClick = { showAddCompany = false; compSelected = null; compSearch = ""; compPosition = ""; compNote = "" }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                            compSelected = null; compSearch = ""; compPosition = ""; compNote = ""; showAddCompany = false
+                        }) { Text(stringResource(R.string.common_add)) }
+                    },
+                    dismissButton = { TextButton(onClick = { compSelected = null }) { Text(stringResource(R.string.common_back)) } }
+                )
+            }
         }
     }
 
@@ -527,13 +610,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         }
                     }
                 }
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { showAddInterest = true }) {
-                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.cd_add_interest))
+                if (editing) {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = { showAddInterest = true }) {
+                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.cd_add_interest))
+                    }
                 }
             } else {
-                TextButton(onClick = { showAddInterest = true }) {
+                if (editing) TextButton(onClick = { showAddInterest = true }) {
                     Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.cd_add_interest))
                 }
@@ -653,10 +738,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     }
                 }
             }
-            Spacer(Modifier.height(4.dp))
-            TextButton(onClick = { showAddDream = true }) {
-                Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.cd_add_dream))
+            if (editing) {
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = { showAddDream = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_dream))
+                }
             }
         }
         if (showAddDream) {
@@ -695,63 +782,150 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     }
 
     // ── Статус и классификация (из вкладки Детали) ───────────
+    // «Уровень связи» слит в статус; тип отношений уважает свой (кастомный) вариант.
     item {
         CardBlock(title = stringResource(R.string.cd_status_class)) {
             InfoRow(stringResource(R.string.common_status),          contact.contactStatus.label(ctxLabel))
-            InfoRow(stringResource(R.string.filter_relation),   contact.relationshipType.label(ctxLabel))
-            InfoRow(stringResource(R.string.filter_connection),   contact.connectionLevel.label(ctxLabel))
+            InfoRow(stringResource(R.string.filter_relation),
+                contact.customRelationshipType?.takeIf { it.isNotBlank() } ?: contact.relationshipType.label(ctxLabel))
             InfoRow(stringResource(R.string.filter_importance),        contact.importanceLevel.label(ctxLabel))
             InfoRow(stringResource(R.string.cd_social_role), contact.socialRole.label(ctxLabel))
             InfoRow(stringResource(R.string.filter_rhythm),    contact.communicationRhythm.label(ctxLabel))
         }
     }
 
-    // ── Теги ─────────────────────────────────────────────────
+    // ── Теги (по макету: caps-заголовок СНАРУЖИ, пилюли r15 + «+ Тег») ──
     item {
-        if (contact.tags.isNotEmpty()) {
-            CardBlock(title = stringResource(R.string.cd_tags)) {
-                @OptIn(ExperimentalLayoutApi::class)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement   = Arrangement.spacedBy(6.dp)
+        var showAddTag by remember { mutableStateOf(false) }
+        var newTag by remember { mutableStateOf("") }
+        Column {
+            Text(
+                stringResource(R.string.cd_tags).uppercase(),
+                fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            @OptIn(ExperimentalLayoutApi::class)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement   = Arrangement.spacedBy(6.dp)
+            ) {
+                contact.tags.forEach { tag ->
+                    Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(15.dp),
+                        color = AppleTheme.colors.brand.copy(alpha = 0.10f)
+                    ) {
+                        Text(
+                            tag,
+                            style    = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color    = AppleTheme.colors.brand,
+                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+                // «+ Тег» — быстрое добавление прямо с карточки (как в макете)
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(15.dp),
+                    color = androidx.compose.ui.graphics.Color.Transparent,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AppleTheme.colors.separator),
+                    modifier = Modifier.clickable { showAddTag = true }
                 ) {
-                    contact.tags.forEach { tag ->
-                        Surface(
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                            color = AppleTheme.colors.brand.copy(alpha = 0.10f)
-                        ) {
-                            Text(
-                                tag,
-                                style    = MaterialTheme.typography.labelMedium,
-                                color    = AppleTheme.colors.brand,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
+                    Text(
+                        stringResource(R.string.cd_add_tag),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppleTheme.colors.secondaryLabel,
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
+        if (showAddTag) {
+            AlertDialog(
+                onDismissRequest = { showAddTag = false; newTag = "" },
+                title = { Text(stringResource(R.string.cd_add_tag_title), fontWeight = FontWeight.Bold) },
+                text = {
+                    OutlinedTextField(
+                        value = newTag, onValueChange = { newTag = it }, keyboardOptions = CapSentences,
+                        label = { Text(stringResource(R.string.cd_tags)) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                },
+                confirmButton = {
+                    Button(enabled = newTag.isNotBlank() &&
+                        contact.tags.none { it.equals(newTag.trim(), ignoreCase = true) },
+                        onClick = {
+                            AppStateStore.updateContact(contact.copy(tags = contact.tags + newTag.trim()))
+                            newTag = ""; showAddTag = false
+                        }) { Text(stringResource(R.string.common_add)) }
+                },
+                dismissButton = { TextButton(onClick = { showAddTag = false; newTag = "" }) { Text(stringResource(R.string.common_cancel)) } }
+            )
+        }
+    }
+
+    // Где познакомились — пустое поле открывается в режиме правки (тап = диалог)
+    item {
+        val hasMeet = !contact.meetContext.isNullOrBlank() || !contact.meetDate.isNullOrBlank()
+        var showMeetDialog by remember { mutableStateOf(false) }
+        if (hasMeet || editing) {
+            Box(Modifier.then(if (editing) Modifier.clickable { showMeetDialog = true } else Modifier)) {
+                CardBlock(title = stringResource(R.string.cd_where_met)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment     = Alignment.Top
+                    ) {
+                        Icon(Icons.Default.Handshake, null, Modifier.size(16.dp),
+                            tint = AppleTheme.colors.brand)
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            if (!contact.meetContext.isNullOrBlank())
+                                Text(contact.meetContext, style = MaterialTheme.typography.bodyMedium)
+                            if (!contact.meetDate.isNullOrBlank())
+                                Text(contact.meetDate, style = MaterialTheme.typography.bodySmall,
+                                    color = AppleTheme.colors.secondaryLabel)
+                            if (!hasMeet)
+                                Text(stringResource(R.string.cd_where_met_hint),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppleTheme.colors.secondaryLabel)
                         }
                     }
                 }
             }
         }
-    }
-
-    // Где познакомились
-    item {
-        if (!contact.meetContext.isNullOrBlank() || !contact.meetDate.isNullOrBlank()) {
-            CardBlock(title = stringResource(R.string.cd_where_met)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment     = Alignment.Top
-                ) {
-                    Icon(Icons.Default.Handshake, null, Modifier.size(16.dp),
-                        tint = AppleTheme.colors.brand)
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        if (!contact.meetContext.isNullOrBlank())
-                            Text(contact.meetContext, style = MaterialTheme.typography.bodyMedium)
-                        if (!contact.meetDate.isNullOrBlank())
-                            Text(contact.meetDate, style = MaterialTheme.typography.bodySmall,
-                                color = AppleTheme.colors.secondaryLabel)
+        if (showMeetDialog) {
+            var ctxDraft by remember { mutableStateOf(contact.meetContext ?: "") }
+            var dateDraft by remember { mutableStateOf(contact.meetDate ?: "") }
+            AlertDialog(
+                onDismissRequest = { showMeetDialog = false },
+                title = { Text(stringResource(R.string.cd_where_met), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = ctxDraft, onValueChange = { ctxDraft = it }, keyboardOptions = CapSentences,
+                            label = { Text(stringResource(R.string.cd_where_met)) },
+                            modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
+                        )
+                        DatePickerField(
+                            value = dateDraft,
+                            onValueChange = { dateDraft = it },
+                            label = stringResource(R.string.cd_date_iso),
+                            modifier = Modifier.fillMaxWidth(),
+                            allowNoYear = true
+                        )
                     }
-                }
-            }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        AppStateStore.updateContact(contact.copy(
+                            meetContext = ctxDraft.trim().ifBlank { null },
+                            meetDate    = dateDraft.trim().ifBlank { null }
+                        ))
+                        showMeetDialog = false
+                    }) { Text(stringResource(R.string.common_save)) }
+                },
+                dismissButton = { TextButton(onClick = { showMeetDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+            )
         }
     }
 
@@ -849,66 +1023,51 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             }
         }
         if (showAddRelated) {
-            val candidates = AppStateStore.contacts.filter {
-                it.id != contact.id &&
-                "${it.firstName} ${it.lastName}".contains(relSearch, ignoreCase = true)
-            }
-            AlertDialog(
-                onDismissRequest = { showAddRelated = false; relSelected = null; relSearch = "" },
-                title = { Text(stringResource(R.string.cd_related_people), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val sel = relSelected
-                        if (sel == null) {
-                            OutlinedTextField(
-                                value = relSearch, onValueChange = { relSearch = it },
-                                label = { Text(stringResource(R.string.ce_search_contact)) },
-                                modifier = Modifier.fillMaxWidth(), singleLine = true
+            // Шаг 1: канонический пикер людей (поиск + аватары)
+            if (relSelected == null) {
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                    title = stringResource(R.string.cd_related_people),
+                    items = AppStateStore.contacts
+                        .filter { it.id != contact.id }
+                        .map { c ->
+                            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                                id = c.id,
+                                title = "${c.firstName} ${c.lastName}".trim(),
+                                subtitle = c.customRelationshipType?.takeIf { it.isNotBlank() }
+                                    ?: c.relationshipType.label(ctxLabel)
                             )
-                            candidates.take(8).forEach { c ->
-                                Text(
-                                    "${c.firstName} ${c.lastName}".trim(),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { relSelected = c }
-                                        .padding(vertical = 8.dp)
-                                )
-                            }
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    "${sel.firstName} ${sel.lastName}".trim(),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                TextButton(onClick = { relSelected = null }) { Text(stringResource(R.string.ce_change)) }
-                            }
+                        },
+                    onPick = { picked -> relSelected = AppStateStore.getContact(picked.id) },
+                    onDismiss = { showAddRelated = false; relSearch = "" },
+                    searchPlaceholder = stringResource(R.string.ce_search_contact),
+                    emptyText = stringResource(R.string.compd_no_candidates)
+                )
+            } else relSelected?.let { sel ->
+                // Шаг 2: роли связи
+                AlertDialog(
+                    onDismissRequest = { showAddRelated = false; relSelected = null },
+                    title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             DropdownField(stringResource(R.string.ce_who_relation), relOtherRole, relRoles) { v -> relOtherRole = v }
                             DropdownField(stringResource(R.string.ce_who_am_i), relMyRole, relRoles) { v -> relMyRole = v }
                         }
-                    }
-                },
-                confirmButton = {
-                    Button(enabled = relSelected != null, onClick = {
-                        relSelected?.let { other ->
+                    },
+                    confirmButton = {
+                        Button(onClick = {
                             AppStateStore.addContactRelation(ContactRelation(
                                 id = java.util.UUID.randomUUID().toString(),
                                 firstContactId = contact.id,
-                                secondContactId = other.id,
+                                secondContactId = sel.id,
                                 firstRole = relMyRole,
                                 secondRole = relOtherRole
                             ))
-                        }
-                        relSelected = null; relSearch = ""; showAddRelated = false
-                    }) { Text(stringResource(R.string.common_add)) }
-                },
-                dismissButton = { TextButton(onClick = { showAddRelated = false; relSelected = null; relSearch = "" }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                            relSelected = null; relSearch = ""; showAddRelated = false
+                        }) { Text(stringResource(R.string.common_add)) }
+                    },
+                    dismissButton = { TextButton(onClick = { relSelected = null }) { Text(stringResource(R.string.common_back)) } }
+                )
+            }
         }
     }
 

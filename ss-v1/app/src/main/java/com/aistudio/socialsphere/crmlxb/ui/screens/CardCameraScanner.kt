@@ -39,12 +39,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aistudio.socialsphere.crmlxb.R
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
 
 // Тёмная палитра камеры-сканера (как в макете Aurelia)
 private val CamBrand = Color(0xFF5FB894)
@@ -55,7 +54,6 @@ private val CamGold  = Color(0xFFD7B468)
  * линией сканирования (по макету), кнопка съёмки. По кадру возвращает Bitmap
  * в [onCaptured], дальше OCR (Tesseract) → BusinessCardParser.
  */
-@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CardCameraScanner(
     onClose: () -> Unit,
@@ -63,14 +61,25 @@ fun CardCameraScanner(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+    // Разрешение камеры — штатный Activity Result API (как в остальном приложении).
+    // Accompanist-permissions убран: 0.37.x собран под Compose 1.8, на BOM 2024.09
+    // (Compose 1.7) падал NoSuchMethodError при первой композиции — крэш сканера.
+    var cameraGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> cameraGranted = granted }
 
     LaunchedEffect(Unit) {
-        if (!cameraPermission.status.isGranted) cameraPermission.launchPermissionRequest()
+        if (!cameraGranted) permLauncher.launch(Manifest.permission.CAMERA)
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        if (!cameraPermission.status.isGranted) {
+        if (!cameraGranted) {
             // ── Нет разрешения — объяснение + запрос ──
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -85,7 +94,7 @@ fun CardCameraScanner(
                 )
                 Spacer(Modifier.height(24.dp))
                 Button(
-                    onClick = { cameraPermission.launchPermissionRequest() },
+                    onClick = { permLauncher.launch(Manifest.permission.CAMERA) },
                     colors = ButtonDefaults.buttonColors(containerColor = CamBrand)
                 ) { Text(stringResource(R.string.imp_allow)) }
                 Spacer(Modifier.height(8.dp))

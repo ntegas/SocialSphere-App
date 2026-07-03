@@ -23,6 +23,23 @@ private val RU_MONTHS_GENITIVE = mapOf(
 fun parseFlexibleDate(raw: String?, defaultYear: Int = LocalDate.now().year): LocalDate? {
     if (raw.isNullOrBlank()) return null
     val s = raw.trim()
+    // 0) vCard-стиль «--MM-DD» / «--MMDD» — дата БЕЗ года (дни рождения из
+    //    телефонной книги и введённые вручную «без года»). Год = defaultYear;
+    //    29 февраля в невисокосный год сдвигается на 28-е, а не теряется.
+    if (s.startsWith("--")) {
+        val digits = s.removePrefix("--").replace("-", "")
+        if (digits.length == 4) {
+            val mo = digits.take(2).toIntOrNull()
+            val d  = digits.takeLast(2).toIntOrNull()
+            if (mo != null && d != null && mo in 1..12 && d in 1..31) {
+                runCatching {
+                    val maxDay = java.time.YearMonth.of(defaultYear, mo).lengthOfMonth()
+                    return LocalDate.of(defaultYear, mo, d.coerceAtMost(maxDay))
+                }
+            }
+        }
+        return null
+    }
     // 1) ISO (в т.ч. с временем «2025-08-15T…») — основной путь
     runCatching { return LocalDate.parse(s.take(10)) }
     // 2) числовые dd<sep>MM<sep>yyyy
@@ -39,6 +56,22 @@ fun parseFlexibleDate(raw: String?, defaultYear: Int = LocalDate.now().year): Lo
             runCatching { return LocalDate.of(year, mon, day) }
     }
     return null
+}
+
+/** true, если дата хранится без года (vCard-стиль «--MM-DD»). */
+fun isYearlessDate(raw: String?): Boolean = raw?.trim()?.startsWith("--") == true
+
+/**
+ * Человекочитаемая дата события для UI. Даты без года («--03-14») показываются
+ * как «14 марта» (локаль системы; MMMM в формат-контексте даёт родительный падеж);
+ * обычные строки возвращаются как есть — прежнее поведение не меняется.
+ */
+fun displayEventDate(raw: String?): String {
+    if (raw.isNullOrBlank()) return ""
+    val s = raw.trim()
+    if (!s.startsWith("--")) return s
+    val d = parseFlexibleDate(s) ?: return s
+    return d.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM"))
 }
 
 /**

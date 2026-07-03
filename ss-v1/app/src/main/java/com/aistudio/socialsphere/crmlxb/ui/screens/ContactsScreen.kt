@@ -526,14 +526,8 @@ private fun ContactFilterSheet(
                 }
             }
 
-            // Connection level
-            FilterSection(stringResource(R.string.filter_connection)) {
-                listOf(ConnectionLevel.CLOSE, ConnectionLevel.NORMAL, ConnectionLevel.WEAK, ConnectionLevel.NEW).forEach { lvl ->
-                    MultiSelectChip(lvl.label(ctxLabel), lvl in lConnLevel) {
-                        lConnLevel = if (lvl in lConnLevel) lConnLevel - lvl else lConnLevel + lvl
-                    }
-                }
-            }
+            // «Уровень связи» слит в «Статус» (Близкий/Слабый теперь в ContactStatus,
+            // секция Status выше показывает их автоматически) — отдельная секция убрана.
 
             // Rhythm
             FilterSection(stringResource(R.string.filter_rhythm)) {
@@ -711,7 +705,8 @@ fun ContactListCard(
                 if (importanceTint != Color.Transparent)
                     Box(Modifier.size(6.dp).clip(CircleShape).background(importanceTint))
             }
-            val sub = listOf(contact.relationshipType.label(ctxLabel), position.ifEmpty { company }).filter { it.isNotEmpty() }.joinToString(" · ")
+            val relLabel = contact.customRelationshipType?.takeIf { it.isNotBlank() } ?: contact.relationshipType.label(ctxLabel)
+            val sub = listOf(relLabel, position.ifEmpty { company }).filter { it.isNotEmpty() }.joinToString(" · ")
             if (sub.isNotEmpty())
                 Text(sub, fontSize = 13.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
@@ -758,7 +753,7 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
                     Text(position, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel, maxLines = 1)
             }
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text(contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.brand)
+                Text(contact.customRelationshipType?.takeIf { it.isNotBlank() } ?: contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.brand)
                 if (contact.importanceLevel != ImportanceLevel.NORMAL)
                     Box(Modifier.size(7.dp).clip(CircleShape).background(importanceTint))
             }

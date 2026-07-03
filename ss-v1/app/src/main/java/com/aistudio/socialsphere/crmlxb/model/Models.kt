@@ -4,9 +4,16 @@ data class Contact(
     val id: String,
     val firstName: String,
     val lastName: String,
+    /** Отчество / среднее имя (как в телефонной книге) — раньше терялось при импорте. */
+    val middleName: String? = null,
     val nickname: String? = null,
     val photoUri: String?,
     val relationshipType: RelationshipType,
+    /** Свой тип отношений («Кум», «Тренер»…) — если задан, показывается вместо
+     *  relationshipType. Стандартный выбор из пикера очищает это поле. */
+    val customRelationshipType: String? = null,
+    /** LEGACY: уровень связи слит в ContactStatus (CLOSE/WEAK). Поле осталось
+     *  в БД/модели ради сохранности данных, UI его больше не показывает. */
     val connectionLevel: ConnectionLevel,
     val importanceLevel: ImportanceLevel,
     val socialRole: SocialRole,
@@ -14,6 +21,9 @@ data class Contact(
     val contactStatus: ContactStatus = ContactStatus.ACTIVE,
     val lastContactDate: String? = null,
     val nextStep: String? = null,
+    /** Свободный текст о семье БЕЗ карточек контактов («сын Петя, 2019 г.р.») —
+     *  показывается в блоке F (Семья) под списком связанных членов семьи. */
+    val familyNote: String? = null,
     val tags: List<String> = emptyList(),
     val canHelpWith: String? = null,
     val iCanHelpWith: String? = null,

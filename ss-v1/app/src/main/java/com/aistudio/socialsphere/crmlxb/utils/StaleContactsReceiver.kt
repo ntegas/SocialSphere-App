@@ -87,8 +87,10 @@ class StaleContactsReceiver : BroadcastReceiver() {
 
                 // ── Сводка «без следующего шага» (одно уведомление) ──
                 if (remindNoStep) {
+                    // Не только ACTIVE: после слияния статусов (v9) близкие/слабые —
+                    // тоже «живые» контакты; исключаем только архив
                     val count = contacts.count {
-                        it.contactStatus == "ACTIVE" && it.nextStep.isNullOrBlank()
+                        it.contactStatus != "ARCHIVED" && it.nextStep.isNullOrBlank()
                     }
                     if (count > 0) {
                         NotificationHelper.showNotification(

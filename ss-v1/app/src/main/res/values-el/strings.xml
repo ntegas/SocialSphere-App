@@ -210,6 +210,12 @@
     <string name="cd_clothes_hint">Ρούχα (π.χ. M, 48)</string>
     <string name="cd_shoes_hint">Παπούτσια (π.χ. 42)</string>
     <string name="cd_preference">Προτίμηση</string>
+    <string name="cd_goes_to_gifts">Θα εμφανιστεί: Δώρα → Προτιμήσεις · Σύνοψη</string>
+    <string name="cd_goes_general">Θα εμφανιστεί: καρτέλα Σημειώσεις</string>
+    <string name="cd_goes_work">Θα εμφανιστεί: Σημειώσεις + Εργασία</string>
+    <string name="cd_goes_personal">Θα εμφανιστεί: Στόχοι &amp; όνειρα + Επισκόπηση (D) + Σύνοψη</string>
+    <string name="cd_goes_important">Θα εμφανιστεί: Σημαντικό (Επισκόπηση) + Σύνοψη</string>
+    <string name="cd_goes_to_allergy">Θα εμφανιστεί: Δώρα → Αλλεργίες · Σύνοψη (με προειδοποίηση)</string>
     <string name="cd_category">Κατηγορία</string>
     <string name="cd_dossier">Ντοσιέ · FORD</string>
     <string name="cd_restrictions">Περιορισμοί</string>
@@ -233,6 +239,12 @@
     <string name="cd_title_req">Τίτλος*</string>
     <string name="cd_link">Σύνδεσμος</string>
     <string name="cd_tags">Ετικέτες</string>
+    <string name="cd_add_tag">+ Ετικέτα</string>
+    <string name="cd_add_tag_title">Νέα ετικέτα</string>
+    <string name="cd_family_note">Οικογένεια χωρίς κάρτες</string>
+    <string name="cd_family_note_hint">Π.χ.: γιος Πέτρος (5 ετών), πεθερά Μαρία</string>
+    <string name="cd_next_step_hint">Πατήστε για να ορίσετε το επόμενο βήμα</string>
+    <string name="cd_where_met_hint">Πατήστε για συμπλήρωση</string>
     <string name="cd_no_tags">Χωρίς ετικέτες</string>
     <string name="cd_tasks">Εργασίες</string>
     <string name="cd_past_events">Παρελθόντα γεγονότα</string>
@@ -308,6 +320,7 @@
     <string name="cal_f_important">Σημαντικά</string>
     <string name="cal_today">Σήμερα</string>
     <string name="cal_tomorrow">Αύριο</string>
+    <string name="date_no_year">Χωρίς έτος</string>
     <string name="cal_later">Αργότερα</string>
     <string name="cal_nearest">Προσεχή</string>
     <string name="cal_next7days">Επόμενες 7 ημέρες</string>
@@ -369,6 +382,10 @@
     <string name="dup_none">Δεν βρέθηκαν πιθανά διπλότυπα</string>
     <string name="dup_two_records">2 εγγραφές</string>
     <string name="dup_merge">Συγχώνευση</string>
+    <string name="dup_manual_title">Χειροκίνητη συγχώνευση</string>
+    <string name="dup_pick_a">Πρώτη επαφή</string>
+    <string name="dup_pick_b">Δεύτερη επαφή</string>
+    <string name="dup_merge_edit">Συγχώνευση και επεξεργασία</string>
     <string name="dup_will_keep">Παραμένει: %1$s</string>
     <string name="dup_merge_confirm_title">Συγχώνευση επαφών;</string>
     <string name="dup_merge_confirm_text">Το «%2$s» θα διαγραφεί και τα δεδομένα του θα μεταφερθούν στο «%1$s». Δεν αναιρείται.</string>
@@ -522,6 +539,7 @@
     <string name="ce_new_contact">Νέα επαφή</string>
     <string name="ce_name_req">Όνομα *</string>
     <string name="ce_surname">Επώνυμο</string>
+    <string name="ce_middle_name">Πατρώνυμο</string>
     <string name="ce_nickname">Παρατσούκλι</string>
     <string name="ce_nickname_hint">πώς τους αποκαλείτε…</string>
     <string name="ce_add_photo">Προσθήκη φωτογραφίας</string>
@@ -573,6 +591,9 @@
     <string name="ce_classification">Ταξινόμηση</string>
     <string name="ce_status">Κατάσταση</string>
     <string name="ce_relation_type">Τύπος σχέσης</string>
+    <string name="ce_relation_custom_add">+ Δικός μου</string>
+    <string name="ce_relation_custom_title">Δικός μου τύπος σχέσης</string>
+    <string name="ce_relation_custom_hint">Π.χ.: Κουμπάρος, Προπονητής</string>
     <string name="ce_connection_level">Επίπεδο σύνδεσης</string>
     <string name="ce_importance">Σημασία</string>
     <string name="ce_social_role">Κοινωνικός ρόλος</string>
@@ -816,6 +837,18 @@
     <string name="lbl_industry_real_estate">Ακίνητα</string>
     <string name="lbl_industry_retail">Λιανική</string>
     <string name="lbl_industry_government">Κυβέρνηση</string>
+    <string name="lbl_industry_construction">Κατασκευές</string>
+    <string name="lbl_industry_logistics">Εφοδιαστική</string>
+    <string name="lbl_industry_manufacturing">Βιομηχανία</string>
+    <string name="lbl_industry_horeca">Εστίαση και ξενοδοχεία</string>
+    <string name="lbl_industry_legal">Νομικά</string>
+    <string name="lbl_industry_marketing">Μάρκετινγκ και διαφήμιση</string>
+    <string name="lbl_industry_media">ΜΜΕ</string>
+    <string name="lbl_industry_beauty">Ομορφιά και μόδα</string>
+    <string name="lbl_industry_sport">Αθλητισμός</string>
+    <string name="lbl_industry_tourism">Τουρισμός</string>
+    <string name="lbl_industry_energy">Ενέργεια</string>
+    <string name="lbl_industry_agriculture">Γεωργία</string>
     <string name="lbl_industry_other">Άλλο</string>
     <string name="lbl_personal_detail_category_likes">Αρέσει</string>
     <string name="lbl_personal_detail_category_dislikes">Δεν αρέσει</string>
@@ -930,7 +963,10 @@
     <string name="sync_change_link">Αλλαγή σύνδεσης τηλεφώνου</string>
     <string name="sync_update_from_phone">Ενημέρωση από τηλέφωνο</string>
     <string name="sync_pick_contact">Επιλέξτε επαφή τηλεφώνου</string>
-    <string name="sync_linked">Συνδεδεμένο με τηλέφωνο</string>
+    <string name="sync_linked">Συνδεδεμένο με τον τηλεφωνικό κατάλογο. Το «Ενημέρωση από τηλέφωνο» φέρνει νέους αριθμούς, email και διευθύνσεις</string>
+    <string name="sync_pull_result">Προστέθηκαν: %1$d τηλ., %2$d email, %3$d διευθ.</string>
+    <string name="sync_pull_nothing">Όλα ενημερωμένα — τίποτα νέο στο τηλέφωνο</string>
+    <string name="sync_pull_gone">Η επαφή δεν βρέθηκε στον κατάλογο (διαγράφηκε;)</string>
     <string name="set_exact_alarms">Επιτρέψτε ακριβείς υπενθυμίσεις</string>
     <string name="set_exact_alarms_hint">Ώστε οι υπενθυμίσεις να φτάνουν ακριβώς στην ώρα τους</string>
 

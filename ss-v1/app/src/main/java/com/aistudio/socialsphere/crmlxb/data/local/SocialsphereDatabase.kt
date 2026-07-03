@@ -26,7 +26,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SizeInfoEntity::class,
         PersonalDetailEntity::class
     ],
-    version = 8,
+    version = 10,
     exportSchema = true
 )
 abstract class SocialsphereDatabase : RoomDatabase() {
@@ -128,6 +128,35 @@ abstract class SocialsphereDatabase : RoomDatabase() {
             }
         }
 
+        // v9 (решение владельца 2026-07-02):
+        // 1) свой тип отношений (customRelationshipType) — «Кум», «Тренер» и т.п.;
+        // 2) слияние «Уровень связи» в «Статус»: CLOSE/WEAK переносятся в
+        //    contactStatus (кроме архивных — Архив важнее уровня связи).
+        //    Колонка connectionLevel остаётся в БД нетронутой (сохранность данных).
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE contacts ADD COLUMN customRelationshipType TEXT")
+                database.execSQL(
+                    "UPDATE contacts SET contactStatus = 'CLOSE' " +
+                    "WHERE connectionLevel = 'CLOSE' AND contactStatus != 'ARCHIVED'"
+                )
+                database.execSQL(
+                    "UPDATE contacts SET contactStatus = 'WEAK' " +
+                    "WHERE connectionLevel = 'WEAK' AND contactStatus != 'ARCHIVED'"
+                )
+            }
+        }
+
+        // v10 (2026-07-02): отчество (middleName) — телефонная книга/vCard несут
+        // 3-4-словные имена, отчество раньше терялось при импорте; familyNote —
+        // свободный текст о семье без карточек контактов (блок F в Обзоре).
+        internal val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE contacts ADD COLUMN middleName TEXT")
+                database.execSQL("ALTER TABLE contacts ADD COLUMN familyNote TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): SocialsphereDatabase {
             return INSTANCE ?: synchronized(this) {
                 val builder = Room.databaseBuilder(
@@ -135,7 +164,7 @@ abstract class SocialsphereDatabase : RoomDatabase() {
                     SocialsphereDatabase::class.java,
                     "socialsphere_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
 
                 // Destructive fallback — ТОЛЬКО в debug. В release недостающая
                 // миграция/несовпадение схемы должны падать с явной ошибкой Room,

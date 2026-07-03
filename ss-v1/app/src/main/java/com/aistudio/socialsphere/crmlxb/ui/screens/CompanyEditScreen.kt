@@ -60,11 +60,18 @@ fun CompanyEditScreen(
     var newEmailType     by remember { mutableStateOf(EmailType.WORK) }
     
     // People
-    val relatedRelations = remember(companyId) { 
-        if (companyId != null) AppStateStore.companyRelations.filter { it.companyId == companyId } else emptyList() 
+    val relatedRelations = remember(companyId) {
+        if (companyId != null) AppStateStore.companyRelations.filter { it.companyId == companyId } else emptyList()
     }
     var showRelationEditDialog by remember { mutableStateOf<ContactCompanyRelation?>(null) }
-    var showSelectContactDropdown by remember { mutableStateOf(false) }
+    // id компании известен ДО сохранения (паттерн editedContactId из ContactEdit):
+    // для новой компании генерируем сразу — связи «добавить сотрудника» не станут orphan
+    val editedCompanyId = remember { companyId ?: java.util.UUID.randomUUID().toString() }
+    // Отложенные сотрудники: применяются при «Готово» (отмена формы = ничего не меняется)
+    val pendingPeople = remember { mutableStateListOf<Pair<Contact, String?>>() }
+    var showAddPerson by remember { mutableStateOf(false) }
+    var personSelected by remember { mutableStateOf<Contact?>(null) }
+    var personPosition by remember { mutableStateOf("") }
 
     // ── Add phone dialog ──────────────────────────────────────
     if (showAddPhone) {
@@ -172,6 +179,50 @@ fun CompanyEditScreen(
         )
     }
 
+    // ── Добавить сотрудника: канонический пикер (поиск) + должность ──
+    if (showAddPerson) {
+        if (personSelected == null) {
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                title = stringResource(R.string.cce_add_person),
+                items = AppStateStore.contacts
+                    .filter { c ->
+                        relatedRelations.none { it.contactId == c.id } &&
+                        pendingPeople.none { it.first.id == c.id }
+                    }
+                    .map { c ->
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                            id = c.id,
+                            title = "${c.firstName} ${c.lastName}".trim(),
+                            subtitle = c.companyRelations.firstOrNull()?.position
+                        )
+                    },
+                onPick = { picked -> personSelected = AppStateStore.getContact(picked.id) },
+                onDismiss = { showAddPerson = false; personPosition = "" },
+                searchPlaceholder = stringResource(R.string.ce_search_contact),
+                emptyText = stringResource(R.string.compd_no_candidates)
+            )
+        } else personSelected?.let { sel ->
+            AlertDialog(
+                onDismissRequest = { showAddPerson = false; personSelected = null; personPosition = "" },
+                title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
+                text = {
+                    OutlinedTextField(
+                        value = personPosition, onValueChange = { personPosition = it }, keyboardOptions = CapSentences,
+                        label = { Text(stringResource(R.string.cd_position)) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        pendingPeople.add(sel to personPosition.trim().ifBlank { null })
+                        personSelected = null; personPosition = ""; showAddPerson = false
+                    }) { Text(stringResource(R.string.common_add)) }
+                },
+                dismissButton = { TextButton(onClick = { personSelected = null }) { Text(stringResource(R.string.common_back)) } }
+            )
+        }
+    }
+
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
         topBar = {}
@@ -202,7 +253,9 @@ fun CompanyEditScreen(
                 Button(
                         onClick = {
                             val newCompany = Company(
-                                id = originalCompany?.id ?: java.util.UUID.randomUUID().toString(),
+                                // editedCompanyId известен до сохранения — связи
+                                // «добавить сотрудника» указывают на верный id
+                                id = editedCompanyId,
                                 name = name,
                                 industry = industry,
                                 description = description,
@@ -217,6 +270,22 @@ fun CompanyEditScreen(
                                 AppStateStore.updateCompany(newCompany)
                             } else {
                                 AppStateStore.addCompany(newCompany)
+                            }
+                            // Отложенные сотрудники → реальные связи контакт↔компания
+                            pendingPeople.forEach { (person, pos) ->
+                                val fresh = AppStateStore.getContact(person.id) ?: return@forEach
+                                if (fresh.companyRelations.none { it.companyId == editedCompanyId }) {
+                                    AppStateStore.updateContact(fresh.copy(
+                                        companyRelations = fresh.companyRelations + ContactCompanyRelation(
+                                            id = java.util.UUID.randomUUID().toString(),
+                                            contactId = fresh.id,
+                                            companyId = editedCompanyId,
+                                            position = pos,
+                                            employmentStatus = EmploymentStatus.CURRENT,
+                                            isPrimary = fresh.companyRelations.isEmpty()
+                                        )
+                                    ))
+                                }
                             }
                             onNavigateBack()
                         },
@@ -261,11 +330,13 @@ fun CompanyEditScreen(
 
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     AureliaCaption(stringResource(R.string.cce_industry))
-                    PillChoiceRow(
-                        options = Industry.values().map { it.label(ctxLabel) },
-                        selected = industry.label(ctxLabel),
-                        onSelect = { v -> industry = Industry.values().firstOrNull { it.label(ctxLabel) == v } ?: industry }
-                    )
+                    // Drop-down вместо пилюль (фидбэк владельца 2026-07-02):
+                    // список вырос до 21 индустрии — стеной чипов не выбрать.
+                    DropdownField(
+                        label = stringResource(R.string.cce_industry),
+                        selectedValue = industry.label(ctxLabel),
+                        options = Industry.values().map { it.label(ctxLabel) }
+                    ) { v -> industry = Industry.values().firstOrNull { it.label(ctxLabel) == v } ?: industry }
                 }
 
                 OutlinedTextField(
@@ -429,22 +500,39 @@ fun CompanyEditScreen(
                     }
                 }
                 
-                Box {
-                    Button(
-                        onClick = { showSelectContactDropdown = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.card, contentColor = AppleTheme.colors.secondaryLabel)
-                    ) {
-                        Text(stringResource(R.string.cce_add_person))
-                    }
-                    DropdownMenu(expanded = showSelectContactDropdown, onDismissRequest = { showSelectContactDropdown = false }) {
-                        AppStateStore.contacts.forEach { contact ->
-                            DropdownMenuItem(
-                                text = { Text("${contact.firstName} ${contact.lastName}") },
-                                onClick = { showSelectContactDropdown = false }
-                            )
+                // Добавленные в ЭТОЙ сессии формы (применятся при «Готово»)
+                if (pendingPeople.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        pendingPeople.forEach { (c, pos) ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("${c.firstName} ${c.lastName}".trim(),
+                                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    if (!pos.isNullOrBlank())
+                                        Text(pos, style = MaterialTheme.typography.bodySmall,
+                                            color = AppleTheme.colors.secondaryLabel)
+                                }
+                                IconButton(onClick = { pendingPeople.removeAll { it.first.id == c.id } }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete),
+                                        Modifier.size(14.dp), tint = AppleTheme.colors.secondaryLabel)
+                                }
+                            }
                         }
                     }
+                }
+                // Пикер с поиском вместо старого DropdownMenu (тот был без поиска
+                // и НЕ создавал связь — известный баг, теперь связь реально создаётся)
+                Button(
+                    onClick = { showAddPerson = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.card, contentColor = AppleTheme.colors.secondaryLabel)
+                ) {
+                    Text(stringResource(R.string.cce_add_person))
                 }
             }
 

@@ -290,7 +290,12 @@ fun CalendarItemEditScreen(
                         value = startDate,
                         onValueChange = { startDate = it },
                         label = stringResource(R.string.cie_start_date),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        // Год может быть неизвестен для дат-годовщин — «--MM-DD»
+                        allowNoYear = type in listOf(
+                            CalendarItemType.BIRTHDAY, CalendarItemType.ANNIVERSARY,
+                            CalendarItemType.NAMEDAY, CalendarItemType.IMPORTANT_DATE
+                        )
                     )
                     if (!isAllDay) {
                         TimePickerField(

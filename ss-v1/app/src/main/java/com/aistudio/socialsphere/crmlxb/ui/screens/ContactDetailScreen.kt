@@ -344,49 +344,53 @@ fun ContactDetailScreen(
     }
 
     // ── Добавление / правка идеи подарка ──
+    // Шторка-редактор идеи подарка (макет GIFT EDITOR; был AlertDialog старого вида)
     if (showAddGift || editingGift != null) {
         val g = editingGift
         var gTitle by remember(g?.id ?: "new") { mutableStateOf(g?.title ?: "") }
         var gNote  by remember(g?.id ?: "new") { mutableStateOf(g?.note ?: "") }
         var gLink  by remember(g?.id ?: "new") { mutableStateOf(g?.link ?: "") }
-        AlertDialog(
-            onDismissRequest = { showAddGift = false; editingGift = null },
-            title = { Text(if (g == null) stringResource(R.string.cd_gift_idea) else stringResource(R.string.cd_gift_edit), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(value = gTitle, onValueChange = { gTitle = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_title_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    OutlinedTextField(value = gNote, onValueChange = { gNote = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_note)) }, modifier = Modifier.fillMaxWidth(), maxLines = 3)
-                    OutlinedTextField(value = gLink, onValueChange = { gLink = it },
-                        label = { Text(stringResource(R.string.cd_link)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                }
-            },
-            confirmButton = {
-                Button(enabled = gTitle.isNotBlank(), onClick = {
-                    if (g == null) {
-                        AppStateStore.addGift(GiftIdea(
-                            id = java.util.UUID.randomUUID().toString(),
-                            contactId = contact.id,
-                            title = gTitle.trim(),
-                            note  = gNote.trim().ifBlank { null },
-                            link  = gLink.trim().ifBlank { null },
-                            status = GiftStatus.IDEA
-                        ))
-                    } else {
-                        AppStateStore.updateGift(g.copy(
-                            title = gTitle.trim(),
-                            note  = gNote.trim().ifBlank { null },
-                            link  = gLink.trim().ifBlank { null }
-                        ))
-                    }
-                    showAddGift = false; editingGift = null
-                }) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddGift = false; editingGift = null }) { Text(stringResource(R.string.common_cancel)) }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(
+            onDismiss = { showAddGift = false; editingGift = null }
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    if (g == null) stringResource(R.string.cd_gift_idea) else stringResource(R.string.cd_gift_edit),
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
+                )
+                OutlinedTextField(value = gTitle, onValueChange = { gTitle = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_title_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(value = gNote, onValueChange = { gNote = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_note)) }, modifier = Modifier.fillMaxWidth(), maxLines = 3)
+                OutlinedTextField(value = gLink, onValueChange = { gLink = it },
+                    label = { Text(stringResource(R.string.cd_link)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Button(
+                    enabled = gTitle.isNotBlank(),
+                    onClick = {
+                        if (g == null) {
+                            AppStateStore.addGift(GiftIdea(
+                                id = java.util.UUID.randomUUID().toString(),
+                                contactId = contact.id,
+                                title = gTitle.trim(),
+                                note  = gNote.trim().ifBlank { null },
+                                link  = gLink.trim().ifBlank { null },
+                                status = GiftStatus.IDEA
+                            ))
+                        } else {
+                            AppStateStore.updateGift(g.copy(
+                                title = gTitle.trim(),
+                                note  = gNote.trim().ifBlank { null },
+                                link  = gLink.trim().ifBlank { null }
+                            ))
+                        }
+                        showAddGift = false; editingGift = null
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
             }
-        )
+        }
     }
 
     // ── Подтверждение удаления идеи ──
@@ -453,34 +457,50 @@ fun ContactDetailScreen(
         )
         var prefCat   by remember { mutableStateOf(PersonalDetailCategory.FOOD) }
         var prefValue by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showAddPref = false },
-            title = { Text(stringResource(R.string.cd_preference), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DropdownField(stringResource(R.string.cd_category), prefCat.label(ctxLabel), prefCategories.map { it.label(ctxLabel) }) { picked ->
-                        prefCat = prefCategories.firstOrNull { it.label(ctxLabel) == picked } ?: prefCat
-                    }
-                    OutlinedTextField(value = prefValue, onValueChange = { prefValue = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_value_hint)) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true)
-                }
-            },
-            confirmButton = {
-                Button(enabled = prefValue.isNotBlank(), onClick = {
-                    AppStateStore.updateContact(contact.copy(
-                        personalDetails = contact.personalDetails + PersonalDetail(
-                            id        = java.util.UUID.randomUUID().toString(),
-                            contactId = contact.id,
-                            category  = prefCat,
-                            value     = prefValue.trim()
-                        )
-                    ))
-                    showAddPref = false
-                }) { Text(stringResource(R.string.common_add)) }
-            },
-            dismissButton = { TextButton(onClick = { showAddPref = false }) { Text(stringResource(R.string.common_cancel)) } }
-        )
+        // Шторка-редактор детали (макет PERSONAL DETAIL EDITOR): категория чипами +
+        // поле + подсказка «куда попадёт» (фидбэк владельца: было непонятно,
+        // где эта запись потом отобразится).
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showAddPref = false }) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    stringResource(R.string.cd_preference),
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
+                )
+                PillChoiceRow(
+                    options = prefCategories.map { it.label(ctxLabel) },
+                    selected = prefCat.label(ctxLabel),
+                    onSelect = { picked -> prefCat = prefCategories.firstOrNull { it.label(ctxLabel) == picked } ?: prefCat }
+                )
+                OutlinedTextField(value = prefValue, onValueChange = { prefValue = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_value_hint)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                // Куда попадёт запись — по выбранной категории
+                Text(
+                    stringResource(
+                        if (prefCat == PersonalDetailCategory.ALLERGIES || prefCat == PersonalDetailCategory.RESTRICTIONS)
+                            R.string.cd_goes_to_allergy else R.string.cd_goes_to_gifts
+                    ),
+                    fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
+                )
+                Button(
+                    enabled = prefValue.isNotBlank(),
+                    onClick = {
+                        AppStateStore.updateContact(contact.copy(
+                            personalDetails = contact.personalDetails + PersonalDetail(
+                                id        = java.util.UUID.randomUUID().toString(),
+                                contactId = contact.id,
+                                category  = prefCat,
+                                value     = prefValue.trim()
+                            )
+                        ))
+                        showAddPref = false
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) { Text(stringResource(R.string.common_add), fontWeight = FontWeight.Bold) }
+            }
+        }
     }
 
     // ── Правка заметки ──
@@ -551,29 +571,48 @@ fun ContactDetailScreen(
         )
     }
 
+    // Шторка «Добавить заметку»: тип — чипами + подсказка «куда попадёт»
+    // (фидбэк владельца: логика заметок была непрозрачной; был AlertDialog).
     if (showAddDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false; noteText = "" },
-            title = { Text(stringResource(R.string.cd_add_note), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = noteText,
-                        onValueChange = { noteText = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_note_text)) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
-                        maxLines = 5
-                    )
-                    DropdownField(stringResource(R.string.cd_note_type), noteType.label(ctxLabel), NoteType.values().filter { it != NoteType.GIFT }.map { it.label(ctxLabel) }) {
-                        noteType = NoteType.values().firstOrNull { n -> n.label(ctxLabel) == it } ?: NoteType.GENERAL
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Checkbox(checked = noteIsImportant, onCheckedChange = { noteIsImportant = it })
-                        Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
-                    }
+        val noteTypes = NoteType.values().filter { it != NoteType.GIFT }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(
+            onDismiss = { showAddDialog = false; noteText = "" }
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    stringResource(R.string.cd_add_note),
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
+                )
+                PillChoiceRow(
+                    options = noteTypes.map { it.label(ctxLabel) },
+                    selected = noteType.label(ctxLabel),
+                    onSelect = { picked -> noteType = noteTypes.firstOrNull { n -> n.label(ctxLabel) == picked } ?: NoteType.GENERAL }
+                )
+                // Куда попадёт запись — по типу (важные — отдельная подсказка)
+                Text(
+                    stringResource(
+                        when {
+                            noteIsImportant -> R.string.cd_goes_important
+                            noteType == NoteType.WORK -> R.string.cd_goes_work
+                            noteType == NoteType.PERSONAL_DETAIL -> R.string.cd_goes_personal
+                            noteType == NoteType.IMPORTANT_TO_REMEMBER -> R.string.cd_goes_important
+                            else -> R.string.cd_goes_general
+                        }
+                    ),
+                    fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
+                )
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_note_text)) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                    maxLines = 5
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Checkbox(checked = noteIsImportant, onCheckedChange = { noteIsImportant = it })
+                    Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
                 }
-            },
-            confirmButton = {
                 Button(
                     onClick = {
                         if (noteText.isNotBlank()) {
@@ -593,23 +632,29 @@ fun ContactDetailScreen(
                             noteText = ""; noteIsImportant = false; showAddDialog = false
                         }
                     },
-                    enabled = noteText.isNotBlank()
-                ) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = { TextButton(onClick = { showAddDialog = false; noteText = "" }) { Text(stringResource(R.string.common_cancel)) } }
-        )
+                    enabled = noteText.isNotBlank(),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
+            }
+        }
     }
 
     // Quick personal detail state
     var pdText     by remember { mutableStateOf("") }
     var pdCategory by remember { mutableStateOf(PersonalDetailCategory.INTERESTS) }
 
+    // Шторка «Личная деталь» (макет PERSONAL DETAIL EDITOR; был AlertDialog старого вида)
     if (showVoiceDialog) {
-        AlertDialog(
-            onDismissRequest = { showVoiceDialog = false; pdText = "" },
-            title = { Text(stringResource(R.string.cd_add_personal_detail), fontWeight = FontWeight.Bold) },
-            text = {
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(
+            onDismiss = { showVoiceDialog = false; pdText = "" }
+        ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        stringResource(R.string.cd_add_personal_detail),
+                        fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                        fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
+                    )
 
                     // Category selector
                     DropdownField(
@@ -691,40 +736,48 @@ fun ContactDetailScreen(
                             }
                         }
                     }
+                    // Куда попадёт запись (прозрачность логики — фидбэк владельца)
+                    val giftCats = listOf(
+                        PersonalDetailCategory.FOOD, PersonalDetailCategory.DRINKS,
+                        PersonalDetailCategory.LIKES, PersonalDetailCategory.DISLIKES,
+                        PersonalDetailCategory.BRANDS
+                    )
+                    if (pdCategory in giftCats)
+                        Text(stringResource(R.string.cd_goes_to_gifts),
+                            fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel)
+                    else if (pdCategory == PersonalDetailCategory.ALLERGIES ||
+                             pdCategory == PersonalDetailCategory.RESTRICTIONS)
+                        Text(stringResource(R.string.cd_goes_to_allergy),
+                            fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel)
+
+                    Button(
+                        onClick = {
+                            if (pdText.isNotBlank()) {
+                                val now = java.time.LocalDateTime.now()
+                                    .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                val newDetail = PersonalDetail(
+                                    id         = java.util.UUID.randomUUID().toString(),
+                                    contactId  = contact.id,
+                                    category   = pdCategory,
+                                    value      = pdText.trim(),
+                                    note       = null
+                                )
+                                // Save to DB via updateContact
+                                val updated = contact.copy(
+                                    personalDetails = contact.personalDetails + newDetail,
+                                    updatedAt       = now
+                                )
+                                AppStateStore.updateContact(updated)
+                                pdText = ""
+                                showVoiceDialog = false
+                            }
+                        },
+                        enabled = pdText.isNotBlank(),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (pdText.isNotBlank()) {
-                            val now = java.time.LocalDateTime.now()
-                                .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            val newDetail = PersonalDetail(
-                                id         = java.util.UUID.randomUUID().toString(),
-                                contactId  = contact.id,
-                                category   = pdCategory,
-                                value      = pdText.trim(),
-                                note       = null
-                            )
-                            // Save to DB via updateContact
-                            val updated = contact.copy(
-                                personalDetails = contact.personalDetails + newDetail,
-                                updatedAt       = now
-                            )
-                            AppStateStore.updateContact(updated)
-                            pdText = ""
-                            showVoiceDialog = false
-                        }
-                    },
-                    enabled = pdText.isNotBlank()
-                ) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showVoiceDialog = false; pdText = "" }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
-        )
+        }
     }
 }
 
@@ -758,7 +811,12 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
     val position = compRel?.position ?: ""
     val address  = AppStateStore.addresses.find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
     val city     = address?.city ?: ""
-    val name     = "${contact.firstName} ${contact.lastName}".trim()
+    // Полное имя с отчеством (как в телефонной книге)
+    val name = listOfNotNull(
+        contact.firstName.takeIf { it.isNotBlank() },
+        contact.middleName?.takeIf { it.isNotBlank() },
+        contact.lastName.takeIf { it.isNotBlank() }
+    ).joinToString(" ")
 
     // Last contact — most recent note/event
     val lastNoteDate = AppStateStore.notes
@@ -799,15 +857,45 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier.size(56.dp).clip(CircleShape)
-                    .background(AureliaTheme.colors.avatarTerracotta)
-                    .border(2.dp, AppleTheme.colors.orange.copy(alpha = 0.5f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(initials.uppercase(), color = Color.White,
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-                    fontSize = 22.sp, fontWeight = FontWeight.W600)
+            // Важность — ЦВЕТНОЙ ОБОДОК аватара (решение владельца 2026-07-02),
+            // не отдельный чип: Ключевой — золото, Важный — терракот, Обычный — без.
+            // Тап по аватару меняет важность (функция быстрой правки сохранена).
+            var showImportanceMenu by remember { mutableStateOf(false) }
+            val importanceRing = when (contact.importanceLevel) {
+                ImportanceLevel.KEY       -> AureliaTheme.colors.gold
+                ImportanceLevel.IMPORTANT -> AppleTheme.colors.red
+                else                      -> Color.Transparent
+            }
+            Box {
+                Box(
+                    modifier = Modifier.size(56.dp).clip(CircleShape)
+                        .background(AureliaTheme.colors.avatarTerracotta)
+                        .then(
+                            if (importanceRing != Color.Transparent)
+                                Modifier.border(2.5.dp, importanceRing, CircleShape)
+                            else Modifier
+                        )
+                        .clickable { showImportanceMenu = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(initials.uppercase(), color = Color.White,
+                        fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                        fontSize = 22.sp, fontWeight = FontWeight.W600)
+                }
+                DropdownMenu(expanded = showImportanceMenu, onDismissRequest = { showImportanceMenu = false }) {
+                    ImportanceLevel.values().forEach { imp ->
+                        DropdownMenuItem(
+                            text = { Text(imp.label(ctxLabel)) },
+                            trailingIcon = if (imp == contact.importanceLevel) {
+                                { Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand) }
+                            } else null,
+                            onClick = {
+                                showImportanceMenu = false
+                                AppStateStore.updateContact(contact.copy(importanceLevel = imp, updatedAt = nowIso()))
+                            }
+                        )
+                    }
+                }
             }
             Column(Modifier.weight(1f)) {
                 Text(name, color = AppleTheme.colors.label,
@@ -823,38 +911,39 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
             }
         }
 
-        // Чипы — редактируемые (функция сохранена), слева под именем
+        // Чипы — редактируемые (функция сохранена), слева под именем.
+        // Состав по решению владельца 2026-07-02: важность ушла в ободок аватара,
+        // уровень связи слит в статус; добавлена соц.роль; ритм «не отслеживается»
+        // не показывается (шум) — правится через ритм-чип, когда задан, или форму.
         Spacer(Modifier.height(11.dp))
         androidx.compose.foundation.layout.FlowRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             EditableChip(
-                current = contact.importanceLevel.label(ctxLabel),
-                options = ImportanceLevel.values().map { it.label(ctxLabel) },
-                container = AppleTheme.colors.red.copy(alpha = 0.12f), labelColor = AppleTheme.colors.red
-            ) { picked -> ImportanceLevel.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(importanceLevel = it, updatedAt = nowIso())) } }
-            EditableChip(
-                current = contact.relationshipType.label(ctxLabel),
+                current = contact.customRelationshipType?.takeIf { it.isNotBlank() }
+                    ?: contact.relationshipType.label(ctxLabel),
                 options = RelationshipType.values().map { it.label(ctxLabel) },
                 container = AppleTheme.colors.brand.copy(alpha = 0.10f), labelColor = AppleTheme.colors.brand
-            ) { picked -> RelationshipType.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(relationshipType = it, updatedAt = nowIso())) } }
-            // Уровень связи (по макету — третий чип hero). Редактируемый.
+            ) { picked -> RelationshipType.values().firstOrNull { it.label(ctxLabel) == picked }?.let {
+                // Выбор стандартного типа очищает свой (кастомный задаётся в форме)
+                AppStateStore.updateContact(contact.copy(relationshipType = it, customRelationshipType = null, updatedAt = nowIso()))
+            } }
+            // Чип «статус» удалён по решению владельца (2026-07-02): состав чипов —
+            // тип отношений / соц.роль / ритм (важность — в ободке аватара).
+            // Поле contactStatus в модели сохранено.
             EditableChip(
-                current = contact.connectionLevel.label(ctxLabel),
-                options = ConnectionLevel.values().map { it.label(ctxLabel) },
+                current = contact.socialRole.label(ctxLabel),
+                options = SocialRole.values().map { it.label(ctxLabel) },
                 container = AppleTheme.colors.orange.copy(alpha = 0.12f), labelColor = AppleTheme.colors.orange
-            ) { picked -> ConnectionLevel.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(connectionLevel = it, updatedAt = nowIso())) } }
-            EditableChip(
-                current = contact.communicationRhythm.label(ctxLabel),
-                options = CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) },
-                container = AppleTheme.colors.fill, labelColor = AppleTheme.colors.label
-            ) { picked -> CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(communicationRhythm = it, updatedAt = nowIso())) } }
-            EditableChip(
-                current = contact.contactStatus.label(ctxLabel),
-                options = ContactStatus.values().map { it.label(ctxLabel) },
-                container = AppleTheme.colors.green.copy(alpha = 0.14f), labelColor = AppleTheme.colors.green
-            ) { picked -> ContactStatus.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(contactStatus = it, updatedAt = nowIso())) } }
+            ) { picked -> SocialRole.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(socialRole = it, updatedAt = nowIso())) } }
+            if (contact.communicationRhythm != CommunicationRhythm.NOT_TRACKED) {
+                EditableChip(
+                    current = contact.communicationRhythm.label(ctxLabel),
+                    options = CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) },
+                    container = AppleTheme.colors.fill, labelColor = AppleTheme.colors.label
+                ) { picked -> CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(communicationRhythm = it, updatedAt = nowIso())) } }
+            }
         }
 
         // Теги (сохранены)

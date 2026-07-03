@@ -74,7 +74,7 @@ fun CalendarItemDetailScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        stringResource(R.string.cid_current_date, event.startDate),
+                        stringResource(R.string.cid_current_date, com.aistudio.socialsphere.crmlxb.utils.displayEventDate(event.startDate)),
                         style = MaterialTheme.typography.bodySmall,
                         color = AppleTheme.colors.secondaryLabel
                     )
@@ -361,7 +361,7 @@ fun EventHeader(event: CalendarItem) {
             modifier = Modifier.padding(top = 4.dp)
         )
         Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DetailChip(Icons.Default.CalendarToday, event.startDate)
+            DetailChip(Icons.Default.CalendarToday, com.aistudio.socialsphere.crmlxb.utils.displayEventDate(event.startDate))
             if (!event.startTime.isNullOrEmpty()) {
                 DetailChip(Icons.Default.Schedule, event.startTime + (if (!event.endTime.isNullOrEmpty()) "–${event.endTime}" else ""))
             }

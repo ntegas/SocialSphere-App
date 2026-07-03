@@ -147,8 +147,13 @@ object ExportManager {
     private fun writeVCard(pw: PrintWriter, c: Contact) {
         pw.println("BEGIN:VCARD")
         pw.println("VERSION:3.0")
-        pw.println("N:${vEsc(c.lastName)};${vEsc(c.firstName)};;;")
-        pw.println("FN:${vEsc("${c.firstName} ${c.lastName}".trim())}")
+        pw.println("N:${vEsc(c.lastName)};${vEsc(c.firstName)};${vEsc(c.middleName ?: "")};;")
+        val fullName = listOfNotNull(
+            c.firstName.takeIf { it.isNotBlank() },
+            c.middleName?.takeIf { it.isNotBlank() },
+            c.lastName.takeIf { it.isNotBlank() }
+        ).joinToString(" ")
+        pw.println("FN:${vEsc(fullName)}")
         if (!c.nickname.isNullOrBlank()) pw.println("NICKNAME:${vEsc(c.nickname)}")
 
         val compRel = c.companyRelations.firstOrNull { it.isPrimary }
@@ -193,8 +198,14 @@ object ExportManager {
             it.type == CalendarItemType.BIRTHDAY &&
             it.links.any { l -> l.targetId == c.id }
         }?.startDate
-        if (!birthday.isNullOrBlank())
-            pw.println("BDAY:${birthday.replace("-", "")}")
+        if (!birthday.isNullOrBlank()) {
+            // Дата без года хранится «--MM-DD» → vCard-форма «--MMDD»
+            // (простой replace("-","") давал бы «MMDD» без маркера отсутствия года)
+            if (birthday.startsWith("--"))
+                pw.println("BDAY:--${birthday.removePrefix("--").replace("-", "")}")
+            else
+                pw.println("BDAY:${birthday.replace("-", "")}")
+        }
 
         // NOTE: все заметки + app-поля (нет в стандарте vCard — кладём текстом)
         val noteParts = mutableListOf<String>()

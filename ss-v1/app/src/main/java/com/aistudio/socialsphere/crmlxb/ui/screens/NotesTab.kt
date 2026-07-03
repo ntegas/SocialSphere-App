@@ -230,10 +230,10 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                 // блюром при включённом режиме приватности (замок в шапке).
                                 val protectedHidden = privacyMode && note.isImportant
                                 Box {
-                                    // На API<31 Modifier.blur не работает — маскируем текст,
-                                    // чтобы приватность соблюдалась на всех устройствах.
-                                    val masked = protectedHidden &&
-                                        android.os.Build.VERSION.SDK_INT < 31
+                                    // Маскируем ВСЕГДА при скрытии: blur — только визуальный
+                                    // эффект, под ним в семантике лежал реальный текст —
+                                    // Accessibility/скринридер мог его прочитать (аудит 2026-07-02).
+                                    val masked = protectedHidden
                                     Text(
                                         if (masked) "•".repeat(note.text.length.coerceIn(4, 60))
                                         else note.text,

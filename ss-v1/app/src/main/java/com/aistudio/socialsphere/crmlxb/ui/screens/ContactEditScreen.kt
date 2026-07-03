@@ -45,7 +45,9 @@ import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 @Composable
 fun ContactEditScreen(
     contactId: String?,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    // После СОЗДАНИЯ контакта открываем его карточку (фидбэк владельца), а не список.
+    onCreated: ((String) -> Unit)? = null
 ) {
     val isEditMode = contactId != null
     val ctxLabel = LocalContext.current
@@ -66,8 +68,9 @@ fun ContactEditScreen(
     var contactRelationsDraft by remember { mutableStateOf(originalRelations) }
     var showAddRelation by remember { mutableStateOf(false) }
 
-    var firstName by remember { mutableStateOf(originalContact?.firstName ?: "") }
-    var lastName  by remember { mutableStateOf(originalContact?.lastName  ?: "") }
+    var firstName  by remember { mutableStateOf(originalContact?.firstName ?: "") }
+    var lastName   by remember { mutableStateOf(originalContact?.lastName  ?: "") }
+    var middleName by remember { mutableStateOf(originalContact?.middleName ?: "") }
 
     // Mutable lists for editing
     var phones     by remember { mutableStateOf(originalContact?.phones     ?: emptyList<ContactPhone>()) }
@@ -83,6 +86,9 @@ fun ContactEditScreen(
 
     // Classification
     var relationshipType   by remember { mutableStateOf(originalContact?.relationshipType   ?: RelationshipType.ACQUAINTANCE) }
+    // Свой тип отношений («Кум», «Тренер»…) — если непустой, показывается вместо стандартного
+    var customRelationType by remember { mutableStateOf(originalContact?.customRelationshipType ?: "") }
+    var showCustomRelDialog by remember { mutableStateOf(false) }
     var connectionLevel    by remember { mutableStateOf(originalContact?.connectionLevel    ?: ConnectionLevel.NORMAL) }
     var importanceLevel    by remember { mutableStateOf(originalContact?.importanceLevel    ?: ImportanceLevel.NORMAL) }
     var socialRole         by remember { mutableStateOf(originalContact?.socialRole         ?: SocialRole.REGULAR) }
@@ -147,6 +153,7 @@ fun ContactEditScreen(
             id               = editedContactId,
             firstName        = firstName.trim(),
             lastName         = lastName.trim(),
+            middleName       = middleName.trim().ifBlank { null },
             nickname         = nickname.trim().ifBlank { null },
             phones           = phones,
             emails           = emails,
@@ -158,6 +165,7 @@ fun ContactEditScreen(
             sizeInfo         = originalContact?.sizeInfo,
             personalDetails  = originalContact?.personalDetails ?: emptyList(),
             relationshipType  = relationshipType,
+            customRelationshipType = customRelationType.trim().ifBlank { null },
             connectionLevel   = connectionLevel,
             importanceLevel   = importanceLevel,
             socialRole        = socialRole,
@@ -171,6 +179,12 @@ fun ContactEditScreen(
             meetDate         = meetDate.trim().ifBlank { null },
             tags             = tags,
             photoUri         = originalContact?.photoUri,
+            // Поля, не редактируемые этой формой, ОБЯЗАНЫ проноситься из оригинала —
+            // иначе каждое сохранение молча стирало их (реальный баг: lastContactDate
+            // и deviceContactId терялись при любом редактировании контакта)
+            lastContactDate  = originalContact?.lastContactDate,
+            deviceContactId  = originalContact?.deviceContactId,
+            familyNote       = originalContact?.familyNote,
             createdAt        = originalContact?.createdAt ?: nowIso(),
             updatedAt        = nowIso()
         )
@@ -185,7 +199,7 @@ fun ContactEditScreen(
         contactRelationsDraft.filter { it.id !in origIds }
             .forEach { AppStateStore.addContactRelation(it) }
 
-        onNavigateBack()
+        if (!isEditMode && onCreated != null) onCreated(editedContactId) else onNavigateBack()
     }
 
     // ── Dialogs ──────────────────────────────────────────────────────
@@ -513,6 +527,19 @@ fun ContactEditScreen(
                         )
                     }
                 }
+                // Отчество — как в телефонной книге (импортируется из vCard/устройства)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    BareFieldColumn(
+                        label = stringResource(R.string.ce_middle_name), value = middleName,
+                        onValueChange = { middleName = it }, keyboardOptions = CapWords,
+                        modifier = Modifier.fillMaxWidth().padding(12.dp)
+                    )
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -528,13 +555,49 @@ fun ContactEditScreen(
                 }
             }
 
-            // ── Тип отношений (пилюли, как в макете) ──────────────────
+            // ── Тип отношений (пилюли + свой вариант, как договорено) ──
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 AureliaCaption(stringResource(R.string.ce_relation_type))
+                val customLabel = customRelationType.trim()
+                val addOwnLabel = stringResource(R.string.ce_relation_custom_add)
                 PillChoiceRow(
-                    options = RelationshipType.values().map { it.label(ctxLabel) },
-                    selected = relationshipType.label(ctxLabel),
-                    onSelect = { v -> relationshipType = RelationshipType.values().firstOrNull { it.label(ctxLabel) == v } ?: relationshipType }
+                    // Если свой тип задан — он в списке и выбран; последняя пилюля «+ Свой»
+                    options = RelationshipType.values().map { it.label(ctxLabel) } +
+                        listOfNotNull(customLabel.takeIf { it.isNotBlank() }) +
+                        listOf(addOwnLabel),
+                    selected = customLabel.ifBlank { relationshipType.label(ctxLabel) },
+                    onSelect = { v ->
+                        when {
+                            v == addOwnLabel -> showCustomRelDialog = true
+                            v == customLabel && customLabel.isNotBlank() -> Unit // уже выбран
+                            else -> RelationshipType.values().firstOrNull { it.label(ctxLabel) == v }?.let {
+                                relationshipType = it
+                                customRelationType = "" // стандартный выбор очищает свой
+                            }
+                        }
+                    }
+                )
+            }
+            if (showCustomRelDialog) {
+                var draft by remember { mutableStateOf(customRelationType) }
+                AlertDialog(
+                    onDismissRequest = { showCustomRelDialog = false },
+                    title = { Text(stringResource(R.string.ce_relation_custom_title), fontWeight = FontWeight.Bold) },
+                    text = {
+                        OutlinedTextField(
+                            value = draft, onValueChange = { draft = it }, keyboardOptions = CapSentences,
+                            label = { Text(stringResource(R.string.ce_relation_custom_hint)) },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
+                    },
+                    confirmButton = {
+                        Button(enabled = draft.isNotBlank(), onClick = {
+                            customRelationType = draft.trim()
+                            relationshipType = RelationshipType.OTHER
+                            showCustomRelDialog = false
+                        }) { Text(stringResource(R.string.common_save)) }
+                    },
+                    dismissButton = { TextButton(onClick = { showCustomRelDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
                 )
             }
 
@@ -1032,23 +1095,10 @@ fun ContactEditScreen(
             }
 
             // ── Классификация (тип отношений/важность — пилюлями наверху экрана) ──
+            // Пикер «Статус» УДАЛЁН по решению владельца (2026-07-02): в UI остаются
+            // тип отношений / важность / соц.роль / ритм. Поле contactStatus в модели
+            // и MIGRATION_8_9 сохранены — данные не теряются.
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AureliaCaption(stringResource(R.string.ce_status))
-                    PillChoiceRow(
-                        options = ContactStatus.values().map { it.label(ctxLabel) },
-                        selected = contactStatus.label(ctxLabel),
-                        onSelect = { v -> contactStatus = ContactStatus.values().firstOrNull { it.label(ctxLabel) == v } ?: contactStatus }
-                    )
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AureliaCaption(stringResource(R.string.ce_connection_level))
-                    PillChoiceRow(
-                        options = ConnectionLevel.values().map { it.label(ctxLabel) },
-                        selected = connectionLevel.label(ctxLabel),
-                        onSelect = { v -> connectionLevel = ConnectionLevel.values().firstOrNull { it.label(ctxLabel) == v } ?: connectionLevel }
-                    )
-                }
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     AureliaCaption(stringResource(R.string.ce_social_role))
                     PillChoiceRow(

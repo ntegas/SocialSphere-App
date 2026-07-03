@@ -28,6 +28,7 @@ import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import com.aistudio.socialsphere.crmlxb.utils.BusinessCardParser
 import com.aistudio.socialsphere.crmlxb.utils.ImportContactCandidate
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
@@ -44,8 +45,12 @@ fun ScanCardScreen(
     onCreated: (String) -> Unit
 ) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var rawText  by remember { mutableStateOf("") }
     var reviewed by remember { mutableStateOf(false) }
+    // Камера открывается сразу (как в макете SCANNER); вставка текста — запасной путь.
+    var showCamera by remember { mutableStateOf(true) }
+    var ocrRunning by remember { mutableStateOf(false) }
 
     var firstName by remember { mutableStateOf("") }
     var lastName  by remember { mutableStateOf("") }
@@ -53,6 +58,36 @@ fun ScanCardScreen(
     var email     by remember { mutableStateOf("") }
     var company   by remember { mutableStateOf("") }
     var position  by remember { mutableStateOf("") }
+
+    // Разбор текста в поля; на шаг проверки — только если парсер что-то нашёл
+    fun applyParsed(text: String) {
+        val p = BusinessCardParser.parse(text)
+        firstName = p.firstName
+        lastName  = p.lastName
+        phone     = p.phones.firstOrNull() ?: ""
+        email     = p.emails.firstOrNull() ?: ""
+        company   = p.company ?: ""
+        position  = p.position ?: ""
+        if (firstName.isNotBlank() || lastName.isNotBlank() ||
+            phone.isNotBlank() || email.isNotBlank()) reviewed = true
+    }
+
+    // ── Камера → кадр → Tesseract-OCR (eng+rus+ell) → разбор в поля ──
+    if (showCamera) {
+        CardCameraScanner(
+            onClose = { showCamera = false },
+            onCaptured = { bmp ->
+                showCamera = false
+                ocrRunning = true
+                scope.launch {
+                    val text = com.aistudio.socialsphere.crmlxb.utils.BusinessCardOcr.recognize(ctx, bmp)
+                    if (text.isNotBlank()) { rawText = text; applyParsed(text) }
+                    ocrRunning = false
+                }
+            }
+        )
+        return
+    }
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
@@ -98,6 +133,31 @@ fun ScanCardScreen(
                             color = AppleTheme.colors.secondaryLabel,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
+                }
+                // Индикатор распознавания после снимка
+                if (ocrRunning) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(stringResource(R.string.scan_recognize) + "…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppleTheme.colors.secondaryLabel)
+                    }
+                }
+                // Снять визитку камерой (повторно)
+                Button(
+                    onClick = { showCamera = true },
+                    enabled = !ocrRunning,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand)
+                ) {
+                    Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.scan_capture))
                 }
                 OutlinedTextField(
                     value = rawText,

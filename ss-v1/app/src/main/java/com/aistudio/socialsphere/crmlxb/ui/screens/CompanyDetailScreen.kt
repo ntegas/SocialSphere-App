@@ -295,68 +295,54 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(
             Text(stringResource(R.string.compd_add_employee))
         }
         if (showAdd) {
-            val candidates = AppStateStore.contacts.filter { c ->
-                relations.none { it.contactId == c.id } &&
-                "${c.firstName} ${c.lastName}".contains(search, ignoreCase = true)
-            }
-            AlertDialog(
-                onDismissRequest = { showAdd = false; selected = null; search = ""; position = "" },
-                title = { Text(stringResource(R.string.compd_add_employee), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val sel = selected
-                        if (sel == null) {
-                            OutlinedTextField(
-                                value = search, onValueChange = { search = it },
-                                label = { Text(stringResource(R.string.ce_search_contact)) },
-                                modifier = Modifier.fillMaxWidth(), singleLine = true
+            // Шаг 1: канонический пикер людей (шторка + поиск + аватары)
+            if (selected == null) {
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                    title = stringResource(R.string.compd_add_employee),
+                    items = AppStateStore.contacts
+                        .filter { c -> relations.none { it.contactId == c.id } }
+                        .map { c ->
+                            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                                id = c.id,
+                                title = "${c.firstName} ${c.lastName}".trim(),
+                                subtitle = c.companyRelations.firstOrNull()?.position
                             )
-                            candidates.take(8).forEach { c ->
-                                Text(
-                                    "${c.firstName} ${c.lastName}".trim(),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.fillMaxWidth().clickable { selected = c }.padding(vertical = 8.dp)
-                                )
-                            }
-                            if (candidates.isEmpty()) {
-                                Text(
-                                    stringResource(R.string.compd_no_candidates),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AppleTheme.colors.secondaryLabel
-                                )
-                            }
-                        } else {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("${sel.firstName} ${sel.lastName}".trim(), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                TextButton(onClick = { selected = null }) { Text(stringResource(R.string.ce_change)) }
-                            }
-                            OutlinedTextField(
-                                value = position, onValueChange = { position = it }, keyboardOptions = CapSentences,
-                                label = { Text(stringResource(R.string.cd_position)) },
-                                modifier = Modifier.fillMaxWidth(), singleLine = true
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(enabled = selected != null, onClick = {
-                        selected?.let { c ->
-                            AppStateStore.updateContact(c.copy(
-                                companyRelations = c.companyRelations + ContactCompanyRelation(
+                        },
+                    onPick = { picked -> selected = AppStateStore.getContact(picked.id) },
+                    onDismiss = { showAdd = false; search = ""; position = "" },
+                    searchPlaceholder = stringResource(R.string.ce_search_contact),
+                    emptyText = stringResource(R.string.compd_no_candidates)
+                )
+            } else selected?.let { sel ->
+                // Шаг 2: должность
+                AlertDialog(
+                    onDismissRequest = { showAdd = false; selected = null; position = "" },
+                    title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
+                    text = {
+                        OutlinedTextField(
+                            value = position, onValueChange = { position = it }, keyboardOptions = CapSentences,
+                            label = { Text(stringResource(R.string.cd_position)) },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            AppStateStore.updateContact(sel.copy(
+                                companyRelations = sel.companyRelations + ContactCompanyRelation(
                                     id = java.util.UUID.randomUUID().toString(),
-                                    contactId = c.id,
+                                    contactId = sel.id,
                                     companyId = company.id,
                                     position = position.ifBlank { null },
                                     employmentStatus = EmploymentStatus.CURRENT,
-                                    isPrimary = c.companyRelations.isEmpty()
+                                    isPrimary = sel.companyRelations.isEmpty()
                                 )
                             ))
-                        }
-                        selected = null; search = ""; position = ""; showAdd = false
-                    }) { Text(stringResource(R.string.common_add)) }
-                },
-                dismissButton = { TextButton(onClick = { showAdd = false; selected = null; search = ""; position = "" }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                            selected = null; search = ""; position = ""; showAdd = false
+                        }) { Text(stringResource(R.string.common_add)) }
+                    },
+                    dismissButton = { TextButton(onClick = { selected = null }) { Text(stringResource(R.string.common_back)) } }
+                )
+            }
         }
     }
 
