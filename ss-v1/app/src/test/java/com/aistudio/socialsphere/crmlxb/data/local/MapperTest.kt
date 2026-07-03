@@ -81,7 +81,9 @@ class MapperTest {
             id = "e1",
             title = "Встреча",
             description = null,
-            type = CalendarItemType.EVENT,
+            // EVENT из старого enum удалён — «Встреча» = MEETING (фикс 2026-07-02:
+            // тест не компилировался и валил сборку IDE, которая собирает тест-классы)
+            type = CalendarItemType.MEETING,
             startDate = "2026-01-01",
             startTime = null,
             endDate = null,
@@ -96,7 +98,7 @@ class MapperTest {
         )
         val back = item.toEntity().toDomain()
         assertEquals("Встреча", back.title)
-        assertEquals(CalendarItemType.EVENT, back.type)
+        assertEquals(CalendarItemType.MEETING, back.type)
         assertEquals(true, back.isAllDay)
 
         val corrupt = item.toEntity().copy(type = "BROKEN")

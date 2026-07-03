@@ -96,6 +96,7 @@ dependencies {
   // BOM 2024.09 падал в рантайме (крэш сканера). Разрешения — Activity Result API.
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
+  implementation(libs.androidx.fragment.ktx) // фикс lintVital: fragment ≥1.3 для ActivityResult
   // Камера-сканер визитки (CameraX) + OCR (Tesseract4Android)
   implementation(libs.androidx.camera.camera2)
   implementation(libs.androidx.camera.core)
@@ -170,3 +171,12 @@ val downloadTessData = tasks.register("downloadTessData") {
 tasks.named("preBuild") { dependsOn(downloadTessData) }
 tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
   .configureEach { dependsOn(downloadTessData) }
+
+// ── Алиасы для кнопки Build в Android Studio/IDEA ────────────────────────────
+// IDE при «Build/Rebuild Project» иногда шлёт JPS-задачи unitTestClasses/
+// androidTestClasses, которых в Android-модуле НЕТ → «Cannot locate tasks that
+// match ':app:unitTestClasses'» и сборка падает ещё до конфигурации кода.
+// Регистрируем алиасы на реальные AGP-задачи компиляции тестов — кнопка IDE
+// работает; на CLI-сборки (assembleDebug) это не влияет.
+tasks.register("unitTestClasses") { dependsOn("compileDebugUnitTestKotlin") }
+tasks.register("androidTestClasses") { dependsOn("compileDebugAndroidTestKotlin") }

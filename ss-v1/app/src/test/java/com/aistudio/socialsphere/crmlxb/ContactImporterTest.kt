@@ -166,20 +166,23 @@ class ContactImporterTest {
 
     // ─── normalizeBirthday: форматы из телефонной книги / vCard ───
 
+    // Поведение изменено (см. док normalizeBirthday): даты БЕЗ года сохраняются
+    // как «--MM-DD» — фиктивный 1972 показывал ложный возраст; формат «--MM-DD»
+    // понимают parseFlexibleDate/displayEventDate. Тесты обновлены 2026-07-02.
     @Test
-    fun birthday_noYearWithDashes_getsFixedYear() {
-        assertEquals("1972-03-12", normalizeBirthday("--03-12"))
+    fun birthday_noYearWithDashes_keptWithoutYear() {
+        assertEquals("--03-12", normalizeBirthday("--03-12"))
     }
 
     @Test
-    fun birthday_noYearCompact_getsFixedYear() {
-        assertEquals("1972-03-12", normalizeBirthday("--0312"))
+    fun birthday_noYearCompact_keptWithoutYear() {
+        assertEquals("--03-12", normalizeBirthday("--0312"))
     }
 
     @Test
-    fun birthday_feb29NoYear_isValidOnLeapFixedYear() {
-        // 1972 — високосный, поэтому 29 февраля валидно и не теряется
-        assertEquals("1972-02-29", normalizeBirthday("--02-29"))
+    fun birthday_feb29NoYear_keptWithoutYear() {
+        // 29 февраля без года не теряется и не искажается
+        assertEquals("--02-29", normalizeBirthday("--02-29"))
     }
 
     @Test

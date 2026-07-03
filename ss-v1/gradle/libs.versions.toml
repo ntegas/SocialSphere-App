@@ -40,6 +40,7 @@ mapsCompose = "4.4.1"
 playServicesMaps = "19.0.0"
 desugarJdkLibs = "2.0.4"
 tesseract4android = "4.9.0"
+fragmentKtx = "1.6.2"
 
 [libraries]
 android-tools-desugar = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
@@ -92,6 +93,9 @@ play-services-maps = { group = "com.google.android.gms", name = "play-services-m
 
 # OCR-движок сканера визиток (Apache-2.0, форк tess-two, Tesseract 5.x, openmp-вариант)
 tesseract4android = { group = "cz.adaptech.tesseract4android", name = "tesseract4android-openmp", version.ref = "tesseract4android" }
+# Явный fragment ≥1.3: lintVitalRelease падал InvalidFragmentVersionForActivityResult
+# (registerForActivityResult в MainActivity + древний транзитивный fragment)
+androidx-fragment-ktx = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "fragmentKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
