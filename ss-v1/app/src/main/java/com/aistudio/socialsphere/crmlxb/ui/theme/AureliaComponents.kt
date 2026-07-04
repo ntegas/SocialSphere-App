@@ -38,6 +38,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -172,8 +175,16 @@ fun AureliaSheet(
             )
         },
     ) {
+        // FIX (фидбэк владельца 2026-07-04): контент шторок обрезался, если был
+        // выше видимой высоты листа (ModalBottomSheet сам НЕ скроллит контент),
+        // и клавиатура перекрывала поля — verticalScroll + imePadding чинят это
+        // разом для ВСЕХ шторок на этом компоненте.
         Column(
-            Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 30.dp),
+            Modifier.fillMaxWidth()
+                .heightIn(max = 560.dp)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(start = 18.dp, end = 18.dp, bottom = 30.dp),
             content = content
         )
     }

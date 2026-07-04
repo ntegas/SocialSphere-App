@@ -204,6 +204,7 @@ fun com.aistudio.socialsphere.crmlxb.model.CalendarItem.displayTitle(
 private val IMPORTED_NOTE_TEMPLATES = listOf(
     R.string.imp_job_on_import,
     R.string.imp_note_from_import,
+    R.string.imp_relation_from_phone,
 )
 
 /**

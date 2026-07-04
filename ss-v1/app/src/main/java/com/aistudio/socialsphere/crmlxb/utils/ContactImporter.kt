@@ -13,6 +13,30 @@ enum class DuplicateStatus {
     SKIPPED
 }
 
+/** Смежный контакт из телефонной книги: имя + роль (уже по-русски, как ContactRelation). */
+data class ImportedRelation(val name: String, val role: String)
+
+/** Android Relation.TYPE (int) → русская роль. Используется как ContactRelation.role
+ *  (данные, не локализуются, см. §16 базы знаний) и как читаемый текст заметки,
+ *  если контакт с таким именем не найден в приложении. */
+private fun androidRelationRole(type: Int, customLabel: String?): String = when (type) {
+    // Пол неизвестен из данных Android — "Партнёр" уже в закрытом словаре ролей
+    // (§16 базы знаний), не изобретаем новое значение вроде "Супруг(а)"
+    ContactsContract.CommonDataKinds.Relation.TYPE_SPOUSE,
+    ContactsContract.CommonDataKinds.Relation.TYPE_DOMESTIC_PARTNER,
+    ContactsContract.CommonDataKinds.Relation.TYPE_PARTNER -> "Партнёр"
+    ContactsContract.CommonDataKinds.Relation.TYPE_FATHER -> "Отец"
+    ContactsContract.CommonDataKinds.Relation.TYPE_MOTHER -> "Мать"
+    ContactsContract.CommonDataKinds.Relation.TYPE_BROTHER -> "Брат"
+    ContactsContract.CommonDataKinds.Relation.TYPE_SISTER -> "Сестра"
+    ContactsContract.CommonDataKinds.Relation.TYPE_FRIEND -> "Друг"
+    ContactsContract.CommonDataKinds.Relation.TYPE_MANAGER,
+    ContactsContract.CommonDataKinds.Relation.TYPE_ASSISTANT -> "Коллега"
+    ContactsContract.CommonDataKinds.Relation.TYPE_CUSTOM -> customLabel?.trim()?.takeIf { it.isNotBlank() } ?: "Родственник"
+    // CHILD/PARENT/RELATIVE/REFERRED_BY — пол/точная роль неизвестны из данных Android
+    else -> "Родственник"
+}
+
 data class ImportContactCandidate(
     val id: String = UUID.randomUUID().toString(),
     val firstName: String = "",
@@ -26,6 +50,15 @@ data class ImportContactCandidate(
     val addresses: List<Address> = emptyList(),
     val birthday: String? = null,
     val notes: String? = null,
+    /** Названия групп телефонной книги («Семья», «Работа»…) — фидбэк 2026-07-04:
+     *  «При импорте ты группой импортируешь телефона?» Системные авто-группы
+     *  Google («System Group: My Contacts» и т.п.) отфильтрованы. */
+    val groupNames: List<String> = emptyList(),
+    /** Смежные контакты/семья (ContactsContract.CommonDataKinds.Relation) —
+     *  «жена: Анна», «друг: Олег» и т.п. Раньше не читались вообще (фидбэк
+     *  владельца 2026-07-04). role — Русская строка-данные (см. §16
+     *  SOCIALSPHERE_KNOWLEDGE.md: роли семьи не локализуются, это данные). */
+    val relations: List<ImportedRelation> = emptyList(),
     val source: String = "Телефонная книга",
     var duplicateStatus: DuplicateStatus = DuplicateStatus.NEW,
     var selectedForImport: Boolean = true,
@@ -34,8 +67,33 @@ data class ImportContactCandidate(
 
 object ContactImporter {
 
+    /** Карта GROUP_ROW_ID → название группы, с фильтром авто-групп Google
+     *  («System Group: My Contacts», «Starred in Android» и т.п.). */
+    private fun readGroupTitles(context: Context): Map<Long, String> {
+        val map = mutableMapOf<Long, String>()
+        context.contentResolver.query(
+            ContactsContract.Groups.CONTENT_URI,
+            arrayOf(ContactsContract.Groups._ID, ContactsContract.Groups.TITLE, ContactsContract.Groups.AUTO_ADD, ContactsContract.Groups.FAVORITES),
+            null, null, null
+        )?.use { c ->
+            val idIdx = c.getColumnIndex(ContactsContract.Groups._ID)
+            val titleIdx = c.getColumnIndex(ContactsContract.Groups.TITLE)
+            val autoIdx = c.getColumnIndex(ContactsContract.Groups.AUTO_ADD)
+            val favIdx = c.getColumnIndex(ContactsContract.Groups.FAVORITES)
+            while (c.moveToNext()) {
+                val title = c.getString(titleIdx)?.trim() ?: continue
+                val isAuto = autoIdx >= 0 && c.getInt(autoIdx) != 0
+                val isFav = favIdx >= 0 && c.getInt(favIdx) != 0
+                if (title.isBlank() || title.startsWith("System Group:") || isAuto || isFav) continue
+                map[c.getLong(idIdx)] = title
+            }
+        }
+        return map
+    }
+
     fun getDeviceContacts(context: Context): List<ImportContactCandidate> {
         val candidates = mutableMapOf<String, ImportContactCandidate>()
+        val groupTitles = readGroupTitles(context)
 
         val contentResolver = context.contentResolver
         val cursor: Cursor? = contentResolver.query(
@@ -185,6 +243,24 @@ object ContactImporter {
                         val text = it.getString(data1Idx)
                         if (!text.isNullOrBlank()) {
                             candidates[contactId] = candidate.copy(notes = text)
+                        }
+                    }
+                    ContactsContract.CommonDataKinds.Relation.CONTENT_ITEM_TYPE -> {
+                        // DATA1 = имя смежного контакта, DATA2 = TYPE (int), DATA3 = свой label
+                        val relName = it.getString(data1Idx)?.trim()
+                        if (!relName.isNullOrBlank()) {
+                            val relType = it.getInt(data2Idx)
+                            val customLabel = if (data3Idx >= 0) it.getString(data3Idx) else null
+                            val role = androidRelationRole(relType, customLabel)
+                            candidates[contactId] = candidate.copy(relations = candidate.relations + ImportedRelation(relName, role))
+                        }
+                    }
+                    ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE -> {
+                        // DATA1 = GROUP_ROW_ID (ссылка на ContactsContract.Groups._ID)
+                        val groupRowId = it.getLong(data1Idx)
+                        val title = groupTitles[groupRowId]
+                        if (title != null && title !in candidate.groupNames) {
+                            candidates[contactId] = candidate.copy(groupNames = candidate.groupNames + title)
                         }
                     }
                 }

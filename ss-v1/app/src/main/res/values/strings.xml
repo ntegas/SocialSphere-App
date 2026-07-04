@@ -74,7 +74,10 @@
     <string name="map_filter_companies">Компании</string>
     <string name="map_filter_home">Дом</string>
     <string name="map_filter_work">Работа</string>
-    
+    <string name="map_filter_by_company">По компании и должности</string>
+    <string name="map_filter_companies_section">Компании</string>
+    <string name="map_filter_positions_section">Должности</string>
+
     <string name="common_today">сегодня</string>
     <string name="common_tomorrow">завтра</string>
     <string name="common_close">Закрыть</string>
@@ -357,6 +360,7 @@
     <string name="map_load_failed_3">и есть ли интернет-соединение</string>
     <string name="map_retry">Попробовать снова</string>
     <string name="map_grant_location">Разрешить геолокацию</string>
+    <string name="map_recenter">Показать моё местоположение</string>
     <string name="addr_home">Дом</string>
     <string name="addr_work">Работа</string>
     <string name="addr_office">Офис</string>
@@ -802,6 +806,7 @@
     <string name="imp_birthday_of">День рождения: %1$s</string>
     <string name="imp_job_on_import">Должность при импорте: %1$s</string>
     <string name="imp_note_from_import">Заметка из импорта: %1$s</string>
+    <string name="imp_relation_from_phone">Смежный контакт из телефона: %1$s</string>
     <string name="imp_job_at"> в </string>
     <string name="lbl_relationship_type_family">Семья</string>
     <string name="lbl_relationship_type_friend">Друг</string>
@@ -994,7 +999,7 @@
     <string name="sync_update_from_phone">Обновить из телефона</string>
     <string name="sync_pick_contact">Выберите контакт телефона</string>
     <string name="sync_linked">Связан с телефонной книгой. «Обновить из телефона» подтянет новые номера, email и адреса</string>
-    <string name="sync_pull_result">Добавлено: %1$d тел., %2$d email, %3$d адр.</string>
+    <string name="sync_pull_result">Добавлено: %1$d тел., %2$d email, %3$d адр., %4$d место работы</string>
     <string name="sync_pull_nothing">Всё уже актуально — новых данных в телефоне нет</string>
     <string name="sync_pull_gone">Контакт не найден в телефонной книге (удалён?)</string>
     <string name="set_exact_alarms">Разрешить точные напоминания</string>

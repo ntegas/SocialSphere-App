@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
@@ -59,7 +62,10 @@ fun AddressEditDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(if (base == null) R.string.ce_new_address else R.string.ce_edit_address), fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(value = aLine, onValueChange = { aLine = it }, keyboardOptions = CapWords,
                     label = { Text(stringResource(R.string.ce_street_req)) },
                     modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)

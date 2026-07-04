@@ -5,6 +5,8 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 import androidx.compose.foundation.border
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -406,9 +408,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     android.widget.Toast.makeText(ctx, ctx.getString(R.string.sync_pull_gone), android.widget.Toast.LENGTH_LONG).show()
                     return@launch
                 }
-                fun digits(s: String) = s.filter { it.isDigit() }
+                // Сравнение по нормализованным 10 цифрам (AppStateStore.phoneDigits) —
+                // раньше было своё сравнение "только цифры" без отсечения кода
+                // страны, из-за чего один и тот же номер в формате +7/8 считался
+                // разным и добавлялся повторно (найдено при разборе жалобы 2026-07-04).
                 val newPhones = dev.phones
-                    .filter { d -> contact.phones.none { digits(it.number) == digits(d.number) } }
+                    .filter { d -> contact.phones.none { AppStateStore.phoneDigits(it.number) == AppStateStore.phoneDigits(d.number) } }
                     .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = contact.id) }
                 val newEmails = dev.emails
                     .filter { d -> contact.emails.none { it.email.equals(d.email, ignoreCase = true) } }
@@ -416,22 +421,44 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                 val newAddrs = dev.addresses
                     .filter { d -> contact.addresses.none { it.addressLine == d.addressLine && it.city == d.city } }
                     .map { it.copy(id = java.util.UUID.randomUUID().toString(), ownerId = contact.id, ownerType = AddressOwnerType.CONTACT) }
-                if (newPhones.isEmpty() && newEmails.isEmpty() && newAddrs.isEmpty()) {
+                // Заметка телефона — раньше подтягивалась только при массовом
+                // импорте, точечная кнопка «Обновить из телефона» её игнорировала.
+                val notePrefix = ctx.getString(R.string.imp_note_from_import, "")
+                val newNote = dev.notes?.takeIf { it.isNotBlank() }
+                    ?.takeIf { text -> contact.notes.none { it.text == notePrefix + text } }
+                val hasContactUpdates = newPhones.isNotEmpty() || newEmails.isNotEmpty() || newAddrs.isNotEmpty() || newNote != null
+                if (hasContactUpdates) {
+                    val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    AppStateStore.updateContact(contact.copy(
+                        firstName  = contact.firstName.ifBlank { dev.firstName },
+                        lastName   = contact.lastName.ifBlank { dev.lastName },
+                        middleName = contact.middleName ?: dev.middleName.ifBlank { null },
+                        phones     = contact.phones + newPhones,
+                        emails     = contact.emails + newEmails,
+                        addresses  = contact.addresses + newAddrs,
+                        notes      = if (newNote != null) contact.notes + Note(
+                            id = java.util.UUID.randomUUID().toString(),
+                            contactId = contact.id,
+                            type = NoteType.GENERAL,
+                            text = notePrefix + newNote,
+                            isImportant = false,
+                            createdAt = now, updatedAt = now
+                        ) else contact.notes
+                    ))
+                }
+                // Работа/должность — раньше точечная кнопка её игнорировала (фидбэк
+                // 2026-07-04: «работу тоже подтянуть»), теперь та же функция, что
+                // и у массового импорта (find-or-create компанию + связь, либо
+                // заметка, если компании нет — без дублей при повторном вызове).
+                val companyAdded = applyImportedCompany(dev.companyName, dev.jobTitle, contact.id, ctx)
+                if (!hasContactUpdates && !companyAdded) {
                     // Раньше кнопка молчала и казалась неработающей — теперь честный ответ
                     android.widget.Toast.makeText(ctx, ctx.getString(R.string.sync_pull_nothing), android.widget.Toast.LENGTH_SHORT).show()
                     return@launch
                 }
-                AppStateStore.updateContact(contact.copy(
-                    firstName  = contact.firstName.ifBlank { dev.firstName },
-                    lastName   = contact.lastName.ifBlank { dev.lastName },
-                    middleName = contact.middleName ?: dev.middleName.ifBlank { null },
-                    phones     = contact.phones + newPhones,
-                    emails     = contact.emails + newEmails,
-                    addresses  = contact.addresses + newAddrs
-                ))
                 android.widget.Toast.makeText(
                     ctx,
-                    ctx.getString(R.string.sync_pull_result, newPhones.size, newEmails.size, newAddrs.size),
+                    ctx.getString(R.string.sync_pull_result, newPhones.size, newEmails.size, newAddrs.size, if (companyAdded) 1 else 0),
                     android.widget.Toast.LENGTH_LONG
                 ).show()
             }
@@ -475,7 +502,10 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                 onDismissRequest = { showLink = false; search = "" },
                 title = { Text(stringResource(R.string.sync_pick_contact), fontWeight = FontWeight.Bold) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         OutlinedTextField(
                             value = search, onValueChange = { search = it },
                             modifier = Modifier.fillMaxWidth(), singleLine = true,

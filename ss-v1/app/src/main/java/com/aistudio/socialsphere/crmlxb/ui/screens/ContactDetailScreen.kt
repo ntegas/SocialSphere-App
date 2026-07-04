@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -576,7 +577,10 @@ fun ContactDetailScreen(
             onDismissRequest = { showSizesDialog = false },
             title = { Text(stringResource(R.string.cd_sizes), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     OutlinedTextField(value = sClothing, onValueChange = { sClothing = it },
                         label = { Text(stringResource(R.string.cd_clothes_hint)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedTextField(value = sShoe, onValueChange = { sShoe = it },

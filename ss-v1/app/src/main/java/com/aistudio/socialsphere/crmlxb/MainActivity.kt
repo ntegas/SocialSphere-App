@@ -175,7 +175,12 @@ fun SocialsphereApp() {
         NavHost(
             navController = navController,
             startDestination = "home",
-            modifier = Modifier.padding(innerPadding)
+            // FIX (фидбэк владельца 2026-07-04): клавиатура перекрывала поля ввода
+            // по всему приложению — edge-to-edge (enableEdgeToEdge) + обнулённые
+            // contentWindowInsets на внешнем Scaffold означают, что НИЧТО не
+            // подстраивалось под IME. imePadding() здесь один раз чинит это для
+            // всех экранов сразу.
+            modifier = Modifier.padding(innerPadding).imePadding()
         ) {
             composable("home") {
                 HomeScreen(

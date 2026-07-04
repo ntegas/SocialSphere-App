@@ -74,7 +74,10 @@
     <string name="map_filter_companies">Εταιρείες</string>
     <string name="map_filter_home">Σπίτι</string>
     <string name="map_filter_work">Εργασία</string>
-    
+    <string name="map_filter_by_company">Ανά εταιρεία και θέση</string>
+    <string name="map_filter_companies_section">Εταιρείες</string>
+    <string name="map_filter_positions_section">Θέσεις</string>
+
     <string name="common_today">σήμερα</string>
     <string name="common_tomorrow">αύριο</string>
     <string name="common_close">Κλείσιμο</string>
@@ -357,6 +360,7 @@
     <string name="map_load_failed_3">και υπάρχει σύνδεση στο διαδίκτυο</string>
     <string name="map_retry">Δοκίμασε ξανά</string>
     <string name="map_grant_location">Επίτρεψε τοποθεσία</string>
+    <string name="map_recenter">Δείξε την τοποθεσία μου</string>
     <string name="addr_home">Σπίτι</string>
     <string name="addr_work">Εργασία</string>
     <string name="addr_office">Γραφείο</string>
@@ -802,6 +806,7 @@
     <string name="imp_birthday_of">Γενέθλια: %1$s</string>
     <string name="imp_job_on_import">Θέση κατά την εισαγωγή: %1$s</string>
     <string name="imp_note_from_import">Σημείωση από εισαγωγή: %1$s</string>
+    <string name="imp_relation_from_phone">Σχετική επαφή από το τηλέφωνο: %1$s</string>
     <string name="imp_job_at"> σε </string>
     <string name="lbl_relationship_type_family">Οικογένεια</string>
     <string name="lbl_relationship_type_friend">Φίλος</string>
@@ -994,7 +999,7 @@
     <string name="sync_update_from_phone">Ενημέρωση από τηλέφωνο</string>
     <string name="sync_pick_contact">Επιλέξτε επαφή τηλεφώνου</string>
     <string name="sync_linked">Συνδεδεμένο με τον τηλεφωνικό κατάλογο. Το «Ενημέρωση από τηλέφωνο» φέρνει νέους αριθμούς, email και διευθύνσεις</string>
-    <string name="sync_pull_result">Προστέθηκαν: %1$d τηλ., %2$d email, %3$d διευθ.</string>
+    <string name="sync_pull_result">Προστέθηκαν: %1$d τηλ., %2$d email, %3$d διευθ., %4$d εργασία</string>
     <string name="sync_pull_nothing">Όλα ενημερωμένα — τίποτα νέο στο τηλέφωνο</string>
     <string name="sync_pull_gone">Η επαφή δεν βρέθηκε στον κατάλογο (διαγράφηκε;)</string>
     <string name="set_exact_alarms">Επιτρέψτε ακριβείς υπενθυμίσεις</string>

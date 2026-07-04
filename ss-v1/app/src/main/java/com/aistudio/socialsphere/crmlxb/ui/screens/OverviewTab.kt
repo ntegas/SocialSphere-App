@@ -5,6 +5,8 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 import androidx.compose.foundation.border
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -694,7 +696,10 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 onDismissRequest = { showAddInterest = false; newInterestVal = "" },
                 title = { Text(stringResource(R.string.cd_add_interest), fontWeight = FontWeight.Bold) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(
                                 PersonalDetailCategory.INTERESTS, PersonalDetailCategory.HABITS,

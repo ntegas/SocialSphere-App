@@ -327,15 +327,29 @@ fun ImportPreviewScreen(
         val existingContacts = AppStateStore.contacts
         candidates.forEach { c ->
             var matchedContact: Contact? = null
-            
-            val phoneMatch = existingContacts.find { existing -> existing.phones.any { e -> c.phones.any { cp -> e.number == cp.number } } }
-            if (phoneMatch != null) matchedContact = phoneMatch
+
+            // Уже связан с этим самым контактом телефона — точное совпадение,
+            // проверяем в первую очередь (надёжнее любого сравнения по полям).
+            val deviceMatch = existingContacts.find { it.deviceContactId == c.id }
+            if (deviceMatch != null) matchedContact = deviceMatch
             else {
-                val emailMatch = existingContacts.find { existing -> existing.emails.any { e -> c.emails.any { ce -> e.email == ce.email } } }
-                if (emailMatch != null) matchedContact = emailMatch
+                // Сравнение по НОРМАЛИЗОВАННЫМ 10 цифрам (было — посимвольное
+                // сравнение строк, из-за чего «+7 900…» и «89001112233» — один
+                // и тот же номер — считались разными, и дубли не находились).
+                val phoneMatch = existingContacts.find { existing ->
+                    existing.phones.any { e -> c.phones.any { cp ->
+                        val d = AppStateStore.phoneDigits(e.number)
+                        d.length >= 7 && d == AppStateStore.phoneDigits(cp.number)
+                    } }
+                }
+                if (phoneMatch != null) matchedContact = phoneMatch
                 else {
-                    val nameMatch = existingContacts.find { it.firstName == c.firstName && it.lastName == c.lastName && c.firstName.isNotBlank() }
-                    if (nameMatch != null) matchedContact = nameMatch
+                    val emailMatch = existingContacts.find { existing -> existing.emails.any { e -> c.emails.any { ce -> e.email.equals(ce.email, ignoreCase = true) } } }
+                    if (emailMatch != null) matchedContact = emailMatch
+                    else {
+                        val nameMatch = existingContacts.find { it.firstName == c.firstName && it.lastName == c.lastName && c.firstName.isNotBlank() }
+                        if (nameMatch != null) matchedContact = nameMatch
+                    }
                 }
             }
             
@@ -470,6 +484,135 @@ fun ImportPreviewScreen(
     }
 }
 
+/** Инверсия роли для НАШЕГО контакта относительно смежного (см. androidRelationRole
+ *  в ContactImporter.kt) — большинство ролей асимметричны и требуют знания пола
+ *  нашего контакта, которого Android не даёт, поэтому безопасный дефолт — «Родственник». */
+private fun inverseImportedRole(role: String): String = when (role) {
+    "Друг" -> "Друг"
+    "Партнёр" -> "Партнёр"
+    "Коллега" -> "Коллега"
+    else -> "Родственник"
+}
+
+/** Ищет контакт приложения по полному имени из Android Relation.NAME
+ *  (не структурировано — только строка целиком). */
+private fun findContactByFullName(fullName: String): Contact? {
+    val words = fullName.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (words.isEmpty()) return null
+    return AppStateStore.contacts.find { c ->
+        val cFull = listOfNotNull(c.firstName.trim(), c.middleName?.trim(), c.lastName.trim())
+            .filter { it.isNotBlank() }.joinToString(" ")
+        cFull.equals(fullName.trim(), ignoreCase = true) ||
+            (words.size == 1 && (c.firstName.equals(words[0], ignoreCase = true) || c.lastName.equals(words[0], ignoreCase = true))) ||
+            (words.size >= 2 && c.firstName.equals(words.first(), ignoreCase = true) && c.lastName.equals(words.last(), ignoreCase = true))
+    }
+}
+
+/**
+ * Смежные контакты из телефона (фидбэк владельца 2026-07-04: «в Android есть
+ * смежные контакты — семья, друг… это должно сохраняться»). Общая функция для
+ * НОВОГО контакта и слияния — раньше такой перенос не было вообще нигде.
+ * Если есть контакт с таким именем — настоящая ContactRelation. Если нет —
+ * заметка (решение владельца: «если про текстовое поле — добавляешь в заметки»),
+ * локаль-безопасный шаблон (см. normalizeImportedNoteText/У62).
+ */
+private fun applyImportedRelations(candidate: ImportContactCandidate, contactId: String, context: android.content.Context) {
+    if (candidate.relations.isEmpty()) return
+    candidate.relations.forEach { rel ->
+        val matched = findContactByFullName(rel.name)?.takeIf { it.id != contactId }
+        if (matched != null) {
+            val alreadyLinked = AppStateStore.contactRelations.any {
+                (it.firstContactId == contactId && it.secondContactId == matched.id) ||
+                (it.firstContactId == matched.id && it.secondContactId == contactId)
+            }
+            if (!alreadyLinked) {
+                AppStateStore.addContactRelation(ContactRelation(
+                    id = java.util.UUID.randomUUID().toString(),
+                    firstContactId = contactId,
+                    secondContactId = matched.id,
+                    firstRole = inverseImportedRole(rel.role),
+                    secondRole = rel.role
+                ))
+            }
+        } else {
+            val text = context.getString(R.string.imp_relation_from_phone, "${rel.role} — ${rel.name}")
+            val current = AppStateStore.contacts.find { it.id == contactId } ?: return@forEach
+            if (current.notes.none { it.text == text }) {
+                val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                AppStateStore.updateContact(current.copy(notes = current.notes + Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    type = NoteType.GENERAL,
+                    text = text,
+                    isImportant = false,
+                    createdAt = now, updatedAt = now
+                )))
+            }
+        }
+    }
+}
+
+/**
+ * Компания/должность из телефона — ЕДИНАЯ функция для нового контакта, слияния
+ * при импорте И точечной кнопки «Обновить из телефона» (фидбэк 2026-07-04:
+ * «работу тоже подтянуть» — раньше эта логика была раздельно и почти дословно
+ * продублирована между performImport/mergeCandidate, точечная кнопка её не
+ * знала вовсе). Если есть компания — find-or-create + связь (если такой связи
+ * ещё нет — повторный вызов не плодит дубли); если только должность без
+ * компании — заметка (тоже с проверкой на дубль текста).
+ * @return true, если контакт реально изменился (для тостов/статистики).
+ */
+internal fun applyImportedCompany(
+    companyName: String?,
+    jobTitle: String?,
+    contactId: String,
+    context: android.content.Context,
+    onCompanyCreated: () -> Unit = {}
+): Boolean {
+    // Страж: компания не создаётся, если название пустое после trim
+    // или совпадает с должностью (классический симптом кривого маппинга)
+    val cleanCompanyName = companyName?.trim()
+    if (!cleanCompanyName.isNullOrBlank() && !cleanCompanyName.equals(jobTitle?.trim(), ignoreCase = true)) {
+        val current = AppStateStore.contacts.find { it.id == contactId } ?: return false
+        val hasRelation = current.companyRelations.any { relation ->
+            AppStateStore.getCompany(relation.companyId)?.name.equals(cleanCompanyName, ignoreCase = true)
+        }
+        if (hasRelation) return false
+        var company = AppStateStore.companies.find { it.name.equals(cleanCompanyName, ignoreCase = true) }
+        if (company == null) {
+            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            company = Company(
+                id = java.util.UUID.randomUUID().toString(), name = cleanCompanyName,
+                industry = Industry.OTHER, createdAt = now, updatedAt = now
+            )
+            AppStateStore.addCompany(company)
+            onCompanyCreated()
+        }
+        val relation = ContactCompanyRelation(
+            id = java.util.UUID.randomUUID().toString(),
+            contactId = contactId,
+            companyId = company.id,
+            position = jobTitle ?: "",
+            employmentStatus = EmploymentStatus.CURRENT,
+            isPrimary = current.companyRelations.isEmpty()
+        )
+        AppStateStore.updateContact(current.copy(companyRelations = current.companyRelations + relation))
+        return true
+    } else if (!jobTitle.isNullOrBlank()) {
+        val text = context.getString(R.string.imp_job_on_import, jobTitle)
+        val current = AppStateStore.contacts.find { it.id == contactId } ?: return false
+        if (current.notes.any { it.text == text }) return false
+        val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        AppStateStore.updateContact(current.copy(notes = current.notes + Note(
+            id = java.util.UUID.randomUUID().toString(), contactId = contactId,
+            type = NoteType.GENERAL, text = text, isImportant = false,
+            createdAt = now, updatedAt = now
+        )))
+        return true
+    }
+    return false
+}
+
 fun performImport(selected: List<ImportContactCandidate>, context: android.content.Context) {
     var companiesCreated = 0
     var contactsImported = 0
@@ -491,6 +634,14 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
             importanceLevel = ImportanceLevel.NORMAL,
             socialRole = SocialRole.REGULAR,
             communicationRhythm = CommunicationRhythm.NOT_TRACKED,
+            // Связь с контактом телефона — candidate.id уже в формате
+            // "device_contact_<ID>" (см. ContactImporter.getDeviceContacts).
+            // Раньше не проставлялось — импортированные так контакты никогда
+            // не получали кнопку «Обновить из телефона» (баг найден 2026-07-04).
+            // Для CSV/vCard-импорта (не из книги устройства) candidate.id — просто
+            // случайный UUID, не совпадающий с device_contact_-форматом нигде
+            // больше, поэтому присваивать его безопасно в любом случае.
+            deviceContactId = candidate.id.takeIf { it.startsWith("device_contact_") },
             phones = candidate.phones.map { it.copy(contactId = contactId, id = java.util.UUID.randomUUID().toString()) },
             emails = candidate.emails.map { it.copy(contactId = contactId, id = java.util.UUID.randomUUID().toString()) },
             createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
@@ -510,52 +661,14 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
             }
         }
 
-        // Страж: компания не создаётся, если название пустое после trim
-        // или совпадает с должностью (классический симптом кривого маппинга)
-        val cleanCompanyName = candidate.companyName?.trim()
-        if (!cleanCompanyName.isNullOrBlank() &&
-            !cleanCompanyName.equals(candidate.jobTitle?.trim(), ignoreCase = true)) {
-            // Find or create company
-            var company = AppStateStore.companies.find { it.name.equals(cleanCompanyName, ignoreCase = true) }
-            if (company == null) {
-                company = Company(
-                    id = java.util.UUID.randomUUID().toString(),
-                    name = cleanCompanyName,
-                    industry = Industry.OTHER,
-                    createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                )
-                AppStateStore.addCompany(company)
-                companiesCreated++
-            }
-            val relation = ContactCompanyRelation(
-                    id = java.util.UUID.randomUUID().toString(),
-                    contactId = contactId,
-                    companyId = company.id,
-                    position = candidate.jobTitle ?: "",
-                    employmentStatus = EmploymentStatus.CURRENT,
-                    isPrimary = true
-                )
-            val contactToUpdate = AppStateStore.contacts.find { it.id == contactId }
-            if (contactToUpdate != null) {
-                AppStateStore.updateContact(contactToUpdate.copy(companyRelations = contactToUpdate.companyRelations + relation))
-            }
-        } else if (!candidate.jobTitle.isNullOrBlank()) {
-             // Job title without company, keep in note
-             val newNote = Note(
-                     id = java.util.UUID.randomUUID().toString(),
-                     contactId = contactId,
-                     type = NoteType.GENERAL,
-                     text = context.getString(R.string.imp_job_on_import, candidate.jobTitle),
-                     isImportant = false,
-                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                     updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                 )
-             val contactToUpdate = AppStateStore.contacts.find { it.id == contactId }
-             if (contactToUpdate != null) {
-                 AppStateStore.updateContact(contactToUpdate.copy(notes = contactToUpdate.notes + newNote))
-             }
+        // Группы телефонной книги (фидбэк 2026-07-04): find-or-create по имени +
+        // привязка нового контакта. addGroup сам дедуплицирует по имени без регистра.
+        if (candidate.groupNames.isNotEmpty()) {
+            val groupIds = candidate.groupNames.mapNotNull { AppStateStore.addGroup(it)?.id }.toSet()
+            if (groupIds.isNotEmpty()) AppStateStore.setContactGroups(contactId, groupIds)
         }
+
+        applyImportedCompany(candidate.companyName, candidate.jobTitle, contactId, context) { companiesCreated++ }
 
         val alreadyHasBirthday = AppStateStore.calendarItems.any {
             it.type == CalendarItemType.BIRTHDAY &&
@@ -597,8 +710,10 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
                  AppStateStore.updateContact(contactToUpdate.copy(notes = contactToUpdate.notes + newNote))
              }
         }
+
+        applyImportedRelations(candidate, contactId, context)
     }
-    
+
     // Store stats temporarily in ImportSession so Result screen can show it
     ImportResultStats.contactsImported = contactsImported
     ImportResultStats.companiesCreated = companiesCreated
@@ -712,11 +827,18 @@ fun ImportDuplicatesScreen(
 fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.Context) {
     val existingId = candidate.matchedContactId ?: return
     val existingContact = AppStateStore.contacts.find { it.id == existingId } ?: return
-    
-    val newPhones = candidate.phones.filter { cp -> existingContact.phones.none { it.number == cp.number } }
+
+    // Нормализованное сравнение (было — посимвольное; см. фикс в ImportPreviewScreen выше)
+    val newPhones = candidate.phones.filter { cp ->
+        existingContact.phones.none { AppStateStore.phoneDigits(it.number) == AppStateStore.phoneDigits(cp.number) }
+    }.map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = existingId) }
+    val newEmails = candidate.emails.filter { ce -> existingContact.emails.none { it.email.equals(ce.email, ignoreCase = true) } }
         .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = existingId) }
-    val newEmails = candidate.emails.filter { ce -> existingContact.emails.none { it.email == ce.email } }
-        .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = existingId) }
+
+    // Связь с телефоном — если контакт слился с записью из книги устройства,
+    // а связи ещё не было, проставляем (тот же баг, что и в performImport).
+    val deviceLink = candidate.id.takeIf { it.startsWith("device_contact_") }
+    val newMiddleName = existingContact.middleName ?: candidate.middleName.ifBlank { null }
     
     // Merge Addresses
     candidate.addresses.forEach { addr ->
@@ -731,37 +853,7 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
     }
     
     // Merge company relation
-    val cleanCompanyName2 = candidate.companyName?.trim()
-    if (!cleanCompanyName2.isNullOrBlank() &&
-        !cleanCompanyName2.equals(candidate.jobTitle?.trim(), ignoreCase = true)) {
-        val hasCompanyRelation = existingContact.companyRelations.any { relation -> 
-            val comp = AppStateStore.companies.find { it.id == relation.companyId }
-            comp?.name.equals(cleanCompanyName2, ignoreCase = true)
-        }
-        if (!hasCompanyRelation) {
-            var company = AppStateStore.companies.find { it.name.equals(cleanCompanyName2, ignoreCase = true) }
-            if (company == null) {
-                company = Company(
-                    id = java.util.UUID.randomUUID().toString(),
-                    name = cleanCompanyName2,
-                    industry = Industry.OTHER,
-                    createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                )
-                AppStateStore.addCompany(company)
-                ImportResultStats.companiesCreated++
-            }
-            val relation = ContactCompanyRelation(
-                id = java.util.UUID.randomUUID().toString(),
-                contactId = existingId,
-                companyId = company.id,
-                position = candidate.jobTitle ?: "",
-                employmentStatus = EmploymentStatus.CURRENT,
-                isPrimary = existingContact.companyRelations.isEmpty()
-            )
-            AppStateStore.updateContact(existingContact.copy(companyRelations = existingContact.companyRelations + relation))
-        }
-    }
+    applyImportedCompany(candidate.companyName, candidate.jobTitle, existingId, context) { ImportResultStats.companiesCreated++ }
     
     // Merge Birthday
     if (!candidate.birthday.isNullOrBlank()) {
@@ -788,16 +880,52 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
         }
     }
     
-    if (newPhones.isNotEmpty() || newEmails.isNotEmpty()) {
+    // Заметка/группы телефона — раньше переносились ТОЛЬКО при создании нового
+    // контакта; при слиянии с существующим (этот путь) молча терялись, хотя
+    // ContactImporter их уже распарсил (найдено при разборе жалобы 2026-07-04).
+    if (!candidate.notes.isNullOrBlank()) {
+        val hasImportedNote = existingContact.notes.any {
+            it.text == context.getString(R.string.imp_note_from_import, candidate.notes)
+        }
+        if (!hasImportedNote) {
+            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            val freshForNote = AppStateStore.contacts.find { it.id == existingId } ?: existingContact
+            AppStateStore.updateContact(freshForNote.copy(
+                notes = freshForNote.notes + Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = existingId,
+                    type = NoteType.GENERAL,
+                    text = context.getString(R.string.imp_note_from_import, candidate.notes),
+                    isImportant = false,
+                    createdAt = now, updatedAt = now
+                )
+            ))
+        }
+    }
+    if (candidate.groupNames.isNotEmpty()) {
+        val groupIds = candidate.groupNames.mapNotNull { AppStateStore.addGroup(it)?.id }.toSet()
+        if (groupIds.isNotEmpty()) {
+            val current = AppStateStore.groupsOfContact(existingId).map { it.id }.toSet()
+            AppStateStore.setContactGroups(existingId, current + groupIds)
+        }
+    }
+
+    if (newPhones.isNotEmpty() || newEmails.isNotEmpty() || deviceLink != null || newMiddleName != existingContact.middleName) {
         val freshExisting = AppStateStore.contacts.find { it.id == existingId } ?: existingContact
         AppStateStore.updateContact(freshExisting.copy(
             phones = freshExisting.phones + newPhones,
             emails = freshExisting.emails + newEmails,
+            middleName = newMiddleName,
+            // Связь с телефоном проставляем, только если её ещё не было —
+            // не затираем существующую (контакт мог быть связан вручную с
+            // ДРУГОЙ карточкой телефона, это выбор владельца).
+            deviceContactId = freshExisting.deviceContactId ?: deviceLink,
             updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         ))
         ImportResultStats.phonesAdded += newPhones.size
         ImportResultStats.emailsAdded += newEmails.size
     }
+    applyImportedRelations(candidate, existingId, context)
     ImportResultStats.duplicatesSkipped++
 }
 

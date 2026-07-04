@@ -79,7 +79,10 @@ fun CompanyEditScreen(
             onDismissRequest = { showAddPhone = false; newPhoneNumber = "" },
             title = { Text(stringResource(R.string.cce_add_phone), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(
                         value = newPhoneNumber,
                         onValueChange = { newPhoneNumber = it },
@@ -132,7 +135,10 @@ fun CompanyEditScreen(
             onDismissRequest = { showAddEmail = false; newEmailAddress = "" },
             title = { Text(stringResource(R.string.cce_add_email), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(
                         value = newEmailAddress,
                         onValueChange = { newEmailAddress = it },

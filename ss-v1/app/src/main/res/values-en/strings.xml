@@ -74,7 +74,10 @@
     <string name="map_filter_companies">Companies</string>
     <string name="map_filter_home">Home</string>
     <string name="map_filter_work">Work</string>
-    
+    <string name="map_filter_by_company">By company and position</string>
+    <string name="map_filter_companies_section">Companies</string>
+    <string name="map_filter_positions_section">Positions</string>
+
     <string name="common_today">today</string>
     <string name="common_tomorrow">tomorrow</string>
     <string name="common_close">Close</string>
@@ -357,6 +360,7 @@
     <string name="map_load_failed_3">and an internet connection is available</string>
     <string name="map_retry">Try again</string>
     <string name="map_grant_location">Allow location</string>
+    <string name="map_recenter">Show my location</string>
     <string name="addr_home">Home</string>
     <string name="addr_work">Work</string>
     <string name="addr_office">Office</string>
@@ -802,6 +806,7 @@
     <string name="imp_birthday_of">Birthday: %1$s</string>
     <string name="imp_job_on_import">Position on import: %1$s</string>
     <string name="imp_note_from_import">Note from import: %1$s</string>
+    <string name="imp_relation_from_phone">Related contact from phone: %1$s</string>
     <string name="imp_job_at"> at </string>
     <string name="lbl_relationship_type_family">Family</string>
     <string name="lbl_relationship_type_friend">Friend</string>
@@ -994,7 +999,7 @@
     <string name="sync_update_from_phone">Update from phone</string>
     <string name="sync_pick_contact">Pick a phone contact</string>
     <string name="sync_linked">Linked to the phone book. "Update from phone" pulls new numbers, emails and addresses</string>
-    <string name="sync_pull_result">Added: %1$d phones, %2$d emails, %3$d addresses</string>
+    <string name="sync_pull_result">Added: %1$d phones, %2$d emails, %3$d addresses, %4$d workplace</string>
     <string name="sync_pull_nothing">Already up to date — nothing new on the phone</string>
     <string name="sync_pull_gone">Contact not found in the phone book (deleted?)</string>
     <string name="set_exact_alarms">Allow exact alarms</string>

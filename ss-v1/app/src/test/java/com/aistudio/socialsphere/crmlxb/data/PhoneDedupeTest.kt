@@ -84,7 +84,7 @@ class PhoneDedupeTest {
         val pairs = AppStateStore.findDuplicatePairs()
 
         assertEquals(1, pairs.size)
-        val ids = setOf(pairs[0].first.id, pairs[0].second.id)
+        val ids = setOf(pairs[0].a.id, pairs[0].b.id)
         assertEquals(setOf("c1", "c2"), ids)
     }
 
@@ -126,6 +126,6 @@ class PhoneDedupeTest {
 
         // C(3,2) = 3 пары, без повторов и без «сам с собой»
         assertEquals(3, pairs.size)
-        pairs.forEach { assertNotEquals(it.first.id, it.second.id) }
+        pairs.forEach { assertNotEquals(it.a.id, it.b.id) }
     }
 }

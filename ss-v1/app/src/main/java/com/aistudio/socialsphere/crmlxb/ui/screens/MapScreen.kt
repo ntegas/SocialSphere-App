@@ -54,7 +54,9 @@ data class MapLocationItem(
     val country: String,
     val locationType: AddressType,
     val latLng: LatLng?,
-    val relatedCompanyName: String? = null
+    val relatedCompanyName: String? = null,
+    val relatedCompanyId: String? = null,
+    val relatedPosition: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,6 +74,10 @@ fun MapScreen(
     var relFilter      by remember { mutableStateOf<RelationshipType?>(null) }
     // Фильтр по группе (v11): совместим с типом отношений — оба условия «И»
     var groupFilter    by remember { mutableStateOf<String?>(null) }
+    // Фильтр по компании/должности — только для вкладки «Работа» (фидбэк владельца
+    // 2026-07-04: «в работах в карте должен быть фильтр позиции компании»)
+    var companyFilter  by remember { mutableStateOf<String?>(null) }
+    var positionFilter by remember { mutableStateOf<String?>(null) }
     var selectedItem   by remember { mutableStateOf<MapLocationItem?>(null) }
     var showMapView    by remember { mutableStateOf(true) }
     var locationPermGranted by remember { mutableStateOf(false) }
@@ -99,10 +105,19 @@ fun MapScreen(
 
     var searchQuery by remember { mutableStateOf("") }
 
-    // Check permission on first composition (don't request automatically)
+    // Check permission on first composition (don't request automatically).
+    // FIX (корень бага «пропала точка/кнопка, острова», 2026-07-04): проверяем
+    // ОБА разрешения — FINE и COARSE. Раньше здесь был только FINE, а permLauncher
+    // ниже засчитывает и COARSE. Из-за этого при выданном «Приблизительно» карта
+    // работала в ту сессию, но при следующем запуске эта проверка видела «точного
+    // нет» → locationPermGranted=false → нет синей точки, нет кнопки «где я»,
+    // userLatLng не запрашивался → карта падала на заглушку (Афины, острова).
     LaunchedEffect(Unit) {
         locationPermGranted = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -155,7 +170,9 @@ fun MapScreen(
                             locationType = address.addressType,
                             latLng      = if (address.latitude != null && address.longitude != null)
                                 LatLng(address.latitude, address.longitude) else null,
-                            relatedCompanyName = companyName
+                            relatedCompanyName = companyName,
+                            relatedCompanyId = compRel?.companyId,
+                            relatedPosition = compRel?.position
                         )
                     }
                     AddressOwnerType.COMPANY -> {
@@ -174,7 +191,8 @@ fun MapScreen(
                             locationType = address.addressType,
                             latLng      = if (address.latitude != null && address.longitude != null)
                                 LatLng(address.latitude, address.longitude) else null,
-                            relatedCompanyName = company.name
+                            relatedCompanyName = company.name,
+                            relatedCompanyId = company.id
                         )
                     }
                 }
@@ -186,7 +204,7 @@ fun MapScreen(
     val geoCache = remember { mutableStateMapOf<String, LatLng>() }
     val coordsOf: (MapLocationItem) -> LatLng? = { it.latLng ?: geoCache[it.addressId] }
 
-    val filteredList by remember(mapObjects, searchQuery, selectedTab, relFilter, groupFilter) {
+    val filteredList by remember(mapObjects, searchQuery, selectedTab, relFilter, groupFilter, companyFilter, positionFilter) {
         derivedStateOf {
             val groupContactIds = groupFilter?.let { AppStateStore.contactIdsInGroup(it) }
             mapObjects.filter { obj ->
@@ -211,7 +229,10 @@ fun MapScreen(
                 // Фильтр группы: только контакты-члены выбранной группы
                 val matchGroup = groupContactIds == null ||
                     (obj.ownerType == AddressOwnerType.CONTACT && obj.ownerId in groupContactIds)
-                matchSearch && matchTab && matchRel && matchGroup
+                // Фильтр компании/должности — только вкладка «Работа» (selectedTab==1)
+                val matchCompany = companyFilter == null || obj.relatedCompanyId == companyFilter
+                val matchPosition = positionFilter == null || obj.relatedPosition == positionFilter
+                matchSearch && matchTab && matchRel && matchGroup && matchCompany && matchPosition
             }
         }
     }
@@ -273,13 +294,19 @@ fun MapScreen(
     }
     val listItems = filteredList
 
-    // Местоположение пользователя (last-known) — чтобы карта открывалась там,
-    // где он сейчас, а не на первом адресе из данных (был в другом городе).
+    // Местоположение пользователя — чтобы карта открывалась там, где он сейчас,
+    // а не на первом адресе из данных (был в другом городе).
+    // FIX (фидбэк владельца 2026-07-04): «показывает какие-то острова» —
+    // lastKnownLatLng брал ТОЛЬКО кэш системы; если ни одно приложение ещё не
+    // спрашивало позицию (частый случай после сброса данных/чистой установки),
+    // кэш пуст и карта навсегда падала на хардкод-заглушку (Афины, zoom 5 —
+    // это и есть «острова»). Теперь при пустом кэше запрашиваем свежую позицию.
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
-    LaunchedEffect(locationPermGranted) {
+    var locateRequest by remember { mutableIntStateOf(0) }
+    LaunchedEffect(locationPermGranted, locateRequest) {
         if (!locationPermGranted) return@LaunchedEffect
         userLatLng = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            lastKnownLatLng(context)
+            lastKnownLatLng(context) ?: freshLatLng(context)
         }
     }
 
@@ -293,7 +320,9 @@ fun MapScreen(
 
     // Когда местоположение получено и пользователь ничего не выбрал — центрируем
     // карту на нём (камера инициализируется один раз, поэтому двигаем эффектом).
-    LaunchedEffect(userLatLng) {
+    // Ключ locateRequest — чтобы кнопка «моё местоположение» центрировала карту
+    // ЗАНОВО, даже если координаты не изменились с прошлого раза.
+    LaunchedEffect(userLatLng, locateRequest) {
         val u = userLatLng ?: return@LaunchedEffect
         if (selectedItem == null) {
             try {
@@ -387,10 +416,18 @@ fun MapScreen(
                                 }
                             }
                         } else {
-                        // FIX: safe MapProperties — never pass true if not confirmed
+                        // FIX (баг найден 2026-07-04): раньше проверялся ТОЛЬКО
+                        // ACCESS_FINE_LOCATION, а locationPermGranted выше допускал
+                        // и COARSE — если пользователь дал «примерное» местоположение
+                        // (частый выбор в системном диалоге с Android 12), точка и
+                        // кнопка «моё местоположение» пропадали молча. Теперь оба
+                        // разрешения равноценны, как и везде в этом экране.
                         val safeLocationEnabled = locationPermGranted && try {
                             ContextCompat.checkSelfPermission(
                                 context, Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.ACCESS_COARSE_LOCATION
                             ) == PackageManager.PERMISSION_GRANTED
                         } catch (e: Exception) { false }
 
@@ -433,28 +470,40 @@ fun MapScreen(
                     }
                     } // end isGmsAvailable
 
-                    // Permission button — only if not granted
-                    if (!locationPermGranted) {
-                        SmallFloatingActionButton(
-                            onClick = {
+                    // FIX (фидбэк владельца 2026-07-04): «пропала кнопка, где я
+                    // нахожусь» — раньше эта кнопка исчезала НАВСЕГДА после выдачи
+                    // разрешения (просила разрешение и только). Теперь она видна
+                    // всегда: без разрешения — запрашивает его, с разрешением —
+                    // принудительно центрирует карту на свежей позиции (полезно,
+                    // если системный кэш местоположения пуст и карта осталась на
+                    // заглушке).
+                    SmallFloatingActionButton(
+                        onClick = {
+                            if (!locationPermGranted) {
                                 permLauncher.launch(
                                     arrayOf(
                                         Manifest.permission.ACCESS_FINE_LOCATION,
                                         Manifest.permission.ACCESS_COARSE_LOCATION
                                     )
                                 )
-                            },
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(8.dp),
-                            containerColor = AppleTheme.colors.card
-                        ) {
-                            Icon(
-                                Icons.Default.MyLocation,
-                                stringResource(R.string.map_grant_location),
-                                tint = AppleTheme.colors.brand
-                            )
-                        }
+                            } else {
+                                selectedItem = null
+                                locateRequest++
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp),
+                        containerColor = AppleTheme.colors.card
+                    ) {
+                        Icon(
+                            Icons.Default.MyLocation,
+                            stringResource(
+                                if (!locationPermGranted) R.string.map_grant_location
+                                else R.string.map_recenter
+                            ),
+                            tint = AppleTheme.colors.brand
+                        )
                     }
 
                     // No-coords notice
@@ -674,6 +723,145 @@ fun MapScreen(
                                     ) {
                                         Text(
                                             g.name, fontSize = 15.sp,
+                                            fontWeight = if (selectedRow) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (selectedRow) AppleTheme.colors.brand else AppleTheme.colors.label
+                                        )
+                                        if (selectedRow) Icon(Icons.Default.Check, null,
+                                            Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                                    }
+                                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                                }
+                            }
+                        }
+                    }
+                }
+                // ── Фильтр компании/должности — только вкладка «Работа» (фидбэк
+                // владельца 2026-07-04: «в работах в карте должен быть фильтр
+                // позиции компании»). Список компаний/должностей строим из
+                // текущих рабочих адресов контактов (без учёта самого фильтра).
+                if (selectedTab == 1) {
+                    var showCompanySheet by remember { mutableStateOf(false) }
+                    val workItems = mapObjects.filter {
+                        it.ownerType == AddressOwnerType.CONTACT &&
+                            it.locationType in listOf(AddressType.WORK, AddressType.OFFICE)
+                    }
+                    val companyOptions = workItems
+                        .mapNotNull { it.relatedCompanyId?.let { id -> id to (it.relatedCompanyName ?: "") } }
+                        .distinctBy { it.first }
+                        .sortedBy { it.second.lowercase() }
+                    val positionOptions = workItems
+                        .mapNotNull { it.relatedPosition?.takeIf { p -> p.isNotBlank() } }
+                        .distinct()
+                        .sorted()
+                    Spacer(Modifier.height(8.dp))
+                    val companyFilterActive = companyFilter != null || positionFilter != null
+                    val companyFilterLabel = listOfNotNull(
+                        companyFilter?.let { id -> companyOptions.firstOrNull { it.first == id }?.second },
+                        positionFilter
+                    ).joinToString(" · ").ifBlank { stringResource(R.string.map_filter_by_company) }
+                    Row(
+                        Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
+                            .background(if (companyFilterActive) AppleTheme.colors.brand else AppleTheme.colors.card)
+                            .then(
+                                if (!companyFilterActive)
+                                    Modifier.border(1.dp, AppleTheme.colors.separator, RoundedCornerShape(16.dp))
+                                else Modifier
+                            )
+                            .clickable { showCompanySheet = true }
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Work, null, Modifier.size(15.dp),
+                            tint = if (companyFilterActive) Color.White else AppleTheme.colors.secondaryLabel)
+                        Text(
+                            companyFilterLabel,
+                            fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            color = if (companyFilterActive) Color.White else AppleTheme.colors.secondaryLabel
+                        )
+                        Icon(Icons.Default.ArrowDropDown, null, Modifier.size(16.dp),
+                            tint = if (companyFilterActive) Color.White else AppleTheme.colors.secondaryLabel)
+                    }
+                    if (showCompanySheet) {
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showCompanySheet = false }) {
+                            Text(
+                                stringResource(R.string.map_filter_by_company),
+                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                                fontSize = 20.sp, fontWeight = FontWeight.W700,
+                                color = AppleTheme.colors.label,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        companyFilter = null; positionFilter = null
+                                        selectedItem = null; showCompanySheet = false
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    stringResource(R.string.map_filter_all),
+                                    fontSize = 15.sp,
+                                    fontWeight = if (!companyFilterActive) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (!companyFilterActive) AppleTheme.colors.brand else AppleTheme.colors.label
+                                )
+                                if (!companyFilterActive) Icon(Icons.Default.Check, null,
+                                    Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                            }
+                            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                            if (companyOptions.isNotEmpty()) {
+                                Text(
+                                    stringResource(R.string.map_filter_companies_section).uppercase(),
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel,
+                                    modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
+                                )
+                                companyOptions.forEach { (id, name) ->
+                                    val selectedRow = companyFilter == id
+                                    Row(
+                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                companyFilter = if (selectedRow) null else id
+                                                selectedItem = null; showCompanySheet = false
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 13.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            name, fontSize = 15.sp,
+                                            fontWeight = if (selectedRow) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (selectedRow) AppleTheme.colors.brand else AppleTheme.colors.label
+                                        )
+                                        if (selectedRow) Icon(Icons.Default.Check, null,
+                                            Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                                    }
+                                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                                }
+                            }
+                            if (positionOptions.isNotEmpty()) {
+                                Text(
+                                    stringResource(R.string.map_filter_positions_section).uppercase(),
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel,
+                                    modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
+                                )
+                                positionOptions.forEach { pos ->
+                                    val selectedRow = positionFilter == pos
+                                    Row(
+                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                positionFilter = if (selectedRow) null else pos
+                                                selectedItem = null; showCompanySheet = false
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 13.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            pos, fontSize = 15.sp,
                                             fontWeight = if (selectedRow) FontWeight.Bold else FontWeight.Medium,
                                             color = if (selectedRow) AppleTheme.colors.brand else AppleTheme.colors.label
                                         )
@@ -952,6 +1140,45 @@ private fun lastKnownLatLng(context: android.content.Context): LatLng? {
             if (current == null || loc.accuracy < current.accuracy) best = loc
         }
         best?.let { LatLng(it.latitude, it.longitude) }
+    } catch (e: Exception) {
+        null
+    }
+}
+
+/**
+ * Свежий запрос позиции, когда системный кэш (lastKnownLatLng) пуст — частый
+ * случай на свежей установке/после сброса данных, если ни одно приложение ещё
+ * не спрашивало геолокацию. Без такого запроса карта навсегда оставалась на
+ * хардкод-заглушке (фидбэк владельца 2026-07-04: «показывает какие-то острова»).
+ * До 8 секунд ждём первый апдейт с любого доступного провайдера, затем сдаёмся.
+ */
+private suspend fun freshLatLng(context: android.content.Context): LatLng? {
+    return try {
+        val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE)
+            as? android.location.LocationManager ?: return null
+        val providers = lm.getProviders(true)
+        if (providers.isEmpty()) return null
+        kotlinx.coroutines.withTimeoutOrNull(8000) {
+            kotlinx.coroutines.suspendCancellableCoroutine<LatLng?> { cont ->
+                val listener = object : android.location.LocationListener {
+                    override fun onLocationChanged(location: android.location.Location) {
+                        if (cont.isActive) cont.resume(LatLng(location.latitude, location.longitude)) {}
+                        try { lm.removeUpdates(this) } catch (e: Exception) { }
+                    }
+                }
+                try {
+                    for (provider in providers) {
+                        @Suppress("MissingPermission")
+                        lm.requestLocationUpdates(provider, 0L, 0f, listener, android.os.Looper.getMainLooper())
+                    }
+                    cont.invokeOnCancellation {
+                        try { lm.removeUpdates(listener) } catch (e: Exception) { }
+                    }
+                } catch (e: SecurityException) {
+                    if (cont.isActive) cont.resume(null) {}
+                }
+            }
+        }
     } catch (e: Exception) {
         null
     }

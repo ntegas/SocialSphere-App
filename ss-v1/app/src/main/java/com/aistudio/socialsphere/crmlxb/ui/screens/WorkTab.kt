@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -325,7 +327,10 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                         onDismissRequest = { showAddrDialog = false; editAddr = null },
                         title = { Text(stringResource(if (base == null) R.string.cd_add_address else R.string.ce_edit_address), fontWeight = FontWeight.Bold) },
                         text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(
+                                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
                                 OutlinedTextField(value = aLine, onValueChange = { aLine = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_street_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedTextField(value = aCity, onValueChange = { aCity = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_city)) }, modifier = Modifier.weight(1f), singleLine = true)

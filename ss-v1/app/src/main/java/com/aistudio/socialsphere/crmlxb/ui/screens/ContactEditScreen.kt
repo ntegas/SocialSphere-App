@@ -263,7 +263,10 @@ fun ContactEditScreen(
                 onDismissRequest = { showAddRelation = false; newRelSelected = null },
                 title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         DropdownField(stringResource(R.string.ce_who_relation), newRelOtherRole, relationRoles) { v ->
                             newRelOtherRole = v
                             if (!myRoleTouched) newRelMyRole = inverseRole(v)
@@ -297,7 +300,10 @@ fun ContactEditScreen(
             onDismissRequest = { showAddPhone = false; newPhone = "" },
             title = { Text(stringResource(R.string.ce_add_phone), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(value = newPhone, onValueChange = { newPhone = it }, keyboardOptions = PhoneKeyboard, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth())
                     DropdownField(stringResource(R.string.ce_type), newPhoneType.label(ctxLabel), PhoneType.values().map { it.label(ctxLabel) }) { v -> newPhoneType = PhoneType.values().firstOrNull { it.label(ctxLabel) == v } ?: PhoneType.MOBILE }
                 }
@@ -319,7 +325,10 @@ fun ContactEditScreen(
             onDismissRequest = { showAddEmail = false; newEmail = "" },
             title = { Text(stringResource(R.string.ce_add_email), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(value = newEmail, onValueChange = { newEmail = it }, keyboardOptions = EmailKeyboard, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
                     DropdownField(stringResource(R.string.ce_type), newEmailType.label(ctxLabel), EmailType.values().map { it.label(ctxLabel) }) { v -> newEmailType = EmailType.values().firstOrNull { it.label(ctxLabel) == v } ?: EmailType.PERSONAL }
                 }
@@ -341,7 +350,10 @@ fun ContactEditScreen(
             onDismissRequest = { showAddMessenger = false; newMessenger = "" },
             title = { Text(stringResource(R.string.ce_add_messenger), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(stringResource(R.string.ce_platform), style = MaterialTheme.typography.labelMedium, color = AppleTheme.colors.secondaryLabel)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MessengerType.values().forEach { mt ->
