@@ -319,15 +319,33 @@ fun MapScreen(
     }
 
     // Когда местоположение получено и пользователь ничего не выбрал — центрируем
-    // карту на нём (камера инициализируется один раз, поэтому двигаем эффектом).
-    // Ключ locateRequest — чтобы кнопка «моё местоположение» центрировала карту
-    // ЗАНОВО, даже если координаты не изменились с прошлого раза.
+    // карту на нём. Ключ locateRequest — чтобы кнопка «моё местоположение»
+    // центрировала карту ЗАНОВО, даже если координаты не изменились.
+    //
+    // ФИКС (баг найден 2026-07-04, «всё равно остров/кнопка не видна»): ПЕРВОЕ
+    // центрирование делалось через cameraState.animate(...), а это вызов В САМУ
+    // GoogleMap — если её View ещё не примонтирована (обычная ситуация в момент
+    // первой отрисовки), animate() бросает исключение, которое тут же тихо
+    // глоталось catch{}. После этого userLatLng больше не менялся → ключ эффекта
+    // не менялся → повторной попытки НИКОГДА не было, и камера навсегда
+    // оставалась на дефолтной точке (Афины/«остров»), даже когда userLatLng
+    // был получен верно. Прямое присвоение cameraState.position — это просто
+    // смена состояния, GoogleMap подхватит его сама, когда домонтируется;
+    // готовности карты не требует. Анимация (плавный пан) оставлена только
+    // для повторных запросов (нажатие кнопки после первого центрирования),
+    // где карта уже точно на экране.
+    var firstCenterDone by remember { mutableStateOf(false) }
     LaunchedEffect(userLatLng, locateRequest) {
         val u = userLatLng ?: return@LaunchedEffect
         if (selectedItem == null) {
-            try {
-                cameraState.animate(CameraUpdateFactory.newLatLngZoom(u, 12f))
-            } catch (e: Exception) { /* карта ещё инициализируется */ }
+            if (!firstCenterDone) {
+                cameraState.position = CameraPosition.fromLatLngZoom(u, 12f)
+                firstCenterDone = true
+            } else {
+                try {
+                    cameraState.animate(CameraUpdateFactory.newLatLngZoom(u, 12f))
+                } catch (e: Exception) { /* карта ещё инициализируется — не критично для повторных запросов */ }
+            }
         }
     }
 
@@ -1166,16 +1184,27 @@ private suspend fun freshLatLng(context: android.content.Context): LatLng? {
                         try { lm.removeUpdates(this) } catch (e: Exception) { }
                     }
                 }
-                try {
-                    for (provider in providers) {
+                // ФИКС (баг найден 2026-07-04): раньше ОДИН try/catch оборачивал
+                // ВЕСЬ цикл — если первый провайдер (обычно "gps", требует FINE)
+                // кидал SecurityException из-за того, что выдано только
+                // «Приблизительно» (COARSE), весь запрос падал в null, даже не
+                // пытаясь спросить "network" (которому достаточно COARSE). Теперь
+                // каждый провайдер пробуется независимо, как уже сделано в
+                // lastKnownLatLng() выше.
+                var anyRequested = false
+                for (provider in providers) {
+                    try {
                         @Suppress("MissingPermission")
                         lm.requestLocationUpdates(provider, 0L, 0f, listener, android.os.Looper.getMainLooper())
-                    }
+                        anyRequested = true
+                    } catch (e: SecurityException) { /* пробуем следующий провайдер */ }
+                }
+                if (!anyRequested) {
+                    if (cont.isActive) cont.resume(null) {}
+                } else {
                     cont.invokeOnCancellation {
                         try { lm.removeUpdates(listener) } catch (e: Exception) { }
                     }
-                } catch (e: SecurityException) {
-                    if (cont.isActive) cont.resume(null) {}
                 }
             }
         }
