@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.aistudio.socialsphere.crmlxb.ui.screens
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -109,6 +111,9 @@ fun CalendarSettingsScreen(
                     stringResource(R.string.evt_company_events)  to CalendarItemType.COMPANY_EVENT
                 )
                 val hidden = AppSettings.calendarHiddenTypes.value
+                // Свой цвет типа (фидбэк 2026-07-04) — тап по квадратику открывает
+                // палитру. Тип+подпись сохраняются для заголовка шторки.
+                var colorPickerFor by remember { mutableStateOf<Pair<CalendarItemType, String>?>(null) }
                 typeRows.forEach { (name, type) ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -120,7 +125,11 @@ fun CalendarSettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Box(Modifier.size(14.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp)).background(eventTypeColor(type)))
+                            Box(
+                                Modifier.size(14.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
+                                    .background(eventTypeColor(type))
+                                    .clickable { colorPickerFor = type to name }
+                            )
                             Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label)
                         }
                         Switch(
@@ -133,9 +142,80 @@ fun CalendarSettingsScreen(
                         )
                     }
                 }
+                colorPickerFor?.let { (type, name) ->
+                    EventColorPickerSheet(
+                        typeName = name,
+                        currentColor = eventTypeColor(type),
+                        onDismiss = { colorPickerFor = null },
+                        onPick = { color ->
+                            AppSettings.calendarTypeColors.value =
+                                AppSettings.calendarTypeColors.value + (type.name to color.toArgb())
+                            colorPickerFor = null
+                        },
+                        onReset = {
+                            AppSettings.calendarTypeColors.value =
+                                AppSettings.calendarTypeColors.value - type.name
+                            colorPickerFor = null
+                        }
+                    )
+                }
                 }
             }
         }
+    }
+}
+
+// Палитра выбора цвета типа события (фидбэк 2026-07-04) — оттенки уже
+// используемые в дизайн-системе приложения (макетные акценты + доп. тона),
+// без произвольного HSV-колесa: выбор ограничен согласованными цветами.
+private val EventColorPalette = listOf(
+    androidx.compose.ui.graphics.Color(0xFF1C6B4C), // малахит
+    androidx.compose.ui.graphics.Color(0xFFB68A36), // золото
+    androidx.compose.ui.graphics.Color(0xFFC45D34), // терракот
+    androidx.compose.ui.graphics.Color(0xFF5E8C66), // сейдж
+    androidx.compose.ui.graphics.Color(0xFF2A5DB0), // сапфир
+    androidx.compose.ui.graphics.Color(0xFF7E5180), // аметист
+    androidx.compose.ui.graphics.Color(0xFF3E7E7A), // тил
+    androidx.compose.ui.graphics.Color(0xFFC0492F), // тревожный красный
+)
+
+@Composable
+private fun EventColorPickerSheet(
+    typeName: String,
+    currentColor: androidx.compose.ui.graphics.Color,
+    onDismiss: () -> Unit,
+    onPick: (androidx.compose.ui.graphics.Color) -> Unit,
+    onReset: () -> Unit,
+) {
+    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = onDismiss) {
+        Text(
+            stringResource(R.string.calset_pick_color, typeName),
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontSize = 18.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label,
+            modifier = Modifier.padding(bottom = 14.dp)
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            EventColorPalette.forEach { swatch ->
+                val selected = swatch.value == currentColor.value
+                Box(
+                    Modifier.size(44.dp).clip(CircleShape).background(swatch)
+                        .then(
+                            if (selected) Modifier.border(3.dp, AppleTheme.colors.label, CircleShape)
+                            else Modifier
+                        )
+                        .clickable { onPick(swatch) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (selected) Icon(Icons.Default.Check, null, Modifier.size(20.dp), tint = androidx.compose.ui.graphics.Color.White)
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            stringResource(R.string.calset_reset_color),
+            fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel,
+            modifier = Modifier.clickable { onReset() }.padding(vertical = 6.dp)
+        )
     }
 }
 

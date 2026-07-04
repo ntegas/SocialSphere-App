@@ -471,6 +471,8 @@
     <string name="calset_sunday">воскресенье</string>
     <string name="calset_colors">Цвета типов событий</string>
     <string name="calset_visibility">Видимость типов событий</string>
+    <string name="calset_pick_color">Цвет типа: %1$s</string>
+    <string name="calset_reset_color">Вернуть цвет по умолчанию</string>
     <string name="calset_visibility_hint">Выключенные типы скрываются в календаре и блоке «Ближайшее»</string>
     <string name="evt_birthday">День рождения</string>
     <string name="evt_birthdays">Дни рождения</string>

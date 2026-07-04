@@ -471,6 +471,8 @@
     <string name="calset_sunday">Κυριακή</string>
     <string name="calset_colors">Χρώματα τύπων γεγονότων</string>
     <string name="calset_visibility">Ορατότητα τύπων γεγονότων</string>
+    <string name="calset_pick_color">Χρώμα για: %1$s</string>
+    <string name="calset_reset_color">Επαναφορά προεπιλεγμένου χρώματος</string>
     <string name="calset_visibility_hint">Οι απενεργοποιημένοι τύποι κρύβονται στο ημερολόγιο και στα Προσεχή</string>
     <string name="evt_birthday">Γενέθλια</string>
     <string name="evt_birthdays">Γενέθλια</string>

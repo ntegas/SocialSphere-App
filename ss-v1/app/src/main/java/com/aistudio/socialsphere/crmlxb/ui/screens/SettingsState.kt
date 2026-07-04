@@ -203,6 +203,27 @@ object AppSettings {
             deserialize = { raw -> raw.split(",").filter { it.isNotBlank() }.toSet() }
         )
     }
+
+    /** Свои цвета типов событий (фидбэк 2026-07-04: «хочу менять цвета годовщины,
+     *  важных дат, встреч»). Ключ — CalendarItemType.name, значение — packed ARGB
+     *  (см. toArgb() из androidx.compose.ui.graphics). Тип без записи здесь =
+     *  встроенный цвет по умолчанию. */
+    val calendarTypeColors: MutableState<Map<String, Int>> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "calendar_type_colors",
+            default     = emptyMap(),
+            serialize   = { map -> map.entries.joinToString(";") { "${it.key}:${it.value}" } },
+            deserialize = { raw ->
+                raw.split(";").filter { it.isNotBlank() }.mapNotNull { pair ->
+                    val idx = pair.indexOf(':')
+                    if (idx < 0) return@mapNotNull null
+                    val v = pair.substring(idx + 1).toIntOrNull() ?: return@mapNotNull null
+                    pair.substring(0, idx) to v
+                }.toMap()
+            }
+        )
+    }
 }
 
 @Composable

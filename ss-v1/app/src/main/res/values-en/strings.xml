@@ -471,6 +471,8 @@
     <string name="calset_sunday">Sunday</string>
     <string name="calset_colors">Event type colors</string>
     <string name="calset_visibility">Event type visibility</string>
+    <string name="calset_pick_color">Color for: %1$s</string>
+    <string name="calset_reset_color">Reset to default color</string>
     <string name="calset_visibility_hint">Disabled types are hidden in the calendar and the Upcoming block</string>
     <string name="evt_birthday">Birthday</string>
     <string name="evt_birthdays">Birthdays</string>
