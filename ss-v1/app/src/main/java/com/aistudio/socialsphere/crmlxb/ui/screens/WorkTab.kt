@@ -41,12 +41,71 @@ import com.aistudio.socialsphere.crmlxb.utils.*
 fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onNavigateToCompany: (String) -> Unit = {}, ctxLabel: android.content.Context, editing: Boolean = false, onEditingChange: (Boolean) -> Unit = {}) {
     // Кнопка «Изменить»/«Готово» этой вкладки убрана — режим правки теперь
     // включается ОДНОЙ кнопкой в шапке карточки контакта, общей на все вкладки.
+    // Профессия без компании (v12) — видна на вкладке Работа даже когда
+    // мест работы нет («электрик», «нотариус»).
     item {
+        if (!contact.profession.isNullOrBlank()) {
+            CardBlock(title = stringResource(R.string.ce_profession)) {
+                Text(contact.profession, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+
+    item {
+        // Правка мест работы ПРЯМО на вкладке (фидбэк владельца 2026-07-03:
+        // «чтобы я не искал, где это редактировать») — через ЕДИНЫЕ
+        // WorkplaceAddFlow/WorkplaceEditDialog, общие с Обзором.
+        var showAddWork by remember { mutableStateOf(false) }
+        var editingRel by remember { mutableStateOf<ContactCompanyRelation?>(null) }
+        var removingRel by remember { mutableStateOf<ContactCompanyRelation?>(null) }
+        if (showAddWork) WorkplaceAddFlow(contact = contact, onDismiss = { showAddWork = false })
+        editingRel?.let { rel ->
+            WorkplaceEditDialog(contact = contact, rel = rel, onDismiss = { editingRel = null })
+        }
+        removingRel?.let { rel ->
+            AlertDialog(
+                onDismissRequest = { removingRel = null },
+                title = { Text(stringResource(R.string.cd_remove_company_title), fontWeight = FontWeight.Bold) },
+                confirmButton = {
+                    Button(onClick = {
+                        AppStateStore.updateContact(contact.copy(
+                            companyRelations = contact.companyRelations.filter { it.id != rel.id }
+                        ))
+                        removingRel = null
+                    }) { Text(stringResource(R.string.cd_remove)) }
+                },
+                dismissButton = { TextButton(onClick = { removingRel = null }) { Text(stringResource(R.string.common_cancel)) } }
+            )
+        }
+        if (editing) {
+            TextButton(onClick = { showAddWork = true }) {
+                Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.cd_add_company))
+            }
+        }
         val compRels = contact.companyRelations
         if (compRels.isEmpty()) return@item
         compRels.forEach { rel ->
             val company = AppStateStore.getCompany(rel.companyId)
             CardBlock(title = if (rel.isPrimary) stringResource(R.string.cd_main_workplace) else stringResource(R.string.cd_more)) {
+                if (editing) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { editingRel = rel }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Edit, stringResource(R.string.common_edit),
+                                Modifier.size(15.dp), tint = AppleTheme.colors.brand)
+                        }
+                        IconButton(onClick = { removingRel = rel }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Close, stringResource(R.string.cd_remove_company),
+                                Modifier.size(15.dp), tint = AppleTheme.colors.red)
+                        }
+                    }
+                }
                 if (company != null) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { onNavigateToCompany(company.id) },
@@ -67,11 +126,14 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                                 style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel
                             )
                         }
+                        val isFormer = rel.employmentStatus == EmploymentStatus.FORMER
                         Box(
-                            Modifier.clip(RoundedCornerShape(percent = 50)).background(AppleTheme.colors.brand.copy(alpha = 0.12f))
+                            Modifier.clip(RoundedCornerShape(percent = 50))
+                                .background(if (isFormer) AppleTheme.colors.fill else AppleTheme.colors.brand.copy(alpha = 0.12f))
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
-                            Text(rel.employmentStatus.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
+                            Text(rel.employmentStatus.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                color = if (isFormer) AppleTheme.colors.secondaryLabel else AppleTheme.colors.brand)
                         }
                     }
                     if (!rel.position.isNullOrBlank() || !rel.department.isNullOrBlank() || !rel.startDate.isNullOrBlank()) {

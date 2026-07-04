@@ -22,6 +22,9 @@ object AppStateStore {
     val addresses           = mutableStateListOf<Address>()
     val sizeInfos           = mutableStateListOf<SizeInfo>()
     val personalDetails     = mutableStateListOf<PersonalDetail>()
+    // Группы контактов (как в телефонной книге) + членство
+    val groups              = mutableStateListOf<ContactGroup>()
+    val groupMembers        = mutableStateListOf<ContactGroupMember>()
 
     private var database: SocialsphereDatabase? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -100,7 +103,12 @@ object AppStateStore {
         val links            = db.calendarDao().getCalendarItemLinks().map { it.toDomain() }
         val reminders        = db.calendarDao().getReminderRules().map { it.toDomain() }
 
+        val groupEntities  = db.contactDao().getContactGroups()
+        val memberEntities = db.contactDao().getContactGroupMembers()
+
         withContext(Dispatchers.Main) {
+            groups.clear();          groups.addAll(groupEntities.map { it.toDomain() })
+            groupMembers.clear();    groupMembers.addAll(memberEntities.map { it.toDomain() })
             notes.clear();           notes.addAll(noteEntities.map { it.toDomain() })
             gifts.clear();           gifts.addAll(giftEntities.map { it.toDomain() })
             companyRelations.clear();companyRelations.addAll(compRelEntities.map { it.toDomain() })
@@ -240,6 +248,23 @@ object AppStateStore {
         }
     }
 
+    /** Восстановление группы из бэкапа: upsert по id, сохраняя точные значения
+     *  (в отличие от renameGroup/addGroup, которые генерируют id/updatedAt заново). */
+    fun restoreGroup(group: ContactGroup) {
+        val idx = groups.indexOfFirst { it.id == group.id }
+        if (idx >= 0) groups[idx] = group else groups.add(group)
+        scope.launch { db()?.contactDao()?.insertContactGroup(group.toEntity()) }
+    }
+
+    /** Восстановление членства в группе из бэкапа: добавляем, только если такой
+     *  записи ещё нет (как contactRelations — join-строка неизменяема). */
+    fun restoreGroupMember(member: ContactGroupMember) {
+        if (groupMembers.none { it.id == member.id }) {
+            groupMembers.add(member)
+            scope.launch { db()?.contactDao()?.insertContactGroupMembers(listOf(member.toEntity())) }
+        }
+    }
+
     fun deleteContact(contactId: String) {
         // Каскад: собираем id связей ДО удаления из памяти, чтобы потом
         // вычистить их и из БД (иначе оставались сиротами).
@@ -254,8 +279,10 @@ object AppStateStore {
         addresses.removeAll { it.ownerId == contactId && it.ownerType == AddressOwnerType.CONTACT }
         companyRelations.removeAll { it.contactId == contactId }
         contactRelations.removeAll { it.firstContactId == contactId || it.secondContactId == contactId }
+        groupMembers.removeAll { it.contactId == contactId }
         scope.launch {
             val db = db() ?: return@launch
+            db.contactDao().deleteGroupMembersForContact(contactId)
             db.contactDao().deleteContact(contactId)
             db.contactDao().deletePhonesForContact(contactId)
             db.contactDao().deleteEmailsForContact(contactId)
@@ -273,7 +300,9 @@ object AppStateStore {
     // ──────────────────────────────────────────────────────────
     //  ДУБЛИКАТЫ: поиск и слияние
     // ──────────────────────────────────────────────────────────
-    private fun phoneDigits(s: String): String = s.filter { it.isDigit() }.takeLast(10)
+    // internal (не private) — виден юнит-тестам дедупликации в том же модуле
+    // (PhoneDedupeTest), прод-логика/видимость снаружи модуля не меняется.
+    internal fun phoneDigits(s: String): String = s.filter { it.isDigit() }.takeLast(10)
 
     /** Пары возможных дублей: совпадение по нормализованному телефону (≥7 цифр)
      *  или по email. Без повторов и без пар «сам с собой». */
@@ -340,6 +369,7 @@ object AppStateStore {
         val merged = keep.copy(
             nickname        = keep.nickname ?: other.nickname,
             photoUri        = keep.photoUri ?: other.photoUri,
+            profession      = keep.profession ?: other.profession,
             nextStep        = keep.nextStep ?: other.nextStep,
             canHelpWith     = keep.canHelpWith ?: other.canHelpWith,
             iCanHelpWith    = keep.iCanHelpWith ?: other.iCanHelpWith,
@@ -383,8 +413,110 @@ object AppStateStore {
                 updateCalendarItem(ci.copy(links = newLinks))
             }
 
+        // Группы: членство other переносится на keep (без дублей);
+        // членство самого other вычистит каскад deleteContact.
+        val mergedGroupIds =
+            groupMembers.filter { it.contactId == keepId }.map { it.groupId }.toSet() +
+            groupMembers.filter { it.contactId == otherId }.map { it.groupId }.toSet()
+        setContactGroups(keepId, mergedGroupIds)
+
         updateContact(merged)
         deleteContact(otherId)
+    }
+
+    // ──────────────────────────────────────────────────────────
+    //  ГРУППЫ КОНТАКТОВ (как в телефонной книге)
+    // ──────────────────────────────────────────────────────────
+
+    /** Создать группу; при совпадении имени (без регистра) возвращает существующую. */
+    fun addGroup(name: String): ContactGroup? {
+        val clean = name.trim()
+        if (clean.isBlank()) return null
+        groups.firstOrNull { it.name.equals(clean, ignoreCase = true) }?.let { return it }
+        val g = ContactGroup(generateId(), clean, nowIso(), nowIso())
+        groups.add(g)
+        scope.launch { db()?.contactDao()?.insertContactGroup(g.toEntity()) }
+        return g
+    }
+
+    fun renameGroup(groupId: String, newName: String) {
+        val clean = newName.trim()
+        if (clean.isBlank()) return
+        val idx = groups.indexOfFirst { it.id == groupId }
+        if (idx < 0) return
+        val g = groups[idx].copy(name = clean, updatedAt = nowIso())
+        groups[idx] = g
+        scope.launch { db()?.contactDao()?.insertContactGroup(g.toEntity()) }
+    }
+
+    /** Удалить группу вместе с членством (контакты не трогаются). */
+    fun deleteGroup(groupId: String) {
+        groups.removeAll { it.id == groupId }
+        groupMembers.removeAll { it.groupId == groupId }
+        scope.launch {
+            val dao = db()?.contactDao() ?: return@launch
+            dao.deleteGroupMembersForGroup(groupId)
+            dao.deleteContactGroup(groupId)
+        }
+    }
+
+    fun groupsOfContact(contactId: String): List<ContactGroup> {
+        val ids = groupMembers.filter { it.contactId == contactId }.map { it.groupId }.toSet()
+        return groups.filter { it.id in ids }
+    }
+
+    fun contactIdsInGroup(groupId: String): Set<String> =
+        groupMembers.filter { it.groupId == groupId }.map { it.contactId }.toSet()
+
+    /** Полностью задать набор групп контакта (диалог с чекбоксами). */
+    fun setContactGroups(contactId: String, groupIds: Set<String>) {
+        val current = groupMembers.filter { it.contactId == contactId }
+        val toRemove = current.filter { it.groupId !in groupIds }
+        val toAdd = groupIds
+            .filter { gid -> current.none { it.groupId == gid } }
+            .map { gid -> ContactGroupMember(generateId(), gid, contactId) }
+        groupMembers.removeAll(toRemove.toSet())
+        groupMembers.addAll(toAdd)
+        scope.launch {
+            val dao = db()?.contactDao() ?: return@launch
+            toRemove.forEach { dao.deleteGroupMember(it.id) }
+            if (toAdd.isNotEmpty()) dao.insertContactGroupMembers(toAdd.map { it.toEntity() })
+        }
+    }
+
+    /**
+     * Преобразование контакта в компанию (фидбэк владельца: «много контактов,
+     * которые на самом деле компании»). Телефоны/email/адреса переезжают в
+     * компанию (новые id — чужие PK не переиспользуем), заметки пере-привязываются
+     * ДО deleteContact (его каскад чистит notes по contactId). Контакт удаляется.
+     * @return id созданной компании или null (контакт не найден / пустое имя).
+     */
+    fun convertContactToCompany(contactId: String): String? {
+        val c = getContact(contactId) ?: return null
+        val name = listOfNotNull(c.firstName, c.middleName, c.lastName)
+            .joinToString(" ").trim()
+            .ifBlank { c.nickname?.trim().orEmpty() }
+        if (name.isBlank()) return null
+        val companyId = generateId()
+        val company = Company(
+            id = companyId,
+            name = name,
+            industry = Industry.OTHER,
+            phones = c.phones.map { it.copy(id = generateId(), contactId = companyId, isPrimary = false) },
+            emails = c.emails.map { it.copy(id = generateId(), contactId = companyId, isPrimary = false) },
+            addresses = c.addresses.map {
+                it.copy(id = generateId(), ownerId = companyId, ownerType = AddressOwnerType.COMPANY)
+            },
+            createdAt = nowIso(), updatedAt = nowIso()
+        )
+        addCompany(company)
+        // updateCompany синхронизирует ГЛОБАЛЬНЫЙ addresses (карта) — addCompany этого не делает
+        updateCompany(company)
+        notes.filter { it.contactId == contactId }.toList().forEach {
+            updateNote(it.copy(contactId = null, companyId = companyId))
+        }
+        deleteContact(contactId)
+        return companyId
     }
 
     // ──────────────────────────────────────────────────────────
@@ -506,6 +638,7 @@ object AppStateStore {
                     notes.clear(); gifts.clear(); companyRelations.clear()
                     contactRelations.clear(); addresses.clear()
                     sizeInfos.clear(); personalDetails.clear()
+                    groups.clear(); groupMembers.clear()
                 }
                 onDone(dbOk)
             }

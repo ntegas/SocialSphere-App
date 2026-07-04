@@ -70,6 +70,8 @@ fun MapScreen(
     // Фильтр по типу отношений (фидбэк владельца: «показывать только семью/друзей/
     // коллег» — до появления полноценных групп). null = все.
     var relFilter      by remember { mutableStateOf<RelationshipType?>(null) }
+    // Фильтр по группе (v11): совместим с типом отношений — оба условия «И»
+    var groupFilter    by remember { mutableStateOf<String?>(null) }
     var selectedItem   by remember { mutableStateOf<MapLocationItem?>(null) }
     var showMapView    by remember { mutableStateOf(true) }
     var locationPermGranted by remember { mutableStateOf(false) }
@@ -184,8 +186,9 @@ fun MapScreen(
     val geoCache = remember { mutableStateMapOf<String, LatLng>() }
     val coordsOf: (MapLocationItem) -> LatLng? = { it.latLng ?: geoCache[it.addressId] }
 
-    val filteredList by remember(mapObjects, searchQuery, selectedTab, relFilter) {
+    val filteredList by remember(mapObjects, searchQuery, selectedTab, relFilter, groupFilter) {
         derivedStateOf {
+            val groupContactIds = groupFilter?.let { AppStateStore.contactIdsInGroup(it) }
             mapObjects.filter { obj ->
                 val q = "${obj.title} ${obj.subtitle} ${obj.city} ${obj.addressLine}"
                 val matchSearch = q.contains(searchQuery, ignoreCase = true)
@@ -205,7 +208,10 @@ fun MapScreen(
                 val matchRel = relFilter == null ||
                     (obj.ownerType == AddressOwnerType.CONTACT &&
                         AppStateStore.getContact(obj.ownerId)?.relationshipType == relFilter)
-                matchSearch && matchTab && matchRel
+                // Фильтр группы: только контакты-члены выбранной группы
+                val matchGroup = groupContactIds == null ||
+                    (obj.ownerType == AddressOwnerType.CONTACT && obj.ownerId in groupContactIds)
+                matchSearch && matchTab && matchRel && matchGroup
             }
         }
     }
@@ -580,38 +586,108 @@ fun MapScreen(
                         }
                     }
                 }
-                // ── Чипы отношений: семья/друзья/коллеги… (только для вкладок людей) ──
+                // ── Фильтр отношений ОДНОЙ кнопкой-списком (фидбэк владельца
+                // 2026-07-03: пролистываемые чипы → «одна кнопочка, выбираешь
+                // как фильтр»). Кнопка показывает текущий выбор, тап — шторка.
                 if (selectedTab != 2) {
                     val ctxRel = LocalContext.current
+                    var showRelSheet by remember { mutableStateOf(false) }
                     Spacer(Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        MapRelChip(stringResource(R.string.map_filter_all), relFilter == null) { relFilter = null; selectedItem = null }
-                        RelationshipType.values().forEach { rel ->
-                            MapRelChip(rel.label(ctxRel), relFilter == rel) {
-                                relFilter = if (relFilter == rel) null else rel
-                                selectedItem = null
+                    val filterActive = relFilter != null || groupFilter != null
+                    val filterLabel = listOfNotNull(
+                        relFilter?.label(ctxRel),
+                        groupFilter?.let { gid -> AppStateStore.groups.firstOrNull { it.id == gid }?.name }
+                    ).joinToString(" · ").ifBlank { stringResource(R.string.map_filter_all) }
+                    Row(
+                        Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
+                            .background(if (filterActive) AppleTheme.colors.brand else AppleTheme.colors.card)
+                            .then(
+                                if (!filterActive)
+                                    Modifier.border(1.dp, AppleTheme.colors.separator, RoundedCornerShape(16.dp))
+                                else Modifier
+                            )
+                            .clickable { showRelSheet = true }
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.FilterList, null, Modifier.size(15.dp),
+                            tint = if (filterActive) Color.White else AppleTheme.colors.secondaryLabel)
+                        Text(
+                            filterLabel,
+                            fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            color = if (filterActive) Color.White else AppleTheme.colors.secondaryLabel
+                        )
+                        Icon(Icons.Default.ArrowDropDown, null, Modifier.size(16.dp),
+                            tint = if (filterActive) Color.White else AppleTheme.colors.secondaryLabel)
+                    }
+                    if (showRelSheet) {
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showRelSheet = false }) {
+                            Text(
+                                stringResource(R.string.map_filter_title),
+                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                                fontSize = 20.sp, fontWeight = FontWeight.W700,
+                                color = AppleTheme.colors.label,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            (listOf<RelationshipType?>(null) + RelationshipType.values().toList()).forEach { rel ->
+                                val selectedRow = relFilter == rel
+                                Row(
+                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            relFilter = rel; selectedItem = null; showRelSheet = false
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 13.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        rel?.label(ctxRel) ?: stringResource(R.string.map_filter_all),
+                                        fontSize = 15.sp,
+                                        fontWeight = if (selectedRow) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selectedRow) AppleTheme.colors.brand else AppleTheme.colors.label
+                                    )
+                                    if (selectedRow) Icon(Icons.Default.Check, null,
+                                        Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                                }
+                                HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                            }
+                            // Группы (v11) — второй раздел того же листа
+                            if (AppStateStore.groups.isNotEmpty()) {
+                                Text(
+                                    stringResource(R.string.filter_groups).uppercase(),
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel,
+                                    modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
+                                )
+                                AppStateStore.groups.sortedBy { it.name.lowercase() }.forEach { g ->
+                                    val selectedRow = groupFilter == g.id
+                                    Row(
+                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                groupFilter = if (selectedRow) null else g.id
+                                                selectedItem = null; showRelSheet = false
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 13.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            g.name, fontSize = 15.sp,
+                                            fontWeight = if (selectedRow) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (selectedRow) AppleTheme.colors.brand else AppleTheme.colors.label
+                                        )
+                                        if (selectedRow) Icon(Icons.Default.Check, null,
+                                            Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                                    }
+                                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
-}
-
-// Чип фильтра отношений на карте (h28/r14: активный — акцент, неактивный — card+кольцо)
-@Composable
-private fun MapRelChip(label: String, active: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier.height(28.dp).clip(RoundedCornerShape(14.dp))
-            .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
-            .then(if (!active) Modifier.border(1.dp, AppleTheme.colors.separator, RoundedCornerShape(14.dp)) else Modifier)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, fontSize = 12.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
-            color = if (active) Color.White else AppleTheme.colors.secondaryLabel)
     }
 }
 

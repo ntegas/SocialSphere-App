@@ -22,6 +22,7 @@ data class ContactEntity(
     val lastContactDate: String? = null,
     val nextStep: String? = null,
     val familyNote: String? = null,
+    val profession: String? = null,
     val tags: String? = null,          // JSON array stored as string
     val canHelpWith: String? = null,
     val iCanHelpWith: String? = null,
@@ -202,4 +203,19 @@ data class ContactRelationEntity(
      val firstRole: String,
      val secondRole: String,
      val note: String?
+)
+
+@Entity(tableName = "contact_groups")
+data class ContactGroupEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val createdAt: String,
+    val updatedAt: String
+)
+
+@Entity(tableName = "contact_group_members")
+data class ContactGroupMemberEntity(
+    @PrimaryKey val id: String,
+    val groupId: String,
+    val contactId: String
 )

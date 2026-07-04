@@ -48,7 +48,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
     onShowAdd: () -> Unit,
     onShowVoice: () -> Unit,
     onEditNote: (Note) -> Unit,
-    onDeleteNote: (Note) -> Unit
+    onDeleteNote: (Note) -> Unit,
+    // Правка существующей личной детали (раньше записанное было не изменить)
+    onEditDetail: (PersonalDetail) -> Unit = {}
 , ctxLabel: android.content.Context,
     privacyMode: Boolean = false,
     onTogglePrivacy: () -> Unit = {}) {
@@ -306,6 +308,28 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                             if (!note.date.isNullOrBlank())
                                 Text(note.date, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                         }
+                        // Правка/удаление — как у заметок ленты (раньше «мечты»
+                        // после создания было не изменить)
+                        Box {
+                            var dreamMenu by remember { mutableStateOf(false) }
+                            IconButton(onClick = { dreamMenu = true }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.MoreVert, stringResource(R.string.cd_note_actions),
+                                    Modifier.size(16.dp), tint = AppleTheme.colors.secondaryLabel)
+                            }
+                            DropdownMenu(expanded = dreamMenu, onDismissRequest = { dreamMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.cd_edit_short)) },
+                                    leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)) },
+                                    onClick = { dreamMenu = false; onEditNote(note) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) },
+                                    leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(18.dp),
+                                        tint = AppleTheme.colors.red) },
+                                    onClick = { dreamMenu = false; onDeleteNote(note) }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -337,7 +361,16 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                         color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(2.dp))
                     items.forEach { d ->
-                        Text("• ${d.value}", style = MaterialTheme.typography.bodyMedium)
+                        // Тап по строке (или карандаш) — правка/удаление детали
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onEditDetail(d) },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("• ${d.value}", style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.Edit, stringResource(R.string.cd_edit_short),
+                                Modifier.size(13.dp), tint = AppleTheme.colors.tertiaryLabel)
+                        }
                         if (!d.note.isNullOrBlank())
                             Text("  ${d.note}", style = MaterialTheme.typography.bodySmall,
                                 color = AppleTheme.colors.secondaryLabel)

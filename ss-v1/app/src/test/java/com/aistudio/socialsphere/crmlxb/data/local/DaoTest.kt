@@ -24,6 +24,9 @@ class DaoTest {
     private lateinit var contactDao: ContactDao
     private lateinit var companyDao: CompanyDao
     private lateinit var calendarDao: CalendarDao
+    private lateinit var addressDao: AddressDao
+    private lateinit var noteDao: NoteDao
+    private lateinit var giftDao: GiftDao
 
     @Before
     fun setup() {
@@ -34,6 +37,9 @@ class DaoTest {
         contactDao = db.contactDao()
         companyDao = db.companyDao()
         calendarDao = db.calendarDao()
+        addressDao = db.addressDao()
+        noteDao = db.noteDao()
+        giftDao = db.giftDao()
     }
 
     @After
@@ -60,6 +66,43 @@ class DaoTest {
     private fun sizeInfo(id: String, contactId: String) = SizeInfoEntity(
         id = id, contactId = contactId, clothingSize = "M", shoeSize = null,
         ringSize = null, other = null
+    )
+
+    private fun messenger(id: String, contactId: String, value: String = "@ivan") = MessengerEntity(
+        id = id, contactId = contactId, type = "TELEGRAM", value = value,
+        link = null, isPrimary = true, comment = null
+    )
+
+    private fun companyRelation(id: String, contactId: String, companyId: String) = ContactCompanyRelationEntity(
+        id = id, contactId = contactId, companyId = companyId,
+        position = null, department = null, role = null, employmentStatus = "CURRENT",
+        startDate = null, endDate = null, responsibilities = null, managedAccounts = null,
+        workNote = null, officeAddressId = null, isPrimary = true
+    )
+
+    private fun group(id: String, name: String = "Друзья") = ContactGroupEntity(
+        id = id, name = name, createdAt = "2026-01-01T00:00", updatedAt = "2026-01-01T00:00"
+    )
+
+    private fun groupMember(id: String, groupId: String, contactId: String) = ContactGroupMemberEntity(
+        id = id, groupId = groupId, contactId = contactId
+    )
+
+    private fun address(id: String, ownerId: String, ownerType: String = "CONTACT", city: String = "Афины") = AddressEntity(
+        id = id, ownerType = ownerType, ownerId = ownerId, addressType = "HOME",
+        addressLine = "ул. Ленина 1", city = city, country = "Греция",
+        comment = null, latitude = null, longitude = null, postalCode = null
+    )
+
+    private fun note(id: String, contactId: String?, text: String = "Заметка") = NoteEntity(
+        id = id, contactId = contactId, companyId = null, calendarItemId = null, giftId = null,
+        type = "GENERAL", text = text, date = null, isImportant = false,
+        createdAt = "2026-01-01T00:00", updatedAt = "2026-01-01T00:00"
+    )
+
+    private fun gift(id: String, contactId: String, title: String = "Книга") = GiftIdeaEntity(
+        id = id, contactId = contactId, title = title, note = null, link = null,
+        date = null, reminderId = null, status = "IDEA"
     )
 
     private fun personalDetail(id: String, contactId: String) = PersonalDetailEntity(
@@ -184,5 +227,144 @@ class DaoTest {
 
         calendarDao.deleteLinksForItem("e1")
         assertTrue(calendarDao.getCalendarItemLinks().isEmpty())
+    }
+
+    // ── ContactDao: мессенджеры/компании/группы (v12) ─────────────────────
+    @Test
+    fun messengers_insertGetDeleteForContact() = runTest {
+        contactDao.insertContact(contact("c1"))
+        contactDao.insertMessengers(listOf(messenger("m1", "c1"), messenger("m2", "c1", value = "@petr")))
+        assertEquals(2, contactDao.getMessengers().size)
+
+        contactDao.deleteMessengersForContact("c1")
+        assertTrue(contactDao.getMessengers().isEmpty())
+    }
+
+    @Test
+    fun companyRelations_insertGetDeleteForContact() = runTest {
+        contactDao.insertContact(contact("c1"))
+        companyDao.insertCompany(company("co1"))
+        contactDao.insertCompanyRelations(listOf(companyRelation("cr1", "c1", "co1")))
+        assertEquals(1, contactDao.getContactCompanyRelations().size)
+
+        contactDao.deleteCompanyRelationsForContact("c1")
+        assertTrue(contactDao.getContactCompanyRelations().isEmpty())
+    }
+
+    @Test
+    fun groups_insertReadUpdateDelete() = runTest {
+        contactDao.insertContactGroup(group("g1"))
+        assertEquals(1, contactDao.getContactGroups().size)
+        assertEquals("Друзья", contactDao.getContactGroups().first().name)
+
+        // update = REPLACE по тому же PK (переименование группы)
+        contactDao.insertContactGroup(group("g1", name = "Коллеги"))
+        assertEquals(1, contactDao.getContactGroups().size)
+        assertEquals("Коллеги", contactDao.getContactGroups().first().name)
+
+        contactDao.deleteContactGroup("g1")
+        assertTrue(contactDao.getContactGroups().isEmpty())
+    }
+
+    @Test
+    fun groupMembers_insertGetDeleteForContactAndGroup() = runTest {
+        contactDao.insertContact(contact("c1"))
+        contactDao.insertContactGroup(group("g1"))
+        contactDao.insertContactGroupMembers(listOf(groupMember("gm1", "g1", "c1")))
+        assertEquals(1, contactDao.getContactGroupMembers().size)
+
+        contactDao.deleteGroupMembersForContact("c1")
+        assertTrue(contactDao.getContactGroupMembers().isEmpty())
+
+        // Отдельно проверяем удаление по groupId и по id участника
+        contactDao.insertContactGroupMembers(listOf(groupMember("gm2", "g1", "c1")))
+        contactDao.deleteGroupMembersForGroup("g1")
+        assertTrue(contactDao.getContactGroupMembers().isEmpty())
+
+        contactDao.insertContactGroupMembers(listOf(groupMember("gm3", "g1", "c1")))
+        contactDao.deleteGroupMember("gm3")
+        assertTrue(contactDao.getContactGroupMembers().isEmpty())
+    }
+
+    // ── AddressDao ─────────────────────────────────────────────────────────
+    @Test
+    fun address_insertReadUpdateDeleteForOwner() = runTest {
+        contactDao.insertContact(contact("c1"))
+        addressDao.insertAddresses(listOf(address("a1", "c1")))
+        assertEquals(1, addressDao.getAllAddresses().size)
+        assertEquals("Афины", addressDao.getAllAddresses().first().city)
+
+        // update = REPLACE по тому же PK
+        addressDao.insertAddresses(listOf(address("a1", "c1", city = "Салоники")))
+        assertEquals(1, addressDao.getAllAddresses().size)
+        assertEquals("Салоники", addressDao.getAllAddresses().first().city)
+
+        addressDao.deleteAddressesForOwner("c1", "CONTACT")
+        assertTrue(addressDao.getAllAddresses().isEmpty())
+    }
+
+    // ── NoteDao ────────────────────────────────────────────────────────────
+    @Test
+    fun note_insertReadUpdateDelete() = runTest {
+        contactDao.insertContact(contact("c1"))
+        noteDao.insertNotes(listOf(note("n1", "c1")))
+        assertEquals(1, noteDao.getAllNotes().size)
+        assertEquals("Заметка", noteDao.getAllNotes().first().text)
+
+        // update = REPLACE по тому же PK
+        noteDao.insertNotes(listOf(note("n1", "c1", text = "Обновлённая заметка")))
+        assertEquals(1, noteDao.getAllNotes().size)
+        assertEquals("Обновлённая заметка", noteDao.getAllNotes().first().text)
+
+        noteDao.deleteNote("n1")
+        assertTrue(noteDao.getAllNotes().isEmpty())
+    }
+
+    @Test
+    fun notes_deleteScopedByContactAndCompany() = runTest {
+        contactDao.insertContact(contact("c1"))
+        companyDao.insertCompany(company("co1"))
+        noteDao.insertNotes(listOf(
+            note("n1", "c1"),
+            NoteEntity(
+                id = "n2", contactId = null, companyId = "co1", calendarItemId = null, giftId = null,
+                type = "GENERAL", text = "Заметка компании", date = null, isImportant = false,
+                createdAt = "2026-01-01T00:00", updatedAt = "2026-01-01T00:00"
+            )
+        ))
+        assertEquals(2, noteDao.getAllNotes().size)
+
+        noteDao.deleteNotesForContact("c1")
+        assertEquals(1, noteDao.getAllNotes().size)
+
+        noteDao.deleteNotesForCompany("co1")
+        assertTrue(noteDao.getAllNotes().isEmpty())
+    }
+
+    // ── GiftDao ────────────────────────────────────────────────────────────
+    @Test
+    fun gift_insertReadUpdateDelete() = runTest {
+        contactDao.insertContact(contact("c1"))
+        giftDao.insertGifts(listOf(gift("gi1", "c1")))
+        assertEquals(1, giftDao.getAllGifts().size)
+        assertEquals("Книга", giftDao.getAllGifts().first().title)
+
+        // update = REPLACE по тому же PK
+        giftDao.insertGifts(listOf(gift("gi1", "c1", title = "Наушники")))
+        assertEquals(1, giftDao.getAllGifts().size)
+        assertEquals("Наушники", giftDao.getAllGifts().first().title)
+
+        giftDao.deleteGift("gi1")
+        assertTrue(giftDao.getAllGifts().isEmpty())
+    }
+
+    @Test
+    fun gifts_deleteForContact() = runTest {
+        contactDao.insertContact(contact("c1"))
+        giftDao.insertGifts(listOf(gift("gi1", "c1"), gift("gi2", "c1", title = "Свитер")))
+        assertEquals(2, giftDao.getAllGifts().size)
+
+        giftDao.deleteGiftsForContact("c1")
+        assertTrue(giftDao.getAllGifts().isEmpty())
     }
 }

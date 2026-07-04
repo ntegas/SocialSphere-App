@@ -78,6 +78,31 @@ interface ContactDao {
 
     @Query("UPDATE contacts SET lastContactDate = :date, updatedAt = :updatedAt WHERE id = :contactId")
     suspend fun updateLastContactDate(contactId: String, date: String, updatedAt: String)
+
+    // ── Группы контактов (как в телефонной книге) ──
+    @Query("SELECT * FROM contact_groups")
+    suspend fun getContactGroups(): List<ContactGroupEntity>
+
+    @Query("SELECT * FROM contact_group_members")
+    suspend fun getContactGroupMembers(): List<ContactGroupMemberEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContactGroup(group: ContactGroupEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContactGroupMembers(members: List<ContactGroupMemberEntity>)
+
+    @Query("DELETE FROM contact_groups WHERE id = :groupId")
+    suspend fun deleteContactGroup(groupId: String)
+
+    @Query("DELETE FROM contact_group_members WHERE groupId = :groupId")
+    suspend fun deleteGroupMembersForGroup(groupId: String)
+
+    @Query("DELETE FROM contact_group_members WHERE contactId = :contactId")
+    suspend fun deleteGroupMembersForContact(contactId: String)
+
+    @Query("DELETE FROM contact_group_members WHERE id = :memberId")
+    suspend fun deleteGroupMember(memberId: String)
 }
 
 @Dao

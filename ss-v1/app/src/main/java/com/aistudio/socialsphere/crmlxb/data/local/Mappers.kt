@@ -25,6 +25,7 @@ fun Contact.toEntity(): ContactEntity = ContactEntity(
     lastContactDate   = lastContactDate,
     nextStep          = nextStep,
     familyNote        = familyNote,
+    profession        = profession,
     tags              = if (tags.isEmpty()) null else tags.joinToString(","),
     canHelpWith       = canHelpWith,
     iCanHelpWith      = iCanHelpWith,
@@ -122,6 +123,14 @@ fun ContactRelation.toEntity(): ContactRelationEntity = ContactRelationEntity(
     firstRole = firstRole,
     secondRole = secondRole,
     note = note
+)
+
+fun ContactGroup.toEntity(): ContactGroupEntity = ContactGroupEntity(
+    id = id, name = name, createdAt = createdAt, updatedAt = updatedAt
+)
+
+fun ContactGroupMember.toEntity(): ContactGroupMemberEntity = ContactGroupMemberEntity(
+    id = id, groupId = groupId, contactId = contactId
 )
 
 fun Address.toEntity(): AddressEntity = AddressEntity(
@@ -231,6 +240,7 @@ fun ContactEntity.toDomain(): Contact = Contact(
     lastContactDate     = lastContactDate,
     nextStep            = nextStep,
     familyNote          = familyNote,
+    profession          = profession,
     tags                = tags?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
     canHelpWith         = canHelpWith,
     iCanHelpWith        = iCanHelpWith,
@@ -305,6 +315,14 @@ fun ContactRelationEntity.toDomain(): ContactRelation = ContactRelation(
     firstRole = firstRole,
     secondRole = secondRole,
     note = note
+)
+
+fun ContactGroupEntity.toDomain(): ContactGroup = ContactGroup(
+    id = id, name = name, createdAt = createdAt, updatedAt = updatedAt
+)
+
+fun ContactGroupMemberEntity.toDomain(): ContactGroupMember = ContactGroupMember(
+    id = id, groupId = groupId, contactId = contactId
 )
 
 fun AddressEntity.toDomain(): Address = Address(

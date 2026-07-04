@@ -115,6 +115,23 @@ object AppSettings {
     val showOverdue            = mutableStateOf(true)
     val repeatOverdueVisually  = mutableStateOf(false)
 
+    /** Биометрия/код устройства для показа защищённых записей («Защищено»).
+     *  При включении карточка контакта стартует с включённым режимом приватности,
+     *  а снятие замочка требует BiometricPrompt. Персистентно. */
+    val biometricLock: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "biometric_lock",
+            default     = false,
+            serialize   = { it.toString() },
+            deserialize = { it == "true" }
+        )
+    }
+
+    /** Безопасное чтение (в @Preview prefs может не быть). */
+    fun biometricLockSafe(): Boolean =
+        try { biometricLock.value } catch (e: Exception) { false }
+
     /** Ежедневное напоминание «пора связаться» (по ритму общения). Персистентно. */
     val remindStaleContacts: MutableState<Boolean> by lazy {
         PersistedMutableState(

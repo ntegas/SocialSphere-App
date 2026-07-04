@@ -1,4 +1,5 @@
 import java.io.FileInputStream
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -117,7 +118,12 @@ dependencies {
   implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
-  // implementation(libs.coil.compose)
+  // Фото контактов (photoUri): выбор из галереи + показ. Coil 2.7.0 —
+  // Maven Central, без требований к AGP (пин 8.5.2 не трогаем).
+  implementation(libs.coil.compose)
+  // Биометрия/код устройства для «Защищено» (тянет androidx.fragment —
+  // MainActivity переведена на FragmentActivity, требование BiometricPrompt)
+  implementation(libs.androidx.biometric)
   implementation(libs.converter.moshi)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
@@ -149,13 +155,22 @@ dependencies {
 // Тянем fast-модели (eng/rus/ell, Apache-2.0) в assets/tessdata, чтобы они
 // вшивались в APK. Файлы крупные (~10–15 МБ) — держим вне git (.gitignore),
 // задача докачивает их при сборке, если отсутствуют. Идемпотентно.
-val tessLangs = listOf("eng", "rus", "ell")
+// Аудит 2026-07-02 (supply chain): sha256 зафиксированы (trust-on-first-use от
+// tessdata_fast@main 2026-07-01) — подмена файла на GitHub/в пути валит сборку.
+val tessLangs = mapOf(
+  "eng" to "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+  "rus" to "e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225",
+  "ell" to "4fba8a0b461038d51f1c20d043d4f2ac38c4e778f1b90830847f7bd8fa3ba726",
+)
+fun sha256Of(f: File): String =
+  MessageDigest.getInstance("SHA-256").digest(f.readBytes())
+    .joinToString("") { b -> "%02x".format(b) }
 val downloadTessData = tasks.register("downloadTessData") {
   val outDir = layout.projectDirectory.dir("src/main/assets/tessdata").asFile
   outputs.dir(outDir)
   doLast {
     outDir.mkdirs()
-    tessLangs.forEach { lang ->
+    tessLangs.forEach { (lang, expectedSha) ->
       val out = File(outDir, "$lang.traineddata")
       if (!out.exists() || out.length() == 0L) {
         val url = "https://github.com/tesseract-ocr/tessdata_fast/raw/main/$lang.traineddata"
@@ -163,6 +178,14 @@ val downloadTessData = tasks.register("downloadTessData") {
         uri(url).toURL().openStream().use { input ->
           out.outputStream().use { output -> input.copyTo(output) }
         }
+      }
+      val actual = sha256Of(out)
+      if (actual != expectedSha) {
+        out.delete()
+        throw GradleException(
+          "tessdata: sha256 не совпал для $lang.traineddata (получен $actual). " +
+          "Файл удалён; проверь источник или обнови хэш осознанно."
+        )
       }
     }
   }

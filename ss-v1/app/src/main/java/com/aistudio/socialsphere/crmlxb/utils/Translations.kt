@@ -111,20 +111,36 @@ fun EmploymentStatus.labelKey(): String = when (this) {
     EmploymentStatus.UNKNOWN -> "Неизвестно"
 }
 
-fun CalendarItemType.label(context: android.content.Context): String = when (this) {
-    CalendarItemType.BIRTHDAY -> context.getString(R.string.lbl_calendar_item_type_birthday)
-    CalendarItemType.ANNIVERSARY -> context.getString(R.string.lbl_calendar_item_type_anniversary)
-    CalendarItemType.NAMEDAY -> context.getString(R.string.lbl_calendar_item_type_nameday)
-    CalendarItemType.IMPORTANT_DATE -> context.getString(R.string.lbl_calendar_item_type_important_date)
-    CalendarItemType.MEETING -> context.getString(R.string.lbl_calendar_item_type_meeting)
-    CalendarItemType.CALL -> context.getString(R.string.lbl_calendar_item_type_call)
-    CalendarItemType.MESSAGE -> context.getString(R.string.lbl_calendar_item_type_message)
-    CalendarItemType.GIFT -> context.getString(R.string.lbl_calendar_item_type_gift)
-    CalendarItemType.TASK -> context.getString(R.string.lbl_calendar_item_type_task)
-    CalendarItemType.NOTE -> context.getString(R.string.lbl_calendar_item_type_note)
-    CalendarItemType.COMPANY_EVENT -> context.getString(R.string.lbl_calendar_item_type_company_event)
-    CalendarItemType.CUSTOM -> context.getString(R.string.lbl_calendar_item_type_custom)
+fun CalendarItemType.labelResId(): Int = when (this) {
+    CalendarItemType.BIRTHDAY -> R.string.lbl_calendar_item_type_birthday
+    CalendarItemType.ANNIVERSARY -> R.string.lbl_calendar_item_type_anniversary
+    CalendarItemType.NAMEDAY -> R.string.lbl_calendar_item_type_nameday
+    CalendarItemType.IMPORTANT_DATE -> R.string.lbl_calendar_item_type_important_date
+    CalendarItemType.MEETING -> R.string.lbl_calendar_item_type_meeting
+    CalendarItemType.CALL -> R.string.lbl_calendar_item_type_call
+    CalendarItemType.MESSAGE -> R.string.lbl_calendar_item_type_message
+    CalendarItemType.GIFT -> R.string.lbl_calendar_item_type_gift
+    CalendarItemType.TASK -> R.string.lbl_calendar_item_type_task
+    CalendarItemType.NOTE -> R.string.lbl_calendar_item_type_note
+    CalendarItemType.COMPANY_EVENT -> R.string.lbl_calendar_item_type_company_event
+    CalendarItemType.CUSTOM -> R.string.lbl_calendar_item_type_custom
 }
+
+fun CalendarItemType.label(context: android.content.Context): String =
+    context.getString(labelResId())
+
+// Языки приложения — для распознавания «запечённых» заголовков (см. ниже).
+private val APP_LANGS = listOf("ru", "en", "el")
+
+/** Строка ресурса во ВСЕХ локалях приложения (ru/en/el), без дублей. */
+private fun localizedVariants(context: android.content.Context, resId: Int): List<String> =
+    APP_LANGS.mapNotNull { lang ->
+        try {
+            val conf = android.content.res.Configuration(context.resources.configuration)
+            conf.setLocale(java.util.Locale(lang))
+            context.createConfigurationContext(conf).getString(resId)
+        } catch (e: Exception) { null }
+    }.distinct()
 
 fun CalendarItemType.labelKey(): String = when (this) {
     CalendarItemType.BIRTHDAY -> "День рождения"
@@ -153,24 +169,27 @@ fun calendarDisplayTitle(
     type: CalendarItemType,
     context: android.content.Context
 ): String {
-    val key = type.labelKey().trim()
     val t = title.trim()
-    return when {
-        // Заголовок не задан — показываем локализованное название типа.
-        t.isEmpty() -> type.label(context)
-        // Заголовок = русское название типа («День рождения», «Встреча»...) —
-        // переводим целиком.
-        t.equals(key, ignoreCase = true) -> type.label(context)
-        // Заголовок начинается с названия типа + разделитель/имя
-        // («День рождения Иван», «Встреча · Бюджет») — переводим только
-        // префикс типа, остальное (имя/детали) оставляем как есть.
-        t.startsWith(key, ignoreCase = true) &&
-            t.length > key.length &&
-            !t[key.length].isLetterOrDigit() ->
-            type.label(context) + t.substring(key.length)
-        // Пользовательский заголовок — не трогаем.
-        else -> title
+    if (t.isEmpty()) return type.label(context)
+    // Название типа во ВСЕХ языках приложения + русский ключ модели: заголовки,
+    // «запечённые» импортом в чужой локали (телефон был на греческом →
+    // «Γενέθλια: Имя» навсегда в БД), нормализуются к текущему языку.
+    val keys = (localizedVariants(context, type.labelResId()) + type.labelKey())
+        .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    for (key in keys) {
+        when {
+            // Заголовок = название типа целиком — переводим целиком.
+            t.equals(key, ignoreCase = true) -> return type.label(context)
+            // Название типа + разделитель/имя («Γενέθλια: Имя», «Встреча · Бюджет») —
+            // переводим только префикс, остальное (имя/детали) как есть.
+            t.startsWith(key, ignoreCase = true) &&
+                t.length > key.length &&
+                !t[key.length].isLetterOrDigit() ->
+                return type.label(context) + t.substring(key.length)
+        }
     }
+    // Пользовательский заголовок — не трогаем.
+    return title
 }
 
 fun com.aistudio.socialsphere.crmlxb.model.CalendarItem.displayTitle(

@@ -24,6 +24,9 @@ data class Contact(
     /** Свободный текст о семье БЕЗ карточек контактов («сын Петя, 2019 г.р.») —
      *  показывается в блоке F (Семья) под списком связанных членов семьи. */
     val familyNote: String? = null,
+    /** Профессия БЕЗ привязки к компании («электрик», «нотариус») — v12.
+     *  Должность в конкретной компании живёт в ContactCompanyRelation.position. */
+    val profession: String? = null,
     val tags: List<String> = emptyList(),
     val canHelpWith: String? = null,
     val iCanHelpWith: String? = null,
@@ -112,6 +115,21 @@ data class ContactRelation(
     val firstRole: String,
     val secondRole: String,
     val note: String? = null
+)
+
+/** Группа контактов (как группы в телефонной книге): «Клиенты», «Футбол»… */
+data class ContactGroup(
+    val id: String,
+    val name: String,
+    val createdAt: String,
+    val updatedAt: String
+)
+
+/** Членство контакта в группе (многие-ко-многим). */
+data class ContactGroupMember(
+    val id: String,
+    val groupId: String,
+    val contactId: String
 )
 
 data class Address(

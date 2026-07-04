@@ -34,7 +34,9 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.data.local.SocialsphereDatabase
 import com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings
 
-class MainActivity : ComponentActivity() {
+// FragmentActivity (наследник ComponentActivity) — требование androidx.biometric
+// BiometricPrompt для разблокировки «Защищено»; остальное поведение не меняется.
+class MainActivity : androidx.fragment.app.FragmentActivity() {
     // Запрос разрешения на показ уведомлений (Android 13+). Результат не критичен:
     // если откажут — уведомления просто не покажутся, логика планирования цела.
     private val notifPermLauncher = registerForActivityResult(

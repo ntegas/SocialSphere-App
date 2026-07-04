@@ -82,6 +82,45 @@ fun PrivacySettingsScreen(
                 }
             }
 
+            // ── Защита записей: биометрия/код для «Защищено» ──
+            Spacer(Modifier.height(22.dp))
+            SectionCaps(stringResource(R.string.priv_protection))
+            var bioLock by remember { AppSettings.biometricLock }
+            val bioAvailable = remember {
+                com.aistudio.socialsphere.crmlxb.utils.BiometricGate.isAvailable(context)
+            }
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+                    .clip(RoundedCornerShape(18.dp)).background(AppleTheme.colors.card)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                        .padding(horizontal = 15.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+                            .background(AppleTheme.colors.brand.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Default.Fingerprint, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand) }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.priv_biometric_title), fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
+                        Text(
+                            if (bioAvailable) stringResource(R.string.priv_biometric_sub)
+                            else stringResource(R.string.priv_biometric_unavailable),
+                            fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
+                        )
+                    }
+                    Switch(
+                        checked = bioLock,
+                        enabled = bioAvailable,
+                        onCheckedChange = { bioLock = it }
+                    )
+                }
+            }
+
             // ── Разрешения Android (функция сохранена) ──
             Spacer(Modifier.height(22.dp))
             SectionCaps(stringResource(R.string.priv_android_perms))

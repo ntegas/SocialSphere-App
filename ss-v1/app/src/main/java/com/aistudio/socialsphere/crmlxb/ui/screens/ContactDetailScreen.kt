@@ -101,7 +101,12 @@ fun ContactDetailScreen(
     var deletingGift    by remember { mutableStateOf<GiftIdea?>(null) }
     var showSizesDialog by remember { mutableStateOf(false) }
     var showAddPref     by remember { mutableStateOf(false) }
+    // Правка СУЩЕСТВУЮЩЕЙ личной детали (интерес/еда/аллергия/бренд…) —
+    // раньше записанное нельзя было ни изменить, ни (вне Подарков) удалить.
+    var editingDetail   by remember { mutableStateOf<PersonalDetail?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showConvertDialog by remember { mutableStateOf(false) }
+    var showGroupsSheet by remember { mutableStateOf(false) }
     // Единая шторка «⋯ Действия» из шапки (по макету): Редактировать /
     // Сохранить в телефон / Поделиться / Удалить.
     var showActionsSheet by remember { mutableStateOf(false) }
@@ -111,8 +116,20 @@ fun ContactDetailScreen(
     var noteType by remember { mutableStateOf(NoteType.GENERAL) }
     var noteIsImportant by remember { mutableStateOf(false) }
     // Режим приватности — скрывает «защищённые» (важные) заметки блюром.
-    // Только на сессию, без персиста (как в макете).
-    var privacyMode by remember { mutableStateOf(false) }
+    // Только на сессию, без персиста (как в макете). Если в Настройках включена
+    // биометрия — карточка стартует ЗАКРЫТОЙ, а снятие замочка идёт через
+    // системный BiometricPrompt (отпечаток или код устройства).
+    val bioLockOn = AppSettings.biometricLockSafe()
+    var privacyMode by remember { mutableStateOf(bioLockOn) }
+    val bioActivity = LocalContext.current as? androidx.fragment.app.FragmentActivity
+    val bioTitle = stringResource(R.string.bio_prompt_title)
+    fun requestReveal() {
+        if (bioLockOn && bioActivity != null) {
+            com.aistudio.socialsphere.crmlxb.utils.BiometricGate.authenticate(
+                activity = bioActivity, title = bioTitle
+            ) { privacyMode = false }
+        } else privacyMode = false
+    }
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -164,11 +181,149 @@ fun ContactDetailScreen(
                         com.aistudio.socialsphere.crmlxb.utils.ExportManager.shareFile(ctx, file, "text/x-vcard")
                     }
                 }
+                ActionSheetRow(Icons.Default.Group, stringResource(R.string.cd_groups)) {
+                    showActionsSheet = false; showGroupsSheet = true
+                }
+                ActionSheetRow(Icons.Default.Business, stringResource(R.string.cd_convert_company)) {
+                    showActionsSheet = false; showConvertDialog = true
+                }
                 ActionSheetRow(Icons.Default.Delete, stringResource(R.string.common_delete), destructive = true) {
                     showActionsSheet = false; showDeleteDialog = true
                 }
             }
         }
+    }
+
+    // ── Группы контакта: чекбоксы членства + создание/правка/удаление групп ──
+    if (showGroupsSheet) {
+        var editingGroup by remember { mutableStateOf<ContactGroup?>(null) }
+        var showNewGroup by remember { mutableStateOf(false) }
+        var groupNameDraft by remember { mutableStateOf("") }
+        fun toggleGroup(groupId: String) {
+            val current = AppStateStore.groupsOfContact(contactId).map { it.id }.toSet()
+            AppStateStore.setContactGroups(
+                contactId,
+                if (groupId in current) current - groupId else current + groupId
+            )
+        }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showGroupsSheet = false }) {
+            Text(
+                stringResource(R.string.cd_groups),
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            if (AppStateStore.groups.isEmpty()) {
+                Text(
+                    stringResource(R.string.groups_empty_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppleTheme.colors.secondaryLabel,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
+            }
+            AppStateStore.groups.sortedBy { it.name.lowercase() }.forEach { g ->
+                val checked = AppStateStore.groupMembers
+                    .any { it.groupId == g.id && it.contactId == contactId }
+                Row(
+                    Modifier.fillMaxWidth().clickable { toggleGroup(g.id) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = checked, onCheckedChange = { toggleGroup(g.id) })
+                    Text(g.name, modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal)
+                    Text(
+                        AppStateStore.contactIdsInGroup(g.id).size.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppleTheme.colors.tertiaryLabel
+                    )
+                    IconButton(onClick = { groupNameDraft = g.name; editingGroup = g }) {
+                        Icon(Icons.Default.Edit, stringResource(R.string.common_edit),
+                            Modifier.size(15.dp), tint = AppleTheme.colors.secondaryLabel)
+                    }
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable { groupNameDraft = ""; showNewGroup = true }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.Add, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                Text(stringResource(R.string.group_new), color = AppleTheme.colors.brand,
+                    fontWeight = FontWeight.SemiBold)
+            }
+        }
+        if (showNewGroup) {
+            AlertDialog(
+                onDismissRequest = { showNewGroup = false },
+                title = { Text(stringResource(R.string.group_new), fontWeight = FontWeight.Bold) },
+                text = {
+                    OutlinedTextField(
+                        value = groupNameDraft, onValueChange = { groupNameDraft = it },
+                        label = { Text(stringResource(R.string.group_name)) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                },
+                confirmButton = {
+                    Button(enabled = groupNameDraft.isNotBlank(), onClick = {
+                        AppStateStore.addGroup(groupNameDraft)?.let { toggleGroup(it.id) }
+                        showNewGroup = false
+                    }) { Text(stringResource(R.string.ce_create)) }
+                },
+                dismissButton = { TextButton(onClick = { showNewGroup = false }) { Text(stringResource(R.string.common_cancel)) } }
+            )
+        }
+        editingGroup?.let { g ->
+            AlertDialog(
+                onDismissRequest = { editingGroup = null },
+                title = { Text(g.name, fontWeight = FontWeight.Bold) },
+                text = {
+                    OutlinedTextField(
+                        value = groupNameDraft, onValueChange = { groupNameDraft = it },
+                        label = { Text(stringResource(R.string.group_name)) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                },
+                confirmButton = {
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(enabled = groupNameDraft.isNotBlank(), onClick = {
+                            AppStateStore.renameGroup(g.id, groupNameDraft)
+                            editingGroup = null
+                        }) { Text(stringResource(R.string.common_save)) }
+                        TextButton(onClick = {
+                            AppStateStore.deleteGroup(g.id)
+                            editingGroup = null
+                        }) { Text(stringResource(R.string.group_delete), color = AppleTheme.colors.red) }
+                    }
+                },
+                dismissButton = { TextButton(onClick = { editingGroup = null }) { Text(stringResource(R.string.common_cancel)) } }
+            )
+        }
+    }
+
+    // ── «Сделать компанией»: контакт → компания (телефоны/email/адреса/заметки
+    // переезжают, карточка контакта удаляется) ──
+    if (showConvertDialog) {
+        AlertDialog(
+            onDismissRequest = { showConvertDialog = false },
+            icon = { Icon(Icons.Default.Business, null, tint = AppleTheme.colors.brand) },
+            title = { Text(stringResource(R.string.cd_convert_company_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.cd_convert_company_text,
+                "${contact.firstName} ${contact.lastName}".trim())) },
+            confirmButton = {
+                Button(onClick = {
+                    showConvertDialog = false
+                    val newCompanyId = AppStateStore.convertContactToCompany(contactId)
+                    if (newCompanyId != null) {
+                        onNavigateBack()
+                        onNavigateToCompany(newCompanyId)
+                    }
+                }) { Text(stringResource(R.string.cd_convert)) }
+            },
+            dismissButton = { TextButton(onClick = { showConvertDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+        )
     }
 
     Scaffold(
@@ -193,7 +348,7 @@ fun ContactDetailScreen(
                             style = if (privacyMode) com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Filled
                                     else com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Neutral,
                             size = 36.dp, iconSize = 18.dp,
-                            onClick = { privacyMode = !privacyMode }
+                            onClick = { if (privacyMode) requestReveal() else privacyMode = true }
                         )
                     }
                     // Круглая кнопка инлайн-правки ТЕКУЩЕЙ вкладки — заменяет старые
@@ -323,6 +478,7 @@ fun ContactDetailScreen(
                         onDeleteGift = { deletingGift = it },
                         onEditSizes  = { showSizesDialog = true },
                         onAddPref    = { showAddPref = true },
+                        onEditPref   = { editingDetail = it },
                         onDeletePref = { pref ->
                             AppStateStore.updateContact(contact.copy(
                                 personalDetails = contact.personalDetails.filter { it.id != pref.id }
@@ -334,10 +490,11 @@ fun ContactDetailScreen(
                         onShowAdd    = { showAddDialog = true },
                         onShowVoice  = { showVoiceDialog = true },
                         onEditNote   = { editingNote = it },
-                        onDeleteNote = { deletingNote = it }
+                        onDeleteNote = { deletingNote = it },
+                        onEditDetail = { editingDetail = it }
                     , ctxLabel = ctxLabel,
                         privacyMode = privacyMode,
-                        onTogglePrivacy = { privacyMode = false })
+                        onTogglePrivacy = { requestReveal() })
                 }
             }
         }
@@ -503,33 +660,47 @@ fun ContactDetailScreen(
         }
     }
 
-    // ── Правка заметки ──
+    // ── Правка заметки — шторка нового дизайна (тип чипами + «куда попадёт») ──
     editingNote?.let { note ->
         var editText by remember(note.id) { mutableStateOf(note.text) }
         var editType by remember(note.id) { mutableStateOf(note.type) }
         var editImportant by remember(note.id) { mutableStateOf(note.isImportant) }
-        AlertDialog(
-            onDismissRequest = { editingNote = null },
-            title = { Text(stringResource(R.string.cd_note_edit), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = editText,
-                        onValueChange = { editText = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_note_text)) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
-                        maxLines = 5
-                    )
-                    DropdownField(stringResource(R.string.cd_note_type), editType.label(ctxLabel), NoteType.values().filter { it != NoteType.GIFT }.map { it.label(ctxLabel) }) {
-                        editType = NoteType.values().firstOrNull { n -> n.label(ctxLabel) == it } ?: editType
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Checkbox(checked = editImportant, onCheckedChange = { editImportant = it })
-                        Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
-                    }
+        val editNoteTypes = NoteType.values().filter { it != NoteType.GIFT }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { editingNote = null }) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    stringResource(R.string.cd_note_edit),
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
+                )
+                PillChoiceRow(
+                    options = editNoteTypes.map { it.label(ctxLabel) },
+                    selected = editType.label(ctxLabel),
+                    onSelect = { picked -> editType = editNoteTypes.firstOrNull { n -> n.label(ctxLabel) == picked } ?: editType }
+                )
+                Text(
+                    stringResource(
+                        when {
+                            editImportant -> R.string.cd_goes_important
+                            editType == NoteType.WORK -> R.string.cd_goes_work
+                            editType == NoteType.PERSONAL_DETAIL -> R.string.cd_goes_personal
+                            editType == NoteType.IMPORTANT_TO_REMEMBER -> R.string.cd_goes_important
+                            else -> R.string.cd_goes_general
+                        }
+                    ),
+                    fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
+                )
+                OutlinedTextField(
+                    value = editText,
+                    onValueChange = { editText = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_note_text)) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                    maxLines = 5
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Checkbox(checked = editImportant, onCheckedChange = { editImportant = it })
+                    Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
                 }
-            },
-            confirmButton = {
                 Button(
                     enabled = editText.isNotBlank(),
                     onClick = {
@@ -539,13 +710,64 @@ fun ContactDetailScreen(
                             isImportant = editImportant
                         ))
                         editingNote = null
-                    }
-                ) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingNote = null }) { Text(stringResource(R.string.common_cancel)) }
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
             }
-        )
+        }
+    }
+
+    // ── Правка существующей личной детали (интерес/еда/аллергия/бренд…) —
+    // категория + значение, с удалением. Открывается из ленты Заметок и
+    // из «Предпочтений» на Подарках. ──
+    editingDetail?.let { det ->
+        var detValue by remember(det.id) { mutableStateOf(det.value) }
+        var detCat by remember(det.id) { mutableStateOf(det.category) }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { editingDetail = null }) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    stringResource(R.string.cd_edit_detail),
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
+                )
+                DropdownField(
+                    label         = stringResource(R.string.cd_category),
+                    selectedValue = detCat.label(ctxLabel),
+                    options       = PersonalDetailCategory.values().map { it.label(ctxLabel) }
+                ) { selected ->
+                    detCat = PersonalDetailCategory.values()
+                        .firstOrNull { it.label(ctxLabel) == selected } ?: detCat
+                }
+                OutlinedTextField(
+                    value = detValue, onValueChange = { detValue = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_value)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                Button(
+                    enabled = detValue.isNotBlank(),
+                    onClick = {
+                        AppStateStore.updateContact(contact.copy(
+                            personalDetails = contact.personalDetails.map {
+                                if (it.id == det.id) it.copy(category = detCat, value = detValue.trim()) else it
+                            }
+                        ))
+                        editingDetail = null
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
+                TextButton(
+                    onClick = {
+                        AppStateStore.updateContact(contact.copy(
+                            personalDetails = contact.personalDetails.filter { it.id != det.id }
+                        ))
+                        editingDetail = null
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) }
+            }
+        }
     }
 
     // ── Подтверждение удаления заметки ──
@@ -808,7 +1030,8 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
     val ctxLabel = LocalContext.current
     val compRel  = contact.companyRelations.firstOrNull { it.isPrimary } ?: contact.companyRelations.firstOrNull()
     val company  = compRel?.companyId?.let { AppStateStore.getCompany(it) }?.name ?: ""
-    val position = compRel?.position ?: ""
+    // Должность в компании, иначе — свободная профессия (v12)
+    val position = compRel?.position?.takeIf { it.isNotBlank() } ?: contact.profession ?: ""
     val address  = AppStateStore.addresses.find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
     val city     = address?.city ?: ""
     // Полное имя с отчеством (как в телефонной книге)
@@ -862,11 +1085,12 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
             // Тап по аватару меняет важность (функция быстрой правки сохранена).
             var showImportanceMenu by remember { mutableStateOf(false) }
             val importanceRing = when (contact.importanceLevel) {
-                ImportanceLevel.KEY       -> AureliaTheme.colors.gold
-                ImportanceLevel.IMPORTANT -> AppleTheme.colors.red
+                ImportanceLevel.KEY       -> AppleTheme.colors.importanceKey
+                ImportanceLevel.IMPORTANT -> AppleTheme.colors.importanceHigh
                 else                      -> Color.Transparent
             }
             Box {
+                val headerPhoto = contact.photoUri?.let { java.io.File(it) }?.takeIf { it.exists() }
                 Box(
                     modifier = Modifier.size(56.dp).clip(CircleShape)
                         .background(AureliaTheme.colors.avatarTerracotta)
@@ -878,7 +1102,13 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                         .clickable { showImportanceMenu = true },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(initials.uppercase(), color = Color.White,
+                    if (headerPhoto != null) {
+                        coil.compose.AsyncImage(
+                            model = headerPhoto, contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.size(56.dp).clip(CircleShape)
+                        )
+                    } else Text(initials.uppercase(), color = Color.White,
                         fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
                         fontSize = 22.sp, fontWeight = FontWeight.W600)
                 }
@@ -898,10 +1128,13 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                 }
             }
             Column(Modifier.weight(1f)) {
-                Text(name, color = AppleTheme.colors.label,
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-                    fontSize = 21.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.01).em,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // SelectionContainer: имя можно выделить долгим тапом и скопировать
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(name, color = AppleTheme.colors.label,
+                        fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                        fontSize = 21.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.01).em,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 if (subtitle.isNotEmpty())
                     Text(subtitle, color = AppleTheme.colors.secondaryLabel, fontSize = 12.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -929,9 +1162,13 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                 // Выбор стандартного типа очищает свой (кастомный задаётся в форме)
                 AppStateStore.updateContact(contact.copy(relationshipType = it, customRelationshipType = null, updatedAt = nowIso()))
             } }
-            // Чип «статус» удалён по решению владельца (2026-07-02): состав чипов —
-            // тип отношений / соц.роль / ритм (важность — в ободке аватара).
-            // Поле contactStatus в модели сохранено.
+            // Чип «статус» ВОЗВРАЩЁН (2026-07-03, владелец передумал после удаления
+            // 2026-07-02): «Поддерживать» — важная пометка «с кем нужно общаться».
+            EditableChip(
+                current = contact.contactStatus.label(ctxLabel),
+                options = ContactStatus.values().map { it.label(ctxLabel) },
+                container = AppleTheme.colors.fill, labelColor = AppleTheme.colors.secondaryLabel
+            ) { picked -> ContactStatus.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(contactStatus = it, updatedAt = nowIso())) } }
             EditableChip(
                 current = contact.socialRole.label(ctxLabel),
                 options = SocialRole.values().map { it.label(ctxLabel) },

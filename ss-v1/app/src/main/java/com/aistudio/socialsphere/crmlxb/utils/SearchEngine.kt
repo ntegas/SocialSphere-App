@@ -176,6 +176,7 @@ fun List<Contact>.applyContactFilters(
     contactStatuses: Set<ContactStatus> = emptySet(),
     cityFilter: String,
     tagFilter: String = "",
+    groupIds: Set<String> = emptySet(),
     sortOrder: ContactSortOrder
 ): List<Contact> {
     var list = this
@@ -209,6 +210,13 @@ fun List<Contact>.applyContactFilters(
         list = list.filter { contact ->
             contact.tags.any { it.contains(tagFilter, ignoreCase = true) }
         }
+    }
+    if (groupIds.isNotEmpty()) {
+        val memberIds = AppStateStore.groupMembers
+            .filter { it.groupId in groupIds }
+            .map { it.contactId }
+            .toSet()
+        list = list.filter { it.id in memberIds }
     }
 
     return when (sortOrder) {

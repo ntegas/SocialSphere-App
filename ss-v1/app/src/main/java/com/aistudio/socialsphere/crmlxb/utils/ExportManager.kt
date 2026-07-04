@@ -29,7 +29,11 @@ data class BackupData(
     val contacts: List<Contact> = emptyList(),
     val companies: List<Company> = emptyList(),
     val calendarItems: List<CalendarItem> = emptyList(),
-    val contactRelations: List<ContactRelation> = emptyList()
+    val contactRelations: List<ContactRelation> = emptyList(),
+    // Группы контактов (v12) — добавлены со значением по умолчанию: старые
+    // бэкапы без этого поля по-прежнему парсятся (Moshi берёт emptyList()).
+    val groups: List<ContactGroup> = emptyList(),
+    val groupMembers: List<ContactGroupMember> = emptyList()
 )
 
 object ExportManager {
@@ -41,11 +45,19 @@ object ExportManager {
     // виде в cacheDir. Чтобы она там не оставалась навсегда — перед каждым новым
     // экспортом удаляем прошлые наши temp-файлы старше часа (только что созданный
     // не трогаем, он ещё нужен для шаринга).
-    private val exportPrefixes = listOf("contacts_", "companies_", "backup_", "socialsphere_backup_")
+    // "contact_" добавлен 2026-07-02: vCard одного контакта (шаринг/в телефон)
+    // раньше не попадал под уборку и лежал в cache бессрочно.
+    private val exportPrefixes = listOf("contacts_", "companies_", "backup_", "socialsphere_backup_", "contact_")
+
+    /** Подпапка cache/exports — FileProvider открывает ТОЛЬКО её (аудит 2026-07-02:
+     *  раньше file_paths.xml отдавал весь cacheDir). Старые файлы чистятся по TTL. */
+    private fun exportsDir(context: Context): File =
+        File(context.cacheDir, "exports").apply { mkdirs() }
+
     private fun cleanOldExports(context: Context) {
         val cutoff = System.currentTimeMillis() - 60L * 60 * 1000
         try {
-            context.cacheDir.listFiles()?.forEach { f ->
+            exportsDir(context).listFiles()?.forEach { f ->
                 if (exportPrefixes.any { f.name.startsWith(it) } && f.lastModified() < cutoff) f.delete()
             }
         } catch (e: Exception) { /* best-effort */ }
@@ -73,7 +85,7 @@ object ExportManager {
     // ─── CSV Contacts ──────────────────────────────────────────
     suspend fun exportContactsCsv(context: Context): File = withContext(Dispatchers.IO) {
         cleanOldExports(context)
-        val file = File(context.cacheDir, "contacts_$ts.csv")
+        val file = File(exportsDir(context), "contacts_$ts.csv")
         PrintWriter(FileWriter(file)).use { pw ->
             pw.println("Имя,Фамилия,Телефон,Email,Компания,Должность,Город,Тип,Важность")
             AppStateStore.contacts.forEach { c ->
@@ -102,7 +114,7 @@ object ExportManager {
     // ─── CSV Companies ─────────────────────────────────────────
     suspend fun exportCompaniesCsv(context: Context): File = withContext(Dispatchers.IO) {
         cleanOldExports(context)
-        val file = File(context.cacheDir, "companies_$ts.csv")
+        val file = File(exportsDir(context), "companies_$ts.csv")
         PrintWriter(FileWriter(file)).use { pw ->
             pw.println("Название,Индустрия,Город,Сайт,Описание,Количество контактов")
             AppStateStore.companies.forEach { c ->
@@ -225,7 +237,7 @@ object ExportManager {
 
     suspend fun exportVCard(context: Context): File = withContext(Dispatchers.IO) {
         cleanOldExports(context)
-        val file = File(context.cacheDir, "contacts_$ts.vcf")
+        val file = File(exportsDir(context), "contacts_$ts.vcf")
         PrintWriter(FileWriter(file)).use { pw ->
             AppStateStore.contacts.forEach { writeVCard(pw, it) }
         }
@@ -238,7 +250,7 @@ object ExportManager {
             cleanOldExports(context)
             val safe = "${contact.firstName}_${contact.lastName}"
                 .replace(Regex("[^A-Za-z0-9_]"), "")
-            val file = File(context.cacheDir, "contact_${safe.ifBlank { "card" }}_$ts.vcf")
+            val file = File(exportsDir(context), "contact_${safe.ifBlank { "card" }}_$ts.vcf")
             PrintWriter(FileWriter(file)).use { pw -> writeVCard(pw, contact) }
             file
         }
@@ -261,7 +273,10 @@ object ExportManager {
     }
 
     // ─── Full JSON backup (полный, с восстановлением) ──────────
-    private val backupAdapter by lazy {
+    // internal (не private) — виден round-trip тесту (ExportManagerTest) в том
+    // же модуле, чтобы сериализовать BackupData напрямую, без прогона через
+    // живой AppStateStore; наружу пакета/модуля видимость не меняется.
+    internal val backupAdapter by lazy {
         com.squareup.moshi.Moshi.Builder()
             .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
             .build()
@@ -275,7 +290,9 @@ object ExportManager {
         contacts = AppStateStore.contacts.toList(),
         companies = AppStateStore.companies.toList(),
         calendarItems = AppStateStore.calendarItems.toList(),
-        contactRelations = AppStateStore.contactRelations.toList()
+        contactRelations = AppStateStore.contactRelations.toList(),
+        groups = AppStateStore.groups.toList(),
+        groupMembers = AppStateStore.groupMembers.toList()
     )
 
     // Бэкап как строка JSON — для прямого сохранения в файл через SAF.
@@ -285,7 +302,7 @@ object ExportManager {
 
     suspend fun exportJsonBackup(context: Context): File = withContext(Dispatchers.IO) {
         cleanOldExports(context)
-        val file = File(context.cacheDir, "backup_$ts.json")
+        val file = File(exportsDir(context), "backup_$ts.json")
         val data = buildBackup()
         file.writeText(backupAdapter.toJson(data))
         file
@@ -320,13 +337,15 @@ object ExportManager {
         data.contactRelations.forEach { r ->
             if (AppStateStore.contactRelations.none { it.id == r.id }) AppStateStore.addContactRelation(r)
         }
+        data.groups.forEach { g -> AppStateStore.restoreGroup(g) }
+        data.groupMembers.forEach { m -> AppStateStore.restoreGroupMember(m) }
         return data.contacts.size
     }
 
     // ─── Full ZIP backup ───────────────────────────────────────
     suspend fun exportFullZip(context: Context): File = withContext(Dispatchers.IO) {
         cleanOldExports(context)
-        val zip  = File(context.cacheDir, "socialsphere_backup_$ts.zip")
+        val zip  = File(exportsDir(context), "socialsphere_backup_$ts.zip")
         val csv  = exportContactsCsv(context)
         val comp = exportCompaniesCsv(context)
         val vcf  = exportVCard(context)

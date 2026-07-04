@@ -67,13 +67,14 @@ fun ContactsScreen(
     var filterConnLevel   by remember { mutableStateOf(emptySet<ConnectionLevel>()) }
     var filterRhythm      by remember { mutableStateOf(emptySet<CommunicationRhythm>()) }
     var filterStatus      by remember { mutableStateOf(emptySet<ContactStatus>()) }
+    var filterGroups      by remember { mutableStateOf(emptySet<String>()) } // id групп
     var filterTag         by remember { mutableStateOf("") }
     var cityFilter        by remember { mutableStateOf("") }
     var showFilterSheet   by remember { mutableStateOf(false) }
 
     val hasActiveFilters = filterRelTypes.isNotEmpty() || filterImportance.isNotEmpty() ||
         filterConnLevel.isNotEmpty() || filterRhythm.isNotEmpty() ||
-        filterStatus.isNotEmpty() ||
+        filterStatus.isNotEmpty() || filterGroups.isNotEmpty() ||
         cityFilter.isNotBlank() || filterTag.isNotBlank()
 
     // All unique tags across contacts for suggestion
@@ -95,6 +96,7 @@ fun ContactsScreen(
                 contactStatuses     = filterStatus,
                 cityFilter          = cityFilter,
                 tagFilter           = filterTag,
+                groupIds            = filterGroups,
                 sortOrder           = sortOrder
             )
         }
@@ -117,6 +119,7 @@ fun ContactsScreen(
             filterConnLevel    = filterConnLevel,
             filterRhythm       = filterRhythm,
             filterStatus       = filterStatus,
+            filterGroups       = filterGroups,
             cityFilter         = cityFilter,
             tagFilter          = filterTag,
             allTags            = allTags,
@@ -128,6 +131,7 @@ fun ContactsScreen(
             onConnLevelChange  = { filterConnLevel  = it },
             onRhythmChange     = { filterRhythm     = it },
             onStatusChange     = { filterStatus     = it },
+            onGroupsChange     = { filterGroups     = it },
             onCityChange       = { cityFilter       = it },
             onTagChange        = { filterTag        = it },
             onSortOrderChange  = { sortOrder        = it },
@@ -135,7 +139,7 @@ fun ContactsScreen(
             onClear            = {
                 filterRelTypes = emptySet(); filterImportance = emptySet()
                 filterConnLevel = emptySet(); filterRhythm = emptySet()
-                filterStatus = emptySet()
+                filterStatus = emptySet(); filterGroups = emptySet()
                 cityFilter = ""; filterTag = ""
             },
             onDismiss          = { showFilterSheet = false }
@@ -232,6 +236,10 @@ fun ContactsScreen(
                 filterImportance.forEach{ add(it.label(ctxLabel) to { filterImportance = filterImportance - it }) }
                 filterConnLevel.forEach { add(it.label(ctxLabel) to { filterConnLevel  = filterConnLevel  - it }) }
                 filterStatus.forEach    { add(it.label(ctxLabel) to { filterStatus     = filterStatus     - it }) }
+                filterGroups.forEach { gid ->
+                    val gName = AppStateStore.groups.firstOrNull { it.id == gid }?.name ?: return@forEach
+                    add("👥 $gName" to { filterGroups = filterGroups - gid })
+                }
                 if (filterTag.isNotBlank())  add("#$filterTag"    to { filterTag   = "" })
                 if (cityFilter.isNotBlank()) add("📍 $cityFilter" to { cityFilter  = "" })
             }
@@ -408,6 +416,7 @@ private fun ContactFilterSheet(
     filterConnLevel: Set<ConnectionLevel>,
     filterRhythm: Set<CommunicationRhythm>,
     filterStatus: Set<ContactStatus> = emptySet(),
+    filterGroups: Set<String> = emptySet(),
     cityFilter: String,
     tagFilter: String = "",
     allTags: List<String> = emptyList(),
@@ -419,6 +428,7 @@ private fun ContactFilterSheet(
     onConnLevelChange: (Set<ConnectionLevel>) -> Unit,
     onRhythmChange: (Set<CommunicationRhythm>) -> Unit,
     onStatusChange: (Set<ContactStatus>) -> Unit = {},
+    onGroupsChange: (Set<String>) -> Unit = {},
     onCityChange: (String) -> Unit,
     onTagChange: (String) -> Unit = {},
     onSortOrderChange: (ContactSortOrder) -> Unit,
@@ -435,6 +445,7 @@ private fun ContactFilterSheet(
     var lConnLevel  by remember { mutableStateOf(filterConnLevel) }
     var lRhythm     by remember { mutableStateOf(filterRhythm) }
     var lStatus     by remember { mutableStateOf(filterStatus) }
+    var lGroups     by remember { mutableStateOf(filterGroups) }
     var lCity       by remember { mutableStateOf(cityFilter) }
     var lTag        by remember { mutableStateOf(tagFilter) }
     // Живой счётчик результатов на кнопке «Применить» (по макету) — сортировка
@@ -444,13 +455,14 @@ private fun ContactFilterSheet(
             AppStateStore.contacts.applyContactFilters(
                 query = searchQuery, relationshipTypes = lRelTypes, importanceLevels = lImportance,
                 connectionLevels = lConnLevel, communicationRhythms = lRhythm, contactStatuses = lStatus,
-                cityFilter = lCity, tagFilter = lTag, sortOrder = sortOrder
+                cityFilter = lCity, tagFilter = lTag, groupIds = lGroups, sortOrder = sortOrder
             ).size
         }
     }
     fun pushAndClose() {
         onStatusChange(lStatus); onRelTypesChange(lRelTypes); onImportanceChange(lImportance)
-        onConnLevelChange(lConnLevel); onRhythmChange(lRhythm); onCityChange(lCity); onTagChange(lTag)
+        onConnLevelChange(lConnLevel); onRhythmChange(lRhythm); onGroupsChange(lGroups)
+        onCityChange(lCity); onTagChange(lTag)
         onDismiss()
     }
     ModalBottomSheet(onDismissRequest = { pushAndClose() }, shape = SocialShape.Sheet) {
@@ -469,7 +481,7 @@ private fun ContactFilterSheet(
                 )
                 TextButton(onClick = {
                     lRelTypes = emptySet(); lImportance = emptySet(); lConnLevel = emptySet()
-                    lRhythm = emptySet(); lStatus = emptySet(); lCity = ""; lTag = ""
+                    lRhythm = emptySet(); lStatus = emptySet(); lGroups = emptySet(); lCity = ""; lTag = ""
                 }) { Text(stringResource(R.string.contacts_reset_all), color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold) }
             }
 
@@ -493,12 +505,52 @@ private fun ContactFilterSheet(
                 MultiSelectChip(stringResource(R.string.view_mode_grid), isGridView) { onGridViewChange(true) }
             }
 
-            // Status
+            // Статус («Поддерживать» = пометка «с кем нужно общаться») — владелец
+            // вернул после удаления 2026-07-02: «это была важная штука».
             FilterSection(stringResource(R.string.filter_status)) {
                 ContactStatus.values().forEach { status ->
                     MultiSelectChip(status.label(ctxLabel), status in lStatus) {
                         lStatus = if (status in lStatus) lStatus - status else lStatus + status
                     }
+                }
+            }
+
+            // Группы (как в телефонной книге): чипы + «+ Новая» прямо здесь.
+            // Состав групп контакта правится в карточке: «⋯» → «Группы».
+            run {
+                var showNewGroup by remember { mutableStateOf(false) }
+                var newGroupName by remember { mutableStateOf("") }
+                FilterSection(stringResource(R.string.filter_groups)) {
+                    AppStateStore.groups.sortedBy { it.name.lowercase() }.forEach { g ->
+                        MultiSelectChip(g.name, g.id in lGroups) {
+                            lGroups = if (g.id in lGroups) lGroups - g.id else lGroups + g.id
+                        }
+                    }
+                    MultiSelectChip("+ " + stringResource(R.string.group_new), false) {
+                        showNewGroup = true
+                    }
+                }
+                if (showNewGroup) {
+                    AlertDialog(
+                        onDismissRequest = { showNewGroup = false; newGroupName = "" },
+                        title = { Text(stringResource(R.string.group_new), fontWeight = FontWeight.Bold) },
+                        text = {
+                            OutlinedTextField(
+                                value = newGroupName, onValueChange = { newGroupName = it },
+                                label = { Text(stringResource(R.string.group_name)) },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true
+                            )
+                        },
+                        confirmButton = {
+                            Button(enabled = newGroupName.isNotBlank(), onClick = {
+                                AppStateStore.addGroup(newGroupName)?.let { lGroups = lGroups + it.id }
+                                newGroupName = ""; showNewGroup = false
+                            }) { Text(stringResource(R.string.ce_create)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showNewGroup = false; newGroupName = "" }) { Text(stringResource(R.string.common_cancel)) }
+                        }
+                    )
                 }
             }
 
@@ -525,9 +577,6 @@ private fun ContactFilterSheet(
                     }
                 }
             }
-
-            // «Уровень связи» слит в «Статус» (Близкий/Слабый теперь в ContactStatus,
-            // секция Status выше показывает их автоматически) — отдельная секция убрана.
 
             // Rhythm
             FilterSection(stringResource(R.string.filter_rhythm)) {
@@ -640,7 +689,9 @@ private fun MultiSelectChip(label: String, selected: Boolean, gold: Boolean = fa
 private fun getContactVisuals(contact: Contact): Triple<String, String, String> {
     val compRel = contact.companyRelations.firstOrNull { it.isPrimary } ?: contact.companyRelations.firstOrNull()
     val company  = compRel?.companyId?.let { AppStateStore.getCompany(it) }?.name ?: ""
-    val position = compRel?.position ?: ""
+    // Должность в компании, иначе — свободная профессия (v12)
+    val position = compRel?.position?.takeIf { it.isNotBlank() }
+        ?: contact.profession ?: ""
     val city     = AppStateStore.addresses.find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }?.city ?: ""
     return Triple(company, position, city)
 }
@@ -670,9 +721,11 @@ fun ContactListCard(
     val (company, position, city) = getContactVisuals(contact)
     val name = "${contact.firstName} ${contact.lastName}".trim()
 
+    // Единая семантика с карточкой контакта: Ключевой — золото, Важный — терракот
+    // (раньше тут было наоборот и бледнее — красный/золото вразнобой с ободком).
     val importanceTint = when (contact.importanceLevel) {
-        ImportanceLevel.KEY       -> AppleTheme.colors.red
-        ImportanceLevel.IMPORTANT -> AppleTheme.colors.orange
+        ImportanceLevel.KEY       -> AppleTheme.colors.importanceKey
+        ImportanceLevel.IMPORTANT -> AppleTheme.colors.importanceHigh
         else                      -> Color.Transparent
     }
 
@@ -690,7 +743,14 @@ fun ContactListCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
-        Box(
+        val listPhoto = contact.photoUri?.let { java.io.File(it) }?.takeIf { it.exists() }
+        if (listPhoto != null) {
+            coil.compose.AsyncImage(
+                model = listPhoto, contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.size(44.dp).clip(CircleShape)
+            )
+        } else Box(
             modifier = Modifier.size(44.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Brush.linearGradient(g)),
             contentAlignment = Alignment.Center
         ) {
@@ -722,8 +782,8 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
     val (company, position, _) = getContactVisuals(contact)
     val name = "${contact.firstName} ${contact.lastName}".trim()
     val importanceTint = when (contact.importanceLevel) {
-        ImportanceLevel.KEY       -> AppleTheme.colors.red
-        ImportanceLevel.IMPORTANT -> AppleTheme.colors.orange
+        ImportanceLevel.KEY       -> AppleTheme.colors.importanceKey
+        ImportanceLevel.IMPORTANT -> AppleTheme.colors.importanceHigh
         else                      -> AppleTheme.colors.brand.copy(alpha = 0.10f)
     }
 

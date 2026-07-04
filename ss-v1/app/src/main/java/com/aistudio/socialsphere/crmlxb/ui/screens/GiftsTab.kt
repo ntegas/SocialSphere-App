@@ -47,6 +47,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
     onDeleteGift: (GiftIdea) -> Unit = {},
     onEditSizes: () -> Unit = {},
     onAddPref: () -> Unit = {},
+    onEditPref: (PersonalDetail) -> Unit = {},
     onDeletePref: (PersonalDetail) -> Unit = {}
 , ctxLabel: android.content.Context) {
     // ── Важные даты вверху ───────────────────────────────────
@@ -373,7 +374,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                         Spacer(Modifier.height(2.dp))
                         items.forEach { pref ->
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                // Тап по строке — правка предпочтения (раньше только удаление)
+                                modifier = Modifier.fillMaxWidth().clickable { onEditPref(pref) },
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {

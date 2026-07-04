@@ -95,8 +95,12 @@ fun ContactEditScreen(
     var communicationRhythm by remember { mutableStateOf(originalContact?.communicationRhythm ?: CommunicationRhythm.NOT_TRACKED) }
     var contactStatus      by remember { mutableStateOf(originalContact?.contactStatus      ?: ContactStatus.ACTIVE) }
 
+    // Фото: абсолютный путь копии в filesDir/photos (см. PhotoStorage)
+    var photoUri        by remember { mutableStateOf(originalContact?.photoUri) }
+
     // New fields
     var nickname        by remember { mutableStateOf(originalContact?.nickname ?: "") }
+    var profession      by remember { mutableStateOf(originalContact?.profession ?: "") }
     var nextStep        by remember { mutableStateOf(originalContact?.nextStep ?: "") }
     var canHelpWith     by remember { mutableStateOf(originalContact?.canHelpWith ?: "") }
     var iCanHelpWith    by remember { mutableStateOf(originalContact?.iCanHelpWith ?: "") }
@@ -130,11 +134,19 @@ fun ContactEditScreen(
         val otherCompRels = (originalContact?.companyRelations ?: emptyList())
             .filter { it.companyId != selectedCompanyId }
             .map { it.copy(isPrimary = false) }
+        // Существующую связь ОБНОВЛЯЕМ copy() (баг: пересоздание затирало
+        // employmentStatus/startDate/role/responsibilities/managedAccounts на
+        // каждом сохранении формы и всё делало «Текущее»).
+        val existingPrimaryRel = originalContact?.companyRelations
+            ?.firstOrNull { it.companyId == selectedCompanyId }
         val compRelList = if (selectedCompanyId.isNotBlank()) listOf(
-            ContactCompanyRelation(
-                id = originalContact?.companyRelations?.firstOrNull { it.companyId == selectedCompanyId }?.id
-                    ?: originalContact?.companyRelations?.firstOrNull()?.id
-                    ?: UUID.randomUUID().toString(),
+            existingPrimaryRel?.copy(
+                position   = companyPosition.ifBlank { null },
+                department = companyDept.ifBlank { null },
+                workNote   = workNote.ifBlank { null },
+                isPrimary  = true
+            ) ?: ContactCompanyRelation(
+                id = UUID.randomUUID().toString(),
                 contactId  = editedContactId,
                 companyId  = selectedCompanyId,
                 position   = companyPosition.ifBlank { null },
@@ -178,13 +190,14 @@ fun ContactEditScreen(
             meetContext      = meetContext.trim().ifBlank { null },
             meetDate         = meetDate.trim().ifBlank { null },
             tags             = tags,
-            photoUri         = originalContact?.photoUri,
+            photoUri         = photoUri,
             // Поля, не редактируемые этой формой, ОБЯЗАНЫ проноситься из оригинала —
             // иначе каждое сохранение молча стирало их (реальный баг: lastContactDate
             // и deviceContactId терялись при любом редактировании контакта)
             lastContactDate  = originalContact?.lastContactDate,
             deviceContactId  = originalContact?.deviceContactId,
             familyNote       = originalContact?.familyNote,
+            profession       = profession.trim().ifBlank { null },
             createdAt        = originalContact?.createdAt ?: nowIso(),
             updatedAt        = nowIso()
         )
@@ -214,154 +227,70 @@ fun ContactEditScreen(
                 else -> "Родственник"
             }
         }
-        var newRelContactId by remember { mutableStateOf("") }
+        var newRelSelected  by remember { mutableStateOf<Contact?>(null) }
         var newRelOtherRole by remember { mutableStateOf("Родственник") }
         var newRelMyRole    by remember { mutableStateOf("Родственник") }
         var myRoleTouched   by remember { mutableStateOf(false) }
-        var showContactPicker by remember { mutableStateOf(false) }
         val candidates = AppStateStore.contacts.filter { c ->
             c.id != editedContactId &&
             contactRelationsDraft.none { it.firstContactId == c.id || it.secondContactId == c.id }
         }
-        val selectedName = AppStateStore.getContact(newRelContactId)
-            ?.let { "${it.firstName} ${it.lastName}".trim() } ?: ""
 
-        AlertDialog(
-            onDismissRequest = { showAddRelation = false },
-            title = { Text(stringResource(R.string.ce_add_person), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box {
-                        OutlinedTextField(
-                            value = selectedName, onValueChange = {},
-                            label = { Text(stringResource(R.string.ce_contact)) },
-                            modifier = Modifier.fillMaxWidth().clickable { showContactPicker = true },
-                            enabled = false, shape = SocialShape.Small,
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = AppleTheme.colors.label,
-                                disabledBorderColor = AppleTheme.colors.tertiaryLabel,
-                                disabledLabelColor = AppleTheme.colors.secondaryLabel
-                            )
+        // Шаг 1: канонический пикер (шторка + поиск + аватары) — единый дизайн
+        // «добавить человека», как в OverviewTab; старый вложенный AlertDialog убран.
+        if (newRelSelected == null) {
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                title = stringResource(R.string.ce_add_person),
+                items = candidates
+                    .sortedBy { "${it.firstName} ${it.lastName}".trim().lowercase() }
+                    .map { c ->
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                            id = c.id,
+                            title = "${c.firstName} ${c.lastName}".trim(),
+                            subtitle = c.nickname?.takeIf { it.isNotBlank() }?.let { "«$it»" }
+                                ?: c.customRelationshipType?.takeIf { it.isNotBlank() }
+                                ?: c.relationshipType.label(ctxLabel)
                         )
+                    },
+                onPick = { picked -> newRelSelected = AppStateStore.getContact(picked.id) },
+                onDismiss = { showAddRelation = false },
+                searchPlaceholder = stringResource(R.string.ce_search_by_name),
+                emptyText = stringResource(R.string.ce_no_contacts_avail)
+            )
+        } else newRelSelected?.let { sel ->
+            // Шаг 2: роли (кто он мне / кто я ему)
+            AlertDialog(
+                onDismissRequest = { showAddRelation = false; newRelSelected = null },
+                title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        DropdownField(stringResource(R.string.ce_who_relation), newRelOtherRole, relationRoles) { v ->
+                            newRelOtherRole = v
+                            if (!myRoleTouched) newRelMyRole = inverseRole(v)
+                        }
+                        DropdownField(stringResource(R.string.ce_who_am_i), newRelMyRole, relationRoles) { v ->
+                            newRelMyRole = v; myRoleTouched = true
+                        }
                     }
-                    // Урок 45 ТЗ: список выбора с поиском и сортировкой —
-                    // листаемое меню без поиска неюзабельно при 20+ контактах
-                    if (showContactPicker) {
-                        var pickerQuery by remember { mutableStateOf("") }
-                        val shown = candidates
-                            .sortedBy { "${it.firstName} ${it.lastName}".trim().lowercase() }
-                            .filter { c ->
-                                pickerQuery.isBlank() ||
-                                "${c.firstName} ${c.lastName}".contains(pickerQuery, ignoreCase = true) ||
-                                c.nickname?.contains(pickerQuery, ignoreCase = true) == true
-                            }
-                        AlertDialog(
-                            onDismissRequest = { showContactPicker = false },
-                            title = { Text(stringResource(R.string.ce_choose_contact), fontWeight = FontWeight.Bold) },
-                            text = {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(
-                                        value = pickerQuery,
-                                        onValueChange = { pickerQuery = it },
-                                        placeholder = { Text(stringResource(R.string.ce_search_by_name)) },
-                                        leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true,
-                                        shape = SocialShape.Small
-                                    )
-                                    if (shown.isEmpty()) {
-                                        Text(
-                                            if (candidates.isEmpty()) stringResource(R.string.ce_no_contacts_avail)
-                                            else stringResource(R.string.ce_no_picker_results, pickerQuery),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = AppleTheme.colors.secondaryLabel,
-                                            modifier = Modifier.padding(vertical = 16.dp)
-                                        )
-                                    } else {
-                                        LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                                            items(shown, key = { it.id }) { c ->
-                                                val cName = "${c.firstName} ${c.lastName}".trim()
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable {
-                                                            newRelContactId = c.id
-                                                            showContactPicker = false
-                                                        }
-                                                        .padding(vertical = 8.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(36.dp)
-                                                            .clip(CircleShape)
-                                                            .background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            cName.split(" ")
-                                                                .mapNotNull { it.firstOrNull()?.uppercase() }
-                                                                .take(2).joinToString(""),
-                                                            style = MaterialTheme.typography.labelMedium,
-                                                            color = AppleTheme.colors.brand,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
-                                                    Column {
-                                                        Text(cName, style = MaterialTheme.typography.bodyMedium,
-                                                            fontWeight = FontWeight.Medium)
-                                                        if (!c.nickname.isNullOrBlank()) {
-                                                            Text("«${c.nickname}»",
-                                                                style = MaterialTheme.typography.bodySmall,
-                                                                color = AppleTheme.colors.secondaryLabel)
-                                                        }
-                                                    }
-                                                }
-                                                HorizontalDivider(
-                                                    color = AppleTheme.colors.separator,
-                                                    thickness = 0.5.dp
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            confirmButton = {},
-                            dismissButton = {
-                                TextButton(onClick = { showContactPicker = false }) { Text(stringResource(R.string.common_cancel)) }
-                            }
-                        )
-                    }
-                    DropdownField(stringResource(R.string.ce_who_relation), newRelOtherRole, relationRoles) { v ->
-                        newRelOtherRole = v
-                        if (!myRoleTouched) newRelMyRole = inverseRole(v)
-                    }
-                    DropdownField(stringResource(R.string.ce_who_am_i), newRelMyRole, relationRoles) { v ->
-                        newRelMyRole = v; myRoleTouched = true
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    enabled = newRelContactId.isNotBlank(),
-                    onClick = {
+                },
+                confirmButton = {
+                    Button(onClick = {
                         contactRelationsDraft = contactRelationsDraft + ContactRelation(
                             id              = UUID.randomUUID().toString(),
                             firstContactId  = editedContactId,
-                            secondContactId = newRelContactId,
+                            secondContactId = sel.id,
                             firstRole       = newRelMyRole,
                             secondRole      = newRelOtherRole
                         )
+                        newRelSelected = null
                         showAddRelation = false
-                    }
-                ) { Text(stringResource(R.string.common_add)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddRelation = false }) { Text(stringResource(R.string.common_cancel)) }
-            }
-        )
+                    }) { Text(stringResource(R.string.common_add)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { newRelSelected = null }) { Text(stringResource(R.string.common_back)) }
+                }
+            )
+        }
     }
     if (showAddPhone) {
         AlertDialog(
@@ -476,32 +405,81 @@ fun ContactEditScreen(
             }
 
             // ── Фото по центру (как в макете) ─────────────────────────
+            // Рабочий выбор фото: системный фото-пикер → копия в filesDir
+            // (URI пикера временный) → photoUri в состоянии/сохранении.
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                var showPhotoMenu by remember { mutableStateOf(false) }
+                val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+                ) { uri ->
+                    if (uri != null) {
+                        com.aistudio.socialsphere.crmlxb.utils.PhotoStorage
+                            .saveContactPhoto(ctxLabel, uri, editedContactId)
+                            ?.let { photoUri = it }
+                    }
+                }
+                fun launchPhotoPicker() = photoPicker.launch(
+                    androidx.activity.result.PickVisualMediaRequest(
+                        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                    )
+                )
                 Box(contentAlignment = Alignment.BottomEnd) {
+                    val photoFile = photoUri?.let { java.io.File(it) }?.takeIf { it.exists() }
                     Box(
-                        modifier = Modifier.size(76.dp).clip(CircleShape).background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
+                        modifier = Modifier.size(76.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                            .clickable { if (photoFile != null) showPhotoMenu = true else launchPhotoPicker() },
                         contentAlignment = Alignment.Center
                     ) {
-                        val initial = (firstName.firstOrNull() ?: lastName.firstOrNull())?.uppercaseChar()
-                        if (initial != null) {
-                            Text(initial.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand)
+                        if (photoFile != null) {
+                            coil.compose.AsyncImage(
+                                model = photoFile, contentDescription = stringResource(R.string.ce_add_photo),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier.size(76.dp).clip(CircleShape)
+                            )
                         } else {
-                            Icon(Icons.Default.Person, null, Modifier.size(36.dp), tint = AppleTheme.colors.brand.copy(alpha = 0.6f))
+                            val initial = (firstName.firstOrNull() ?: lastName.firstOrNull())?.uppercaseChar()
+                            if (initial != null) {
+                                Text(initial.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand)
+                            } else {
+                                Icon(Icons.Default.Person, null, Modifier.size(36.dp), tint = AppleTheme.colors.brand.copy(alpha = 0.6f))
+                            }
                         }
                     }
                     Box(
-                        modifier = Modifier.size(24.dp).clip(CircleShape).background(AppleTheme.colors.brand),
+                        modifier = Modifier.size(24.dp).clip(CircleShape).background(AppleTheme.colors.brand)
+                            .clickable { if (photoFile != null) showPhotoMenu = true else launchPhotoPicker() },
                         contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Default.Add, null, Modifier.size(14.dp), tint = Color.White) }
+                    ) {
+                        Icon(if (photoFile != null) Icons.Default.Edit else Icons.Default.Add,
+                            null, Modifier.size(14.dp), tint = Color.White)
+                    }
+                    DropdownMenu(expanded = showPhotoMenu, onDismissRequest = { showPhotoMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.ce_photo_replace)) },
+                            onClick = { showPhotoMenu = false; launchPhotoPicker() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.ce_photo_remove), color = AppleTheme.colors.red) },
+                            onClick = {
+                                showPhotoMenu = false
+                                com.aistudio.socialsphere.crmlxb.utils.PhotoStorage
+                                    .deleteContactPhotos(ctxLabel, editedContactId)
+                                photoUri = null
+                            }
+                        )
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    stringResource(R.string.ce_add_photo),
+                    if (photoUri == null) stringResource(R.string.ce_add_photo)
+                    else stringResource(R.string.ce_photo_replace),
                     style = MaterialTheme.typography.labelLarge,
-                    color = AppleTheme.colors.brand
+                    color = AppleTheme.colors.brand,
+                    modifier = Modifier.clickable { if (photoUri != null) showPhotoMenu = true else launchPhotoPicker() }
                 )
             }
 
@@ -731,90 +709,34 @@ fun ContactEditScreen(
                     Text(stringResource(R.string.ce_address))
                 }
                 if (showAddrDialog) {
-                    val base = editingAddr
-                    var aLine by remember { mutableStateOf(base?.addressLine ?: "") }
-                    var aCity by remember { mutableStateOf(base?.city ?: "") }
-                    var aCountry by remember { mutableStateOf(base?.country ?: "") }
-                    var aType by remember { mutableStateOf(base?.addressType ?: AddressType.HOME) }
-                    var aPostal by remember { mutableStateOf(base?.postalCode ?: "") }
-                    AlertDialog(
-                        onDismissRequest = { showAddrDialog = false; editingAddr = null },
-                        title = { Text(stringResource(if (base == null) R.string.ce_new_address else R.string.ce_edit_address), fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                OutlinedTextField(value = aLine, onValueChange = { aLine = it }, keyboardOptions = CapWords,
-                                    label = { Text(stringResource(R.string.ce_street_req)) },
-                                    modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(value = aCity, onValueChange = { aCity = it }, keyboardOptions = CapWords,
-                                        label = { Text(stringResource(R.string.ce_city)) },
-                                        modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small)
-                                    OutlinedTextField(value = aCountry, onValueChange = { aCountry = it }, keyboardOptions = CapWords,
-                                        label = { Text(stringResource(R.string.ce_country)) },
-                                        modifier = Modifier.weight(1f), singleLine = true, shape = SocialShape.Small)
-                                }
-                                OutlinedTextField(value = aPostal, onValueChange = { aPostal = it },
-                                    label = { Text(stringResource(R.string.ce_postal_code)) },
-                                    modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
-                                DropdownField(stringResource(R.string.ce_address_type), aType.label(ctxLabel),
-                                    AddressType.values().map { it.label(ctxLabel) }) { picked ->
-                                    aType = AddressType.values().firstOrNull { it.label(ctxLabel) == picked } ?: aType
-                                }
-                            }
+                    // ЕДИНЫЙ диалог адреса (AddressComponents.kt) — та же реализация,
+                    // что на вкладке Связь; геокодинг внутри компонента.
+                    AddressEditDialog(
+                        base = editingAddr,
+                        ownerId = editedContactId,
+                        scope = scope,
+                        onDismiss = { showAddrDialog = false; editingAddr = null },
+                        onCommit = { a ->
+                            draftAddresses = if (draftAddresses.none { it.id == a.id }) draftAddresses + a
+                                else draftAddresses.map { if (it.id == a.id) a else it }
                         },
-                        confirmButton = {
-                            Button(enabled = aLine.isNotBlank(), onClick = {
-                                val targetId = base?.id ?: UUID.randomUUID().toString()
-                                val newAddr = Address(
-                                    id          = targetId,
-                                    ownerType   = AddressOwnerType.CONTACT,
-                                    ownerId     = editedContactId,
-                                    addressType = aType,
-                                    addressLine = aLine.trim(),
-                                    city        = aCity.trim(),
-                                    country     = aCountry.trim(),
-                                    postalCode  = aPostal.trim().ifBlank { null },
-                                    latitude    = base?.latitude,
-                                    longitude   = base?.longitude
-                                )
-                                draftAddresses = if (base == null) draftAddresses + newAddr
-                                    else draftAddresses.map { if (it.id == targetId) newAddr else it }
-                                showAddrDialog = false
-                                editingAddr = null
-                                // Геокодим адрес один раз при добавлении и сохраняем
-                                // координаты, чтобы он надёжно показывался на карте и
-                                // не зависел от повторного геокодинга при каждом открытии.
-                                scope.launch {
-                                    val ll = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        if (!android.location.Geocoder.isPresent()) return@withContext null
-                                        try {
-                                            val q = listOf(newAddr.addressLine, newAddr.city, newAddr.country)
-                                                .filter { it.isNotBlank() }.joinToString(", ")
-                                            if (q.isBlank()) return@withContext null
-                                            @Suppress("DEPRECATION")
-                                            android.location.Geocoder(ctxLabel, java.util.Locale.getDefault())
-                                                .getFromLocationName(q, 1)?.firstOrNull()
-                                                ?.let { it.latitude to it.longitude }
-                                        } catch (e: Exception) { null }
-                                    }
-                                    if (ll != null) {
-                                        draftAddresses = draftAddresses.map {
-                                            if (it.id == newAddr.id)
-                                                it.copy(latitude = ll.first, longitude = ll.second)
-                                            else it
-                                        }
-                                    }
-                                }
-                            }) { Text(stringResource(if (base == null) R.string.common_add else R.string.common_save)) }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showAddrDialog = false; editingAddr = null }) { Text(stringResource(R.string.common_cancel)) }
+                        onGeocoded = { a ->
+                            draftAddresses = draftAddresses.map { if (it.id == a.id) a else it }
                         }
                     )
                 }
             }
 
             SectionCard(stringResource(R.string.ce_company_work)) {
+                // Профессия БЕЗ компании (фидбэк владельца 2026-07-03: «не могу
+                // добавить профессию, не указав компанию») — поле видно всегда.
+                OutlinedTextField(
+                    value = profession, onValueChange = { profession = it },
+                    keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.ce_profession)) },
+                    placeholder = { Text(stringResource(R.string.ce_profession_hint)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small
+                )
                 var showCompanyDropdown by remember { mutableStateOf(false) }
                 var showNewCompanyDialog by remember { mutableStateOf(false) }
                 val companies = AppStateStore.companies
@@ -832,75 +754,36 @@ fun ContactEditScreen(
                         disabledLabelColor = AppleTheme.colors.secondaryLabel
                     )
                 )
-                // Поиск компании — как в выборе контакта (семья).
+                // Выбор компании — канонический пикер с поиском, строкой «создать»
+                // и пунктом «Без компании» (сброс) первой строкой списка.
                 if (showCompanyDropdown) {
-                    var companyQuery by remember { mutableStateOf("") }
-                    val shownCompanies = companies
-                        .sortedBy { it.name.lowercase() }
-                        .filter { companyQuery.isBlank() || it.name.contains(companyQuery, ignoreCase = true) }
-                    AlertDialog(
-                        onDismissRequest = { showCompanyDropdown = false },
-                        title = { Text(stringResource(R.string.ce_company), fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = companyQuery,
-                                    onValueChange = { companyQuery = it },
-                                    placeholder = { Text(stringResource(R.string.ce_search_company)) },
-                                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    shape = SocialShape.Small
+                    val noCompanyLabel = stringResource(R.string.ce_no_company)
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                        title = stringResource(R.string.ce_company),
+                        items = buildList {
+                            if (selectedCompanyId.isNotBlank()) add(
+                                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                                    id = "", title = noCompanyLabel
                                 )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth()
-                                        .clickable { showCompanyDropdown = false; showNewCompanyDialog = true }
-                                        .padding(vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(Icons.Default.Add, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
-                                    Text(stringResource(R.string.ce_new_company), color = AppleTheme.colors.brand, fontWeight = FontWeight.Medium)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth()
-                                        .clickable { selectedCompanyId = ""; showCompanyDropdown = false }
-                                        .padding(vertical = 8.dp)
-                                ) {
-                                    Text(stringResource(R.string.ce_no_company), color = AppleTheme.colors.secondaryLabel)
-                                }
-                                HorizontalDivider()
-                                if (shownCompanies.isEmpty()) {
-                                    Text(
-                                        stringResource(R.string.ce_no_picker_results, companyQuery),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppleTheme.colors.secondaryLabel,
-                                        modifier = Modifier.padding(vertical = 12.dp)
-                                    )
-                                } else {
-                                    LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
-                                        items(shownCompanies, key = { it.id }) { company ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth()
-                                                    .clickable {
-                                                        selectedCompanyId = company.id
-                                                        showCompanyDropdown = false
-                                                    }
-                                                    .padding(vertical = 10.dp)
-                                            ) {
-                                                Text(company.name, style = MaterialTheme.typography.bodyMedium,
-                                                    fontWeight = FontWeight.Medium)
-                                            }
-                                            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
-                                        }
-                                    }
-                                }
+                            )
+                            companies.sortedBy { it.name.lowercase() }.forEach { company ->
+                                add(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                                    id = company.id,
+                                    title = company.name,
+                                    subtitle = company.industry.label(ctxLabel),
+                                    isCompany = true
+                                ))
                             }
                         },
-                        confirmButton = {},
-                        dismissButton = {
-                            TextButton(onClick = { showCompanyDropdown = false }) { Text(stringResource(R.string.common_cancel)) }
-                        }
+                        onPick = { picked ->
+                            selectedCompanyId = picked.id
+                            showCompanyDropdown = false
+                        },
+                        onDismiss = { showCompanyDropdown = false },
+                        searchPlaceholder = stringResource(R.string.ce_search_company),
+                        emptyText = stringResource(R.string.picker_no_results),
+                        createNewText = stringResource(R.string.ce_new_company),
+                        onCreateNew = { showCompanyDropdown = false; showNewCompanyDialog = true }
                     )
                 }
                 if (showNewCompanyDialog) {
@@ -1095,10 +978,17 @@ fun ContactEditScreen(
             }
 
             // ── Классификация (тип отношений/важность — пилюлями наверху экрана) ──
-            // Пикер «Статус» УДАЛЁН по решению владельца (2026-07-02): в UI остаются
-            // тип отношений / важность / соц.роль / ритм. Поле contactStatus в модели
-            // и MIGRATION_8_9 сохранены — данные не теряются.
+            // Пикер «Статус» ВОЗВРАЩЁН (2026-07-03): владелец передумал после
+            // удаления 2026-07-02 — «Поддерживать» = пометка «с кем нужно общаться».
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AureliaCaption(stringResource(R.string.filter_status))
+                    PillChoiceRow(
+                        options = ContactStatus.values().map { it.label(ctxLabel) },
+                        selected = contactStatus.label(ctxLabel),
+                        onSelect = { v -> contactStatus = ContactStatus.values().firstOrNull { it.label(ctxLabel) == v } ?: contactStatus }
+                    )
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     AureliaCaption(stringResource(R.string.ce_social_role))
                     PillChoiceRow(
@@ -1191,9 +1081,11 @@ fun PillChoiceRow(
         options.forEach { opt ->
             val isSel = opt == selected
             val isGold = isSel && opt in goldFor
-            val bg = when { isGold -> AureliaTheme.colors.gold.copy(alpha = 0.14f); isSel -> AppleTheme.colors.brand; else -> AppleTheme.colors.card }
-            val borderColor = when { isGold -> AureliaTheme.colors.gold; isSel -> AppleTheme.colors.brand; else -> AppleTheme.colors.separator }
-            val textColor = when { isGold -> AureliaTheme.colors.gold; isSel -> Color.White; else -> AppleTheme.colors.label }
+            // Яркое золото важности (importanceKey) вместо бледного базового
+            val goldTone = AppleTheme.colors.importanceKey
+            val bg = when { isGold -> goldTone.copy(alpha = 0.14f); isSel -> AppleTheme.colors.brand; else -> AppleTheme.colors.card }
+            val borderColor = when { isGold -> goldTone; isSel -> AppleTheme.colors.brand; else -> AppleTheme.colors.separator }
+            val textColor = when { isGold -> goldTone; isSel -> Color.White; else -> AppleTheme.colors.label }
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(percent = 50))

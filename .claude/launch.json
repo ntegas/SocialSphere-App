@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "aurelia-proto",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8137", "--directory", "C:/Users/USER/AppData/Local/Temp/claude/C--ss/9089d4e5-68e6-4ec4-8577-0d960e897779/scratchpad"],
+      "port": 8137
+    }
+  ]
+}

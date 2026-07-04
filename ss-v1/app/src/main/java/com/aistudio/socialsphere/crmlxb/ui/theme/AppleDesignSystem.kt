@@ -83,6 +83,11 @@ data class AppleColors(
     val alarmRed: Color,          // тревожный красный (#C0492F): опасная зона, «никогда не общались»
     val orange: Color,            // золото (статус/просрочка)
     val goldLabel: Color,         // тёмное золото для подписей (#9A7223 на светлом)
+    // Важность контакта — НАСЫЩЕННЕЕ базового золота/терракота (фидбэк владельца
+    // 2026-07-03: «оранжевый не очень хорошо виднеется»). Единые токены для
+    // ободка аватара, точек в списке, плиток сетки.
+    val importanceKey: Color,     // «Ключевой» — яркое золото
+    val importanceHigh: Color,    // «Важный» — яркий терракот
     val green: Color,             // = brand (легаси-поле)
     val blue: Color,              // приглушённый зелёный (легаси-поле)
     val pink: Color,              // = red (легаси-поле)
@@ -121,6 +126,8 @@ val AppleLightColors = AppleColors(
     alarmRed = Color(0xFFC0492F),          // тревожный красный (прототип)
     orange = Color(0xFFB68A36),            // золото (статус/просрочка)
     goldLabel = Color(0xFF9A7223),         // тёмное золото подписей на светлом
+    importanceKey  = Color(0xFFD18A00),    // яркое золото (виднее #B68A36)
+    importanceHigh = Color(0xFFD2521F),    // яркий терракот (виднее #C45D34)
     green  = Color(0xFF1C6B4C),            // малахит
     blue   = Color(0xFF2E6B57),            // приглушённый зелёный
     pink   = Color(0xFFC45D34),
@@ -148,6 +155,8 @@ val AppleDarkColors = AppleColors(
     alarmRed = Color(0xFFE0846E),          // на тёмном — осветлённый (читаемость)
     orange = Color(0xFFD7B468),            // золото
     goldLabel = Color(0xFFD7B468),         // на тёмном — светлое золото
+    importanceKey  = Color(0xFFF2C14E),    // яркое золото на тёмном
+    importanceHigh = Color(0xFFF08A5C),    // яркий терракот на тёмном
     green  = Color(0xFF5FB894),
     blue   = Color(0xFF7FBDB2),
     pink   = Color(0xFFE0846E),

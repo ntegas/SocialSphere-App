@@ -24,9 +24,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NoteEntity::class,
         GiftIdeaEntity::class,
         SizeInfoEntity::class,
-        PersonalDetailEntity::class
+        PersonalDetailEntity::class,
+        ContactGroupEntity::class,
+        ContactGroupMemberEntity::class
     ],
-    version = 10,
+    version = 12,
     exportSchema = true
 )
 abstract class SocialsphereDatabase : RoomDatabase() {
@@ -157,6 +159,32 @@ abstract class SocialsphereDatabase : RoomDatabase() {
             }
         }
 
+        // v11 (2026-07-03): группы контактов (как в телефонной книге) —
+        // таблица групп + членство (многие-ко-многим). SQL 1:1 с Entity.
+        internal val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `contact_groups` (" +
+                    "`id` TEXT NOT NULL, `name` TEXT NOT NULL, " +
+                    "`createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, " +
+                    "PRIMARY KEY(`id`))"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `contact_group_members` (" +
+                    "`id` TEXT NOT NULL, `groupId` TEXT NOT NULL, " +
+                    "`contactId` TEXT NOT NULL, PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
+        // v12 (2026-07-03): профессия без привязки к компании («не могу добавить
+        // профессию, не указав компанию») — свободное поле контакта.
+        internal val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE contacts ADD COLUMN profession TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): SocialsphereDatabase {
             return INSTANCE ?: synchronized(this) {
                 val builder = Room.databaseBuilder(
@@ -164,7 +192,7 @@ abstract class SocialsphereDatabase : RoomDatabase() {
                     SocialsphereDatabase::class.java,
                     "socialsphere_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
 
                 // Destructive fallback — ТОЛЬКО в debug. В release недостающая
                 // миграция/несовпадение схемы должны падать с явной ошибкой Room,

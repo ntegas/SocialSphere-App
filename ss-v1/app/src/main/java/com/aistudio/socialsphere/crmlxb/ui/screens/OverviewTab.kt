@@ -140,8 +140,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                             maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
+                        // «14 июля» вместо сырого ISO «2026-07-14»
+                        val niceDate = try {
+                            java.time.LocalDate.parse(ev.effectiveDate())
+                                .format(java.time.format.DateTimeFormatter.ofPattern("d MMMM"))
+                        } catch (e: Exception) { ev.effectiveDate() }
                         Text(
-                            ev.effectiveDate(),
+                            niceDate,
                             fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                             color = AppleTheme.colors.secondaryLabel
                         )
@@ -157,13 +162,52 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     val impNotes = AppStateStore.notes.filter {
         it.contactId == contact.id && it.type == NoteType.IMPORTANT_TO_REMEMBER
     }
-    if (impNotes.isNotEmpty()) {
+    // В режиме правки блок виден и пустым — иначе «Важно помнить» негде было
+    // завести (фидбэк владельца: в правке должны выходить ВСЕ поля).
+    if (impNotes.isNotEmpty() || editing) {
         item {
+            var showAddImp by remember { mutableStateOf(false) }
+            var newImpVal  by remember { mutableStateOf("") }
             CardBlock(title = stringResource(R.string.cd_remember)) {
                 impNotes.forEach { note ->
                     Text("• ${note.text}", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(4.dp))
                 }
+                if (editing) TextButton(onClick = { showAddImp = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.common_add))
+                }
+            }
+            if (showAddImp) {
+                AlertDialog(
+                    onDismissRequest = { showAddImp = false; newImpVal = "" },
+                    title = { Text(stringResource(R.string.cd_remember), fontWeight = FontWeight.Bold) },
+                    text = {
+                        OutlinedTextField(
+                            value = newImpVal, onValueChange = { newImpVal = it }, keyboardOptions = CapSentences,
+                            label = { Text(stringResource(R.string.cd_note_text)) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                            maxLines = 4
+                        )
+                    },
+                    confirmButton = {
+                        Button(enabled = newImpVal.isNotBlank(), onClick = {
+                            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                            AppStateStore.addNote(Note(
+                                id = java.util.UUID.randomUUID().toString(),
+                                contactId = contact.id,
+                                companyId = null, calendarItemId = null, giftId = null,
+                                type = NoteType.IMPORTANT_TO_REMEMBER,
+                                text = newImpVal.trim(),
+                                date = java.time.LocalDate.now().toString(),
+                                isImportant = false,
+                                createdAt = now, updatedAt = now
+                            ))
+                            newImpVal = ""; showAddImp = false
+                        }) { Text(stringResource(R.string.common_add)) }
+                    },
+                    dismissButton = { TextButton(onClick = { showAddImp = false; newImpVal = "" }) { Text(stringResource(R.string.common_cancel)) } }
+                )
             }
         }
     }
@@ -355,62 +399,73 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     emptyText = stringResource(R.string.compd_no_candidates)
                 )
             } else famSelected?.let { sel ->
-                // Шаг 2: роли + необязательная заметка
-                AlertDialog(
-                    onDismissRequest = { showAddFamily = false; famSelected = null; famNote = "" },
-                    title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            DropdownField(stringResource(R.string.ce_who_relation), famOtherRole, famRoles) { v -> famOtherRole = v }
-                            DropdownField(stringResource(R.string.ce_who_am_i), famMyRole, famRoles) { v -> famMyRole = v }
-                            OutlinedTextField(
-                                value = famNote, onValueChange = { famNote = it }, keyboardOptions = CapSentences,
-                                label = { Text(stringResource(R.string.cd_fact_note_optional)) },
-                                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
+                // Шаг 2: роли + необязательная заметка — шторка нового дизайна
+                // (был AlertDialog — «старый дизайн» из фидбэка владельца)
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(
+                    onDismiss = { showAddFamily = false; famSelected = null; famNote = "" }
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatar(
+                                sel.id, "${sel.firstName} ${sel.lastName}".trim(), size = 38.dp, fontSize = 14.sp)
+                            Text(
+                                "${sel.firstName} ${sel.lastName}".trim(),
+                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                                fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
                             )
                         }
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            AppStateStore.addContactRelation(ContactRelation(
-                                id = java.util.UUID.randomUUID().toString(),
-                                firstContactId = contact.id,
-                                secondContactId = sel.id,
-                                firstRole = famMyRole,
-                                secondRole = famOtherRole
-                            ))
-                            if (famNote.isNotBlank()) {
-                                val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                                AppStateStore.addNote(Note(
+                        DropdownField(stringResource(R.string.ce_who_relation), famOtherRole, famRoles) { v -> famOtherRole = v }
+                        DropdownField(stringResource(R.string.ce_who_am_i), famMyRole, famRoles) { v -> famMyRole = v }
+                        OutlinedTextField(
+                            value = famNote, onValueChange = { famNote = it }, keyboardOptions = CapSentences,
+                            label = { Text(stringResource(R.string.cd_fact_note_optional)) },
+                            modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
+                        )
+                        Button(
+                            onClick = {
+                                AppStateStore.addContactRelation(ContactRelation(
                                     id = java.util.UUID.randomUUID().toString(),
-                                    contactId = contact.id,
-                                    companyId = null, calendarItemId = null, giftId = null,
-                                    type = NoteType.GENERAL,
-                                    text = famNote.trim(),
-                                    date = java.time.LocalDate.now().toString(),
-                                    isImportant = false,
-                                    createdAt = now, updatedAt = now
+                                    firstContactId = contact.id,
+                                    secondContactId = sel.id,
+                                    firstRole = famMyRole,
+                                    secondRole = famOtherRole
                                 ))
-                            }
-                            famSelected = null; famSearch = ""; famNote = ""; showAddFamily = false
-                        }) { Text(stringResource(R.string.common_add)) }
-                    },
-                    dismissButton = { TextButton(onClick = { famSelected = null }) { Text(stringResource(R.string.common_back)) } }
-                )
+                                if (famNote.isNotBlank()) {
+                                    val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                    AppStateStore.addNote(Note(
+                                        id = java.util.UUID.randomUUID().toString(),
+                                        contactId = contact.id,
+                                        companyId = null, calendarItemId = null, giftId = null,
+                                        type = NoteType.GENERAL,
+                                        text = famNote.trim(),
+                                        date = java.time.LocalDate.now().toString(),
+                                        isImportant = false,
+                                        createdAt = now, updatedAt = now
+                                    ))
+                                }
+                                famSelected = null; famSearch = ""; famNote = ""; showAddFamily = false
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) { Text(stringResource(R.string.common_add), fontWeight = FontWeight.Bold) }
+                        Text(
+                            stringResource(R.string.common_back),
+                            fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                                .clickable { famSelected = null }
+                                .padding(6.dp)
+                        )
+                    }
+                }
             }
         }
     }
 
     // ── O — OCCUPATION / Работа ─────────────────────────────
     item {
-        val compRel = contact.companyRelations.firstOrNull { it.isPrimary }
-            ?: contact.companyRelations.firstOrNull()
-        val hasWork = compRel != null
+        val hasWork = contact.companyRelations.isNotEmpty()
         var showAddCompany by remember { mutableStateOf(false) }
-        var compSearch   by remember { mutableStateOf("") }
-        var compSelected by remember { mutableStateOf<Company?>(null) }
-        var compPosition by remember { mutableStateOf("") }
-        var compNote     by remember { mutableStateOf("") }
+        var editingWorkRel by remember { mutableStateOf<ContactCompanyRelation?>(null) }
         var pendingRemoveCompany by remember { mutableStateOf<ContactCompanyRelation?>(null) }
         pendingRemoveCompany?.let { rel ->
             AlertDialog(
@@ -435,14 +490,78 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             isEmpty = !hasWork,
             editing = editing
         ) {
-            if (compRel != null) {
-                val companyName = AppStateStore.getCompany(compRel.companyId)?.name ?: ""
-                if (companyName.isNotBlank()) InfoRow(stringResource(R.string.cd_company), "$companyName ›",
-                    onClick = { onNavigateToCompany(compRel.companyId) })
-                if (!compRel.position.isNullOrBlank())       InfoRow(stringResource(R.string.cd_position),   compRel.position)
-                if (!compRel.department.isNullOrBlank())     InfoRow(stringResource(R.string.cd_department),        compRel.department)
-                if (!compRel.responsibilities.isNullOrBlank()) InfoRow(stringResource(R.string.cd_tasks),     compRel.responsibilities)
-                if (!compRel.workNote.isNullOrBlank())       InfoRow(stringResource(R.string.cd_note),      compRel.workNote)
+            // ВСЕ места работы (раньше показывалось только одно — после добавления
+            // второго казалось, что «ничего не произошло», а удаление «не работало»,
+            // потому что на месте удалённого всплывало другое, скрытое).
+            if (hasWork) {
+                val rels = contact.companyRelations
+                    .sortedWith(compareByDescending<ContactCompanyRelation> { it.isPrimary }
+                        .thenBy { it.employmentStatus == EmploymentStatus.FORMER })
+                rels.forEachIndexed { i, rel ->
+                    if (i > 0) HorizontalDivider(
+                        color = AppleTheme.colors.separator, thickness = 0.5.dp,
+                        modifier = Modifier.padding(vertical = 6.dp)
+                    )
+                    val companyName = AppStateStore.getCompany(rel.companyId)?.name ?: ""
+                    val isFormer = rel.employmentStatus == EmploymentStatus.FORMER
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Column(
+                            Modifier.weight(1f).clickable { onNavigateToCompany(rel.companyId) }
+                        ) {
+                            Text(
+                                if (companyName.isNotBlank()) "$companyName ›" else stringResource(R.string.cd_company),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isFormer) AppleTheme.colors.secondaryLabel else AppleTheme.colors.label
+                            )
+                            val meta = listOfNotNull(
+                                rel.position?.takeIf { it.isNotBlank() },
+                                rel.department?.takeIf { it.isNotBlank() }
+                            ).joinToString(" · ")
+                            if (meta.isNotBlank())
+                                Text(meta, style = MaterialTheme.typography.bodySmall,
+                                    color = AppleTheme.colors.secondaryLabel)
+                        }
+                        // Статус-капсула: текущее — бренд, прошлое — приглушённо
+                        Box(
+                            Modifier.clip(RoundedCornerShape(percent = 50))
+                                .background(
+                                    if (isFormer) AppleTheme.colors.fill
+                                    else AppleTheme.colors.brand.copy(alpha = 0.12f)
+                                )
+                                .padding(horizontal = 9.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                rel.employmentStatus.label(ctxLabel), fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isFormer) AppleTheme.colors.secondaryLabel else AppleTheme.colors.brand
+                            )
+                        }
+                        if (editing) {
+                            IconButton(
+                                onClick = { editingWorkRel = rel },
+                                modifier = Modifier.size(26.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, stringResource(R.string.common_edit),
+                                    Modifier.size(14.dp), tint = AppleTheme.colors.brand)
+                            }
+                            IconButton(
+                                onClick = { pendingRemoveCompany = rel },
+                                modifier = Modifier.size(26.dp)
+                            ) {
+                                Icon(Icons.Default.Close, stringResource(R.string.cd_remove_company),
+                                    Modifier.size(15.dp), tint = AppleTheme.colors.red)
+                            }
+                        }
+                    }
+                    if (!rel.workNote.isNullOrBlank())
+                        Text(rel.workNote, style = MaterialTheme.typography.bodySmall,
+                            color = AppleTheme.colors.secondaryLabel)
+                }
                 // Work notes
                 val workNotes = AppStateStore.notes.filter {
                     it.contactId == contact.id && it.type == NoteType.WORK
@@ -451,92 +570,19 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     Text("• ${n.text}", style = MaterialTheme.typography.bodySmall,
                         color = AppleTheme.colors.secondaryLabel)
                 }
-                if (editing) {
-                    Spacer(Modifier.height(4.dp))
-                    TextButton(onClick = { showAddCompany = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_company))
-                    }
-                }
-                if (editing) TextButton(onClick = { pendingRemoveCompany = compRel }) {
-                    Icon(Icons.Default.Close, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.cd_remove_company))
-                }
-            } else {
-                if (editing) TextButton(onClick = { showAddCompany = true }) {
-                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.cd_add_company))
-                }
+            }
+            if (editing) TextButton(onClick = { showAddCompany = true }) {
+                Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.cd_add_company))
             }
         }
+        // ЕДИНЫЙ поток добавления/правки места работы (WorkplaceComponents.kt) —
+        // тот же код используется на вкладке Работа, никаких локальных копий.
         if (showAddCompany) {
-            // Шаг 1: канонический пикер компаний (поиск + лого-градиенты)
-            if (compSelected == null) {
-                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
-                    title = stringResource(R.string.cd_add_company),
-                    items = AppStateStore.companies.map { c ->
-                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
-                            id = c.id,
-                            title = c.name,
-                            subtitle = c.industry.label(ctxLabel),
-                            isCompany = true
-                        )
-                    },
-                    onPick = { picked -> compSelected = AppStateStore.companies.firstOrNull { it.id == picked.id } },
-                    onDismiss = { showAddCompany = false; compSearch = ""; compPosition = ""; compNote = "" },
-                    searchPlaceholder = stringResource(R.string.ce_search_company),
-                    emptyText = stringResource(R.string.cd_company_none_hint)
-                )
-            } else compSelected?.let { sel ->
-                // Шаг 2: должность + необязательная заметка
-                AlertDialog(
-                    onDismissRequest = { showAddCompany = false; compSelected = null; compPosition = ""; compNote = "" },
-                    title = { Text(sel.name, fontWeight = FontWeight.Bold) },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            OutlinedTextField(
-                                value = compPosition, onValueChange = { compPosition = it }, keyboardOptions = CapSentences,
-                                label = { Text(stringResource(R.string.cd_position)) },
-                                modifier = Modifier.fillMaxWidth(), singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = compNote, onValueChange = { compNote = it }, keyboardOptions = CapSentences,
-                                label = { Text(stringResource(R.string.cd_fact_note_optional)) },
-                                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            AppStateStore.updateContact(contact.copy(
-                                companyRelations = contact.companyRelations + ContactCompanyRelation(
-                                    id = java.util.UUID.randomUUID().toString(),
-                                    contactId = contact.id,
-                                    companyId = sel.id,
-                                    position = compPosition.ifBlank { null },
-                                    employmentStatus = EmploymentStatus.CURRENT,
-                                    isPrimary = contact.companyRelations.isEmpty()
-                                )
-                            ))
-                            if (compNote.isNotBlank()) {
-                                val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                                AppStateStore.addNote(Note(
-                                    id = java.util.UUID.randomUUID().toString(),
-                                    contactId = contact.id,
-                                    companyId = null, calendarItemId = null, giftId = null,
-                                    type = NoteType.WORK,
-                                    text = compNote.trim(),
-                                    date = java.time.LocalDate.now().toString(),
-                                    isImportant = false,
-                                    createdAt = now, updatedAt = now
-                                ))
-                            }
-                            compSelected = null; compSearch = ""; compPosition = ""; compNote = ""; showAddCompany = false
-                        }) { Text(stringResource(R.string.common_add)) }
-                    },
-                    dismissButton = { TextButton(onClick = { compSelected = null }) { Text(stringResource(R.string.common_back)) } }
-                )
-            }
+            WorkplaceAddFlow(contact = contact, onDismiss = { showAddCompany = false })
+        }
+        editingWorkRel?.let { rel ->
+            WorkplaceEditDialog(contact = contact, rel = rel, onDismiss = { editingWorkRel = null })
         }
     }
 
@@ -782,7 +828,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     }
 
     // ── Статус и классификация (из вкладки Детали) ───────────
-    // «Уровень связи» слит в статус; тип отношений уважает свой (кастомный) вариант.
+    // Статус возвращён по решению владельца 2026-07-03 (после удаления 2026-07-02):
+    // «Поддерживать» — рабочая пометка «с кем нужно общаться».
     item {
         CardBlock(title = stringResource(R.string.cd_status_class)) {
             InfoRow(stringResource(R.string.common_status),          contact.contactStatus.label(ctxLabel))

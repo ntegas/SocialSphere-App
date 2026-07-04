@@ -274,6 +274,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                 var editAddr by remember { mutableStateOf<Address?>(null) }
                 var showAddrDialog by remember { mutableStateOf(false) }
                 var pendingRemoveAddr by remember { mutableStateOf<Address?>(null) }
+                // Скоуп уровня карточки: переживает закрытие диалога (геокод в фоне)
+                val addrScope = rememberCoroutineScope()
 
                 addresses.forEach { addr ->
                     Row(
@@ -313,41 +315,25 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                 }
 
                 if (showAddrDialog) {
-                    val base = editAddr
-                    var aLine by remember { mutableStateOf(base?.addressLine ?: "") }
-                    var aCity by remember { mutableStateOf(base?.city ?: "") }
-                    var aPostal by remember { mutableStateOf(base?.postalCode ?: "") }
-                    var aCountry by remember { mutableStateOf(base?.country ?: "") }
-                    var aType by remember { mutableStateOf(base?.addressType ?: AddressType.HOME) }
-                    val typeOptions = AddressType.values().filter { it !in workTypes }
-                    AlertDialog(
-                        onDismissRequest = { showAddrDialog = false; editAddr = null },
-                        title = { Text(stringResource(if (base == null) R.string.ce_address else R.string.ce_edit_address), fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                OutlinedTextField(value = aLine, onValueChange = { aLine = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_street_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(value = aCity, onValueChange = { aCity = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_city)) }, modifier = Modifier.weight(1f), singleLine = true)
-                                    OutlinedTextField(value = aPostal, onValueChange = { aPostal = it }, label = { Text(stringResource(R.string.ce_postal_code)) }, modifier = Modifier.weight(1f), singleLine = true)
-                                }
-                                OutlinedTextField(value = aCountry, onValueChange = { aCountry = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_country)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                                DropdownField(stringResource(R.string.ce_address_type), aType.label(ctxLabel), typeOptions.map { it.label(ctxLabel) }) { v -> aType = typeOptions.firstOrNull { it.label(ctxLabel) == v } ?: aType }
+                    // ЕДИНЫЙ диалог адреса (AddressComponents.kt) — со ВСЕМИ типами:
+                    // смена «домашний → рабочий» переносит адрес на вкладку Работа.
+                    AddressEditDialog(
+                        base = editAddr,
+                        ownerId = contact.id,
+                        scope = addrScope,
+                        onDismiss = { showAddrDialog = false; editAddr = null },
+                        onCommit = { a ->
+                            val updated = if (allAddrs.none { it.id == a.id }) allAddrs + a
+                                          else allAddrs.map { if (it.id == a.id) a else it }
+                            AppStateStore.updateContact(contact.copy(addresses = updated))
+                        },
+                        onGeocoded = { a ->
+                            AppStateStore.getContact(contact.id)?.let { fresh ->
+                                AppStateStore.updateContact(fresh.copy(
+                                    addresses = fresh.addresses.map { if (it.id == a.id) a else it }
+                                ))
                             }
-                        },
-                        confirmButton = {
-                            Button(enabled = aLine.isNotBlank(), onClick = {
-                                val targetId = base?.id ?: java.util.UUID.randomUUID().toString()
-                                val a = Address(
-                                    id = targetId, ownerType = AddressOwnerType.CONTACT, ownerId = contact.id,
-                                    addressType = aType, addressLine = aLine.trim(), city = aCity.trim(), country = aCountry.trim(),
-                                    postalCode = aPostal.trim().ifBlank { null }, latitude = base?.latitude, longitude = base?.longitude
-                                )
-                                val updated = if (base == null) allAddrs + a else allAddrs.map { if (it.id == targetId) a else it }
-                                AppStateStore.updateContact(contact.copy(addresses = updated))
-                                showAddrDialog = false; editAddr = null
-                            }) { Text(stringResource(if (base == null) R.string.common_add else R.string.common_save)) }
-                        },
-                        dismissButton = { TextButton(onClick = { showAddrDialog = false; editAddr = null }) { Text(stringResource(R.string.common_cancel)) } }
+                        }
                     )
                 }
                 pendingRemoveAddr?.let { ra ->

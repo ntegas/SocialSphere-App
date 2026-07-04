@@ -831,14 +831,21 @@ private fun HomeEventCard(event: HomeEvent, onClick: () -> Unit) {
         CalendarItemType.MEETING, CalendarItemType.CALL  -> AppleTheme.colors.green
         else                                             -> AppleTheme.colors.brand
     }
+    // Фидбэк владельца 2026-07-03: было «День рождения, день рождения…» без
+    // понимания ЧЬЁ — теперь ИМЯ человека (привязка события) — главный текст,
+    // тип события — подпись. Карточки фиксированного размера, не «прыгают».
+    val ctxTitle = androidx.compose.ui.platform.LocalContext.current
+    val displayTitle = com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxTitle)
+    val mainText = event.subtitle.ifEmpty { displayTitle }
+    val subText  = if (event.subtitle.isEmpty()) "" else displayTitle
     Card(
         onClick   = onClick,
-        modifier  = Modifier.width(182.dp),
+        modifier  = Modifier.width(182.dp).height(110.dp),
         shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
         colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column(Modifier.padding(14.dp).fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.size(38.dp).clip(CircleShape).background(accent.copy(alpha = 0.12f)),
@@ -846,17 +853,23 @@ private fun HomeEventCard(event: HomeEvent, onClick: () -> Unit) {
                     Icon(event.icon, null, Modifier.size(19.dp), tint = accent)
                 }
                 Column(Modifier.weight(1f)) {
-                    val ctxTitle = androidx.compose.ui.platform.LocalContext.current
-                    Text(com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxTitle),
+                    Text(mainText,
                         fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (event.subtitle.isNotEmpty())
-                        Text(event.subtitle, fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                    Text(if (subText.isNotEmpty()) subText else " ",
+                        fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
                 }
             }
-            Text(event.date, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                color = accent, modifier = Modifier.padding(top = 12.dp))
+            // «14 июля» вместо сырого ISO «2026-07-14»
+            val niceDate = try {
+                java.time.LocalDate.parse(event.date)
+                    .format(java.time.format.DateTimeFormatter.ofPattern("d MMMM"))
+            } catch (e: Exception) {
+                com.aistudio.socialsphere.crmlxb.utils.displayEventDate(event.date)
+            }
+            Text(niceDate, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                color = accent, maxLines = 1)
         }
     }
 }

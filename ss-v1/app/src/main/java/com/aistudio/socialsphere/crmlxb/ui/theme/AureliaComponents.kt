@@ -45,6 +45,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
@@ -125,8 +126,19 @@ fun AureliaAvatar(
     fontSize: androidx.compose.ui.unit.TextUnit = 16.sp,
     serif: Boolean = false,
     brush: Brush = AureliaAvatars.brushFor(id),
+    // Фото контакта (Contact.photoUri, абсолютный путь в filesDir/photos) —
+    // если задано и файл жив, показывается вместо градиента с инициалами.
+    photoUri: String? = null,
 ) {
-    Box(
+    val photoFile = photoUri?.let { java.io.File(it) }?.takeIf { it.exists() }
+    if (photoFile != null) {
+        coil.compose.AsyncImage(
+            model = photoFile,
+            contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = modifier.size(size).clip(CircleShape)
+        )
+    } else Box(
         modifier.size(size).clip(CircleShape).background(brush),
         contentAlignment = Alignment.Center
     ) {
@@ -444,7 +456,18 @@ fun AureliaPickerSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (item.isCompany) {
+                    if (item.id.isBlank()) {
+                        // Служебная строка «сбросить выбор» (пустой id) — нейтральный
+                        // кружок с крестиком вместо аватара с инициалами из тире.
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape)
+                                .background(AppleTheme.colors.neutralFill),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Close, null,
+                                Modifier.size(18.dp), tint = AppleTheme.colors.secondaryLabel)
+                        }
+                    } else if (item.isCompany) {
                         Box(
                             Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
                                 .background(AureliaAvatars.companyBrushFor(item.id)),
