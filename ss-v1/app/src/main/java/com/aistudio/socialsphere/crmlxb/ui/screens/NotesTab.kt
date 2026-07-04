@@ -238,7 +238,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                     val masked = protectedHidden
                                     Text(
                                         if (masked) "•".repeat(note.text.length.coerceIn(4, 60))
-                                        else note.text,
+                                        else com.aistudio.socialsphere.crmlxb.utils.normalizeImportedNoteText(note.text, ctxLabel),
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = if (protectedHidden) Modifier.blur(7.dp) else Modifier
                                     )

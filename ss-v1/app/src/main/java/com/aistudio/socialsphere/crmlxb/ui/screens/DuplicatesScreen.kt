@@ -116,7 +116,8 @@ fun DuplicatesScreen(
                     Text(stringResource(R.string.dup_none), color = AppleTheme.colors.secondaryLabel)
                 }
             } else {
-                pairs.forEach { (a, b) ->
+                pairs.forEach { match ->
+                    val a = match.a; val b = match.b
                     val keep = if (contactScore(a) >= contactScore(b)) a else b
                     val drop = if (keep.id == a.id) b else a
                     Card(
@@ -147,6 +148,18 @@ fun DuplicatesScreen(
                                     )
                                 }
                             }
+                            // ПРИЧИНА совпадения (фидбэк: «непонятно, чем связаны»)
+                            val reason = when {
+                                match.byPhone != null -> stringResource(R.string.dup_match_phone, "…" + match.byPhone.takeLast(4))
+                                match.byEmail != null -> stringResource(R.string.dup_match_email, match.byEmail)
+                                else -> null
+                            }
+                            if (reason != null) Text(
+                                reason,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AppleTheme.colors.goldLabel
+                            )
                             DuplicateContactLine(a)
                             HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                             DuplicateContactLine(b)

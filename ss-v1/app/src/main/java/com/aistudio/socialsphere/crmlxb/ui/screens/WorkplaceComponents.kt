@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -43,51 +45,73 @@ fun WorkplaceAddFlow(
     val ctxLabel = LocalContext.current
     var compSelected by remember { mutableStateOf<Company?>(null) }
     var showNewCompany by remember { mutableStateOf(false) }
+    // «Без компании — только должность» (фидбэк 2026-07-04): пишем в
+    // contact.profession — то же поле, что в форме контакта и WorkTab.
+    var noCompanyMode by remember { mutableStateOf(false) }
     var compPosition by remember { mutableStateOf("") }
     var compNote by remember { mutableStateOf("") }
 
+    if (noCompanyMode) {
+        var prof by remember { mutableStateOf(contact.profession ?: "") }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.ce_profession),
+            onDismiss = { noCompanyMode = false; onDismiss() },
+            confirmText = stringResource(R.string.common_save),
+            confirmEnabled = prof.isNotBlank(),
+            onConfirm = {
+                AppStateStore.updateContact(contact.copy(profession = prof.trim()))
+                noCompanyMode = false; onDismiss()
+            },
+            secondaryText = stringResource(R.string.common_back),
+            onSecondary = { noCompanyMode = false }
+        ) {
+            OutlinedTextField(
+                value = prof, onValueChange = { prof = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.ce_profession)) },
+                placeholder = { Text(stringResource(R.string.ce_profession_hint), color = AppleTheme.colors.tertiaryLabel) },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+        }
+        return
+    }
+
     if (showNewCompany) {
         var newCompanyName by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showNewCompany = false },
-            title = { Text(stringResource(R.string.ce_new_company_title), fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(
-                    value = newCompanyName,
-                    onValueChange = { newCompanyName = it }, keyboardOptions = CapWords,
-                    label = { Text(stringResource(R.string.ce_company_name_req)) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.ce_new_company_title),
+            onDismiss = { showNewCompany = false },
+            confirmText = stringResource(R.string.ce_create),
+            confirmEnabled = newCompanyName.isNotBlank(),
+            onConfirm = {
+                val clean = newCompanyName.trim()
+                val existing = AppStateStore.companies
+                    .firstOrNull { it.name.equals(clean, ignoreCase = true) }
+                if (existing != null) {
+                    compSelected = existing
+                } else {
+                    val now = java.time.LocalDateTime.now()
+                        .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    val company = Company(
+                        id = java.util.UUID.randomUUID().toString(),
+                        name = clean,
+                        industry = Industry.OTHER,
+                        createdAt = now, updatedAt = now
+                    )
+                    AppStateStore.addCompany(company)
+                    compSelected = company
+                }
+                showNewCompany = false
             },
-            confirmButton = {
-                Button(
-                    enabled = newCompanyName.isNotBlank(),
-                    onClick = {
-                        val clean = newCompanyName.trim()
-                        val existing = AppStateStore.companies
-                            .firstOrNull { it.name.equals(clean, ignoreCase = true) }
-                        if (existing != null) {
-                            compSelected = existing
-                        } else {
-                            val now = java.time.LocalDateTime.now()
-                                .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            val company = Company(
-                                id = java.util.UUID.randomUUID().toString(),
-                                name = clean,
-                                industry = Industry.OTHER,
-                                createdAt = now, updatedAt = now
-                            )
-                            AppStateStore.addCompany(company)
-                            compSelected = company
-                        }
-                        showNewCompany = false
-                    }
-                ) { Text(stringResource(R.string.ce_create)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNewCompany = false }) { Text(stringResource(R.string.common_cancel)) }
-            }
-        )
+            secondaryText = stringResource(R.string.common_back),
+            onSecondary = { showNewCompany = false }
+        ) {
+            OutlinedTextField(
+                value = newCompanyName,
+                onValueChange = { newCompanyName = it }, keyboardOptions = CapWords,
+                label = { Text(stringResource(R.string.ce_company_name_req)) },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+        }
     }
 
     // Шаг 1: канонический пикер компаний (уже связанные не предлагаем)
@@ -109,7 +133,9 @@ fun WorkplaceAddFlow(
             searchPlaceholder = stringResource(R.string.ce_search_company),
             emptyText = stringResource(R.string.cd_company_none_hint),
             createNewText = stringResource(R.string.ce_new_company),
-            onCreateNew = { showNewCompany = true }
+            onCreateNew = { showNewCompany = true },
+            extraActionText = stringResource(R.string.cd_work_no_company),
+            onExtraAction = { noCompanyMode = true }
         )
     } else compSelected?.let { sel ->
         // Шаг 2: должность + режим добавления + необязательная заметка.
@@ -118,42 +144,13 @@ fun WorkplaceAddFlow(
         var addMode by remember(sel.id) { mutableStateOf(0) }
         val hasCurrentWork = contact.companyRelations
             .any { it.employmentStatus == EmploymentStatus.CURRENT }
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(sel.name, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = compPosition, onValueChange = { compPosition = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_position)) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
-                    )
-                    if (hasCurrentWork) {
-                        val modeLabels = listOf(
-                            stringResource(R.string.cd_work_mode_primary),
-                            stringResource(R.string.cd_work_mode_parallel),
-                            stringResource(R.string.cd_work_mode_former)
-                        )
-                        PillChoiceRow(
-                            options = modeLabels,
-                            selected = modeLabels[addMode],
-                            onSelect = { v -> addMode = modeLabels.indexOf(v).coerceAtLeast(0) }
-                        )
-                        if (addMode == 0) Text(
-                            stringResource(R.string.cd_work_mode_primary_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppleTheme.colors.secondaryLabel
-                        )
-                    }
-                    OutlinedTextField(
-                        value = compNote, onValueChange = { compNote = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_fact_note_optional)) },
-                        modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = sel.name,
+            onDismiss = onDismiss,
+            confirmText = stringResource(R.string.common_add),
+            secondaryText = stringResource(R.string.common_back),
+            onSecondary = { compSelected = null },
+            onConfirm = {
                     val newRel = ContactCompanyRelation(
                         id = java.util.UUID.randomUUID().toString(),
                         contactId = contact.id,
@@ -186,10 +183,36 @@ fun WorkplaceAddFlow(
                         ))
                     }
                     onDismiss()
-                }) { Text(stringResource(R.string.common_add)) }
-            },
-            dismissButton = { TextButton(onClick = { compSelected = null }) { Text(stringResource(R.string.common_back)) } }
-        )
+            }
+        ) {
+            OutlinedTextField(
+                value = compPosition, onValueChange = { compPosition = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_position)) },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+            if (hasCurrentWork) {
+                val modeLabels = listOf(
+                    stringResource(R.string.cd_work_mode_primary),
+                    stringResource(R.string.cd_work_mode_parallel),
+                    stringResource(R.string.cd_work_mode_former)
+                )
+                PillChoiceRow(
+                    options = modeLabels,
+                    selected = modeLabels[addMode],
+                    onSelect = { v -> addMode = modeLabels.indexOf(v).coerceAtLeast(0) }
+                )
+                if (addMode == 0) Text(
+                    stringResource(R.string.cd_work_mode_primary_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppleTheme.colors.secondaryLabel
+                )
+            }
+            OutlinedTextField(
+                value = compNote, onValueChange = { compNote = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_fact_note_optional)) },
+                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
+            )
+        }
     }
 }
 
@@ -208,13 +231,23 @@ fun WorkplaceEditDialog(
     val companyName = AppStateStore.getCompany(rel.companyId)?.name ?: ""
     var position by remember(rel.id) { mutableStateOf(rel.position ?: "") }
     var department by remember(rel.id) { mutableStateOf(rel.department ?: "") }
+    // Роль/зона ответственности/ключевые аккаунты/заметка — были показаны (только
+    // для чтения) в WorkTab, а в CompanyEditScreen редактировались ФИКТИВНО
+    // (onValueChange={} на всех полях, кроме статуса — правки молча терялись).
+    var role by remember(rel.id) { mutableStateOf(rel.role ?: "") }
+    var responsibilities by remember(rel.id) { mutableStateOf(rel.responsibilities ?: "") }
+    var managedAccounts by remember(rel.id) { mutableStateOf(rel.managedAccounts ?: "") }
+    var workNote by remember(rel.id) { mutableStateOf(rel.workNote ?: "") }
     var isCurrent by remember(rel.id) { mutableStateOf(rel.employmentStatus != EmploymentStatus.FORMER) }
     var isPrimary by remember(rel.id) { mutableStateOf(rel.isPrimary) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(companyName, fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = position, onValueChange = { position = it }, keyboardOptions = CapSentences,
                     label = { Text(stringResource(R.string.cd_position)) },
@@ -223,6 +256,11 @@ fun WorkplaceEditDialog(
                 OutlinedTextField(
                     value = department, onValueChange = { department = it }, keyboardOptions = CapSentences,
                     label = { Text(stringResource(R.string.cd_department)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                OutlinedTextField(
+                    value = role, onValueChange = { role = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cce_role)) },
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 val statusLabels = listOf(
@@ -240,6 +278,21 @@ fun WorkplaceEditDialog(
                     Text(stringResource(R.string.cd_work_primary_place),
                         style = MaterialTheme.typography.bodyMedium)
                 }
+                OutlinedTextField(
+                    value = responsibilities, onValueChange = { responsibilities = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cce_responsibility)) },
+                    modifier = Modifier.fillMaxWidth(), minLines = 2
+                )
+                OutlinedTextField(
+                    value = managedAccounts, onValueChange = { managedAccounts = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cce_accounts_directions)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                OutlinedTextField(
+                    value = workNote, onValueChange = { workNote = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cce_work_note)) },
+                    modifier = Modifier.fillMaxWidth(), minLines = 2
+                )
             }
         },
         confirmButton = {
@@ -247,6 +300,10 @@ fun WorkplaceEditDialog(
                 val updated = rel.copy(
                     position = position.trim().ifBlank { null },
                     department = department.trim().ifBlank { null },
+                    role = role.trim().ifBlank { null },
+                    responsibilities = responsibilities.trim().ifBlank { null },
+                    managedAccounts = managedAccounts.trim().ifBlank { null },
+                    workNote = workNote.trim().ifBlank { null },
                     employmentStatus = if (isCurrent) EmploymentStatus.CURRENT else EmploymentStatus.FORMER,
                     isPrimary = isPrimary
                 )

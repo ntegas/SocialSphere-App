@@ -384,6 +384,8 @@
     <string name="dup_two_records">2 записи</string>
     <string name="dup_merge">Объединить</string>
     <string name="dup_manual_title">Объединить вручную</string>
+    <string name="dup_match_phone">Совпадает телефон: %1$s</string>
+    <string name="dup_match_email">Совпадает email: %1$s</string>
     <string name="dup_pick_a">Первый контакт</string>
     <string name="dup_pick_b">Второй контакт</string>
     <string name="dup_merge_edit">Объединить и править</string>
@@ -576,6 +578,7 @@
     <string name="bio_prompt_title">Показать защищённые записи</string>
     <string name="filter_groups">Группы</string>
     <string name="ce_profession">Профессия</string>
+    <string name="cd_work_no_company">Без компании — только должность</string>
     <string name="cd_work_primary_place">Основное место</string>
     <string name="cd_edit_detail">Правка детали</string>
     <string name="ce_profession_hint">Электрик, нотариус, врач…</string>

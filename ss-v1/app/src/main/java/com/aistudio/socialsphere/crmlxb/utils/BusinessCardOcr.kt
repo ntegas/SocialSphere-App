@@ -49,12 +49,41 @@ object BusinessCardOcr {
         val tess = TessBaseAPI()
         try {
             if (!tess.init(dataPath, LANGS)) return@withContext ""
-            tess.setImage(bitmap)
+            // Предобработка (фидбэк 2026-07-04 «плохо читает»): апскейл мелких
+            // кадров + ч/б с усиленным контрастом — заметно поднимает точность
+            // Tesseract на визитках при слабом свете/мелком шрифте.
+            tess.setImage(preprocess(bitmap))
             tess.getUTF8Text().orEmpty().trim()
         } catch (e: Exception) {
             ""
         } finally {
             tess.recycle()
         }
+    }
+
+    /** Ч/б + контраст ×1.6 + апскейл до ширины ≥1600px (Tesseract любит ~300dpi). */
+    private fun preprocess(src: Bitmap): Bitmap {
+        val minWidth = 1600
+        val scaled = if (src.width < minWidth) {
+            val k = minWidth.toFloat() / src.width
+            Bitmap.createScaledBitmap(src, minWidth, (src.height * k).toInt(), true)
+        } else src
+        val out = Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(out)
+        val paint = android.graphics.Paint()
+        // Насыщенность 0 (grayscale), затем контраст: c=1.6, сдвиг к середине
+        val gray = android.graphics.ColorMatrix().apply { setSaturation(0f) }
+        val c = 1.6f
+        val t = (1f - c) * 128f
+        val contrast = android.graphics.ColorMatrix(floatArrayOf(
+            c, 0f, 0f, 0f, t,
+            0f, c, 0f, 0f, t,
+            0f, 0f, c, 0f, t,
+            0f, 0f, 0f, 1f, 0f
+        ))
+        gray.postConcat(contrast)
+        paint.colorFilter = android.graphics.ColorMatrixColorFilter(gray)
+        canvas.drawBitmap(scaled, 0f, 0f, paint)
+        return out
     }
 }

@@ -384,6 +384,8 @@
     <string name="dup_two_records">2 records</string>
     <string name="dup_merge">Merge</string>
     <string name="dup_manual_title">Merge manually</string>
+    <string name="dup_match_phone">Same phone: %1$s</string>
+    <string name="dup_match_email">Same email: %1$s</string>
     <string name="dup_pick_a">First contact</string>
     <string name="dup_pick_b">Second contact</string>
     <string name="dup_merge_edit">Merge and edit</string>
@@ -576,6 +578,7 @@
     <string name="bio_prompt_title">Show protected records</string>
     <string name="filter_groups">Groups</string>
     <string name="ce_profession">Profession</string>
+    <string name="cd_work_no_company">No company — just a role</string>
     <string name="cd_work_primary_place">Primary workplace</string>
     <string name="cd_edit_detail">Edit detail</string>
     <string name="ce_profession_hint">Electrician, notary, doctor…</string>

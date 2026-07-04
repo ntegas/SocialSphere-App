@@ -179,6 +179,54 @@ fun AureliaSheet(
     }
 }
 
+// ── ЕДИНАЯ шторка-форма (правило владельца 2026-07-04: не точечные копии!) ───
+// Каркас ЛЮБОЙ формы ввода: Playfair-заголовок 20 → контент → широкая
+// акцент-кнопка 48/r14 → опциональная вторичная текст-кнопка («Назад» и т.п.).
+// Подтверждения удаления (2 кнопки, без полей) — НЕ сюда, им AlertDialog.
+@Composable
+fun AureliaFormSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    confirmEnabled: Boolean = true,
+    secondaryText: String? = null,
+    onSecondary: (() -> Unit)? = null,
+    titleLeading: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    AureliaSheet(onDismiss = onDismiss) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                titleLeading?.invoke()
+                Text(
+                    title,
+                    fontFamily = AureliaSerif, fontWeight = FontWeight.W700,
+                    fontSize = 20.sp, color = AppleTheme.colors.label,
+                )
+            }
+            content()
+            androidx.compose.material3.Button(
+                onClick = onConfirm,
+                enabled = confirmEnabled,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) { Text(confirmText, fontWeight = FontWeight.Bold) }
+            if (secondaryText != null && onSecondary != null) {
+                Text(
+                    secondaryText,
+                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                    color = AppleTheme.colors.secondaryLabel,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .aureliaPress(onClick = onSecondary)
+                        .padding(6.dp),
+                )
+            }
+        }
+    }
+}
+
 // ── Тап-анимация масштаба (au-press: transform .12s ease; :active scale .96) ─
 fun Modifier.aureliaPress(enabled: Boolean = true, onClick: () -> Unit): Modifier = composed {
     val interaction = remember { MutableInteractionSource() }
@@ -387,6 +435,9 @@ fun AureliaPickerSheet(
     emptyText: String = "",
     createNewText: String? = null,
     onCreateNew: (() -> Unit)? = null,
+    // Вторая служебная строка (например «Без компании — указать должность»)
+    extraActionText: String? = null,
+    onExtraAction: (() -> Unit)? = null,
 ) {
     val search = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     val filtered = if (search.value.isBlank()) items
@@ -436,6 +487,27 @@ fun AureliaPickerSheet(
                         }
                         Text(createNewText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                             color = AppleTheme.colors.brand)
+                    }
+                }
+            }
+            if (extraActionText != null && onExtraAction != null) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                            .aureliaPress { onExtraAction() }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(AppleTheme.colors.neutralFill),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("—", fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                                color = AppleTheme.colors.secondaryLabel)
+                        }
+                        Text(extraActionText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                            color = AppleTheme.colors.label)
                     }
                 }
             }

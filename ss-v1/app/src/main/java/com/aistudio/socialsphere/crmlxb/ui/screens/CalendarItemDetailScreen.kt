@@ -94,7 +94,7 @@ fun CalendarItemDetailScreen(
                             } catch (e: Exception) {
                                 java.time.LocalDate.now().plusWeeks(1).toString()
                             }
-                            Text(next, color = AppleTheme.colors.separator)
+                            Text(next, color = AppleTheme.colors.tertiaryLabel)
                         },
                         modifier    = Modifier.fillMaxWidth(),
                         singleLine  = true,

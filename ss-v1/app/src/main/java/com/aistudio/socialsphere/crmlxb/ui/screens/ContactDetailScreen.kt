@@ -906,7 +906,7 @@ fun ContactDetailScreen(
                                 PersonalDetailCategory.DISLIKES    -> stringResource(R.string.cd_late_hint)
                                 else                               -> stringResource(R.string.cd_enter_value)
                             }
-                            Text(hint, color = AppleTheme.colors.separator)
+                            Text(hint, color = AppleTheme.colors.tertiaryLabel)
                         },
                         modifier  = Modifier.fillMaxWidth(),
                         singleLine = true

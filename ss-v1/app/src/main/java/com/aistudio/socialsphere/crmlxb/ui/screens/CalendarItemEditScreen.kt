@@ -197,6 +197,9 @@ fun CalendarItemEditScreen(
                                 isAllDay = isAllDay,
                                 importance = importance,
                                 status = status,
+                                // colorKey в форме сейчас не редактируется — сохраняем как
+                                // было, а не хардкодим null (см. У60)
+                                colorKey = originalItem?.colorKey,
                                 links = links,
                                 recurrenceRule = recurrenceStr,
                                 reminders = newReminderRules,

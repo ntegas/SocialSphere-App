@@ -384,6 +384,8 @@
     <string name="dup_two_records">2 εγγραφές</string>
     <string name="dup_merge">Συγχώνευση</string>
     <string name="dup_manual_title">Χειροκίνητη συγχώνευση</string>
+    <string name="dup_match_phone">Ίδιο τηλέφωνο: %1$s</string>
+    <string name="dup_match_email">Ίδιο email: %1$s</string>
     <string name="dup_pick_a">Πρώτη επαφή</string>
     <string name="dup_pick_b">Δεύτερη επαφή</string>
     <string name="dup_merge_edit">Συγχώνευση και επεξεργασία</string>
@@ -576,6 +578,7 @@
     <string name="bio_prompt_title">Εμφάνιση προστατευμένων εγγραφών</string>
     <string name="filter_groups">Ομάδες</string>
     <string name="ce_profession">Επάγγελμα</string>
+    <string name="cd_work_no_company">Χωρίς εταιρεία — μόνο ρόλος</string>
     <string name="cd_work_primary_place">Κύρια εργασία</string>
     <string name="cd_edit_detail">Επεξεργασία λεπτομέρειας</string>
     <string name="ce_profession_hint">Ηλεκτρολόγος, συμβολαιογράφος, γιατρός…</string>

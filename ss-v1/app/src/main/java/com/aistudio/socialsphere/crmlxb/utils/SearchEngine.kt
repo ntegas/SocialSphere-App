@@ -116,6 +116,13 @@ object SearchEngine {
         contact.tags.forEach { t ->
             if (t.lowercase().contains(q)) { score += 55; matchField = "Тег" }
         }
+        // Группы (фидбэк 2026-07-04: «группы должны находиться в поиске»)
+        AppStateStore.groupMembers
+            .filter { it.contactId == contact.id }
+            .forEach { m ->
+                val g = AppStateStore.groups.firstOrNull { it.id == m.groupId } ?: return@forEach
+                if (g.name.lowercase().contains(q)) { score += 55; matchField = "Группа" }
+            }
         // Свой тип отношений / где познакомились / следующий шаг
         if (contact.customRelationshipType?.lowercase()?.contains(q) == true) { score += 40; matchField = "Тип" }
         if (contact.nextStep?.lowercase()?.contains(q) == true) { score += 25; matchField = "След. шаг" }

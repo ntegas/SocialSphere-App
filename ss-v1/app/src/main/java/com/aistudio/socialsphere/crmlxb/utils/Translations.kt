@@ -196,6 +196,40 @@ fun com.aistudio.socialsphere.crmlxb.model.CalendarItem.displayTitle(
     context: android.content.Context
 ): String = calendarDisplayTitle(title, type, context)
 
+// Шаблоны, которыми ImportScreens.kt запекает текст заметки при импорте
+// («Должность при импорте: X», «Заметка из импорта: X») — в языке, который был
+// активен НА МОМЕНТ импорта, не текущем. Тот же класс бага, что и заголовки
+// календаря (см. calendarDisplayTitle) — только для Note.text, у которого нет
+// enum-типа, только шаблонный префикс с плейсхолдером.
+private val IMPORTED_NOTE_TEMPLATES = listOf(
+    R.string.imp_job_on_import,
+    R.string.imp_note_from_import,
+)
+
+/**
+ * Нормализует префикс заметки, запечённый при импорте, к ТЕКУЩЕМУ языку —
+ * само значение после префикса (должность/текст заметки) не трогается.
+ * Данные в БД не меняются, только показ.
+ */
+fun normalizeImportedNoteText(text: String, context: android.content.Context): String {
+    for (templateResId in IMPORTED_NOTE_TEMPLATES) {
+        val currentPrefix = context.getString(templateResId, "")
+        if (currentPrefix.isBlank()) continue
+        if (text.startsWith(currentPrefix)) return text // уже на текущем языке
+        for (lang in APP_LANGS) {
+            val localizedPrefix = try {
+                val conf = android.content.res.Configuration(context.resources.configuration)
+                conf.setLocale(java.util.Locale(lang))
+                context.createConfigurationContext(conf).getString(templateResId, "")
+            } catch (e: Exception) { null } ?: continue
+            if (localizedPrefix.isNotBlank() && text.startsWith(localizedPrefix)) {
+                return currentPrefix + text.substring(localizedPrefix.length)
+            }
+        }
+    }
+    return text
+}
+
 fun NoteType.label(context: android.content.Context): String = when (this) {
     NoteType.GENERAL -> context.getString(R.string.lbl_note_type_general)
     NoteType.IMPORTANT_TO_REMEMBER -> context.getString(R.string.lbl_note_type_important_to_remember)

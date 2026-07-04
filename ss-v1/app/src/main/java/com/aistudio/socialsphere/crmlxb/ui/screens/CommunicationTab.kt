@@ -79,30 +79,26 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     val base = editPhone
                     var num by remember { mutableStateOf(base?.number ?: "") }
                     var pType by remember { mutableStateOf(base?.type ?: PhoneType.MOBILE) }
-                    AlertDialog(
-                        onDismissRequest = { showPhoneDialog = false; editPhone = null },
-                        title = { Text(stringResource(if (base == null) R.string.cd_add_phone else R.string.ce_edit_phone), fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                OutlinedTextField(value = num, onValueChange = { num = it }, keyboardOptions = PhoneKeyboard, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                                DropdownField(stringResource(R.string.ce_type), pType.label(ctxLabel), PhoneType.values().map { it.label(ctxLabel) }) { v -> pType = PhoneType.values().firstOrNull { it.label(ctxLabel) == v } ?: pType }
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                        title = stringResource(if (base == null) R.string.cd_add_phone else R.string.ce_edit_phone),
+                        onDismiss = { showPhoneDialog = false; editPhone = null },
+                        confirmText = stringResource(if (base == null) R.string.common_add else R.string.common_save),
+                        confirmEnabled = num.isNotBlank(),
+                        onConfirm = {
+                            val list = contact.phones.toMutableList()
+                            if (base == null) {
+                                list.add(ContactPhone(java.util.UUID.randomUUID().toString(), contact.id, num.trim(), pType, list.isEmpty()))
+                            } else {
+                                val i = list.indexOfFirst { it.id == base.id }
+                                if (i >= 0) list[i] = base.copy(number = num.trim(), type = pType)
                             }
-                        },
-                        confirmButton = {
-                            Button(enabled = num.isNotBlank(), onClick = {
-                                val list = contact.phones.toMutableList()
-                                if (base == null) {
-                                    list.add(ContactPhone(java.util.UUID.randomUUID().toString(), contact.id, num.trim(), pType, list.isEmpty()))
-                                } else {
-                                    val i = list.indexOfFirst { it.id == base.id }
-                                    if (i >= 0) list[i] = base.copy(number = num.trim(), type = pType)
-                                }
-                                AppStateStore.updateContact(contact.copy(phones = list))
-                                showPhoneDialog = false; editPhone = null
-                            }) { Text(stringResource(if (base == null) R.string.common_add else R.string.common_save)) }
-                        },
-                        dismissButton = { TextButton(onClick = { showPhoneDialog = false; editPhone = null }) { Text(stringResource(R.string.common_cancel)) } }
-                    )
+                            AppStateStore.updateContact(contact.copy(phones = list))
+                            showPhoneDialog = false; editPhone = null
+                        }
+                    ) {
+                        OutlinedTextField(value = num, onValueChange = { num = it }, keyboardOptions = PhoneKeyboard, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        DropdownField(stringResource(R.string.ce_type), pType.label(ctxLabel), PhoneType.values().map { it.label(ctxLabel) }) { v -> pType = PhoneType.values().firstOrNull { it.label(ctxLabel) == v } ?: pType }
+                    }
                 }
                 pendingRemovePhone?.let { rp ->
                     AlertDialog(
@@ -146,30 +142,26 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     val base = editEmail
                     var addr by remember { mutableStateOf(base?.email ?: "") }
                     var eType by remember { mutableStateOf(base?.type ?: EmailType.PERSONAL) }
-                    AlertDialog(
-                        onDismissRequest = { showEmailDialog = false; editEmail = null },
-                        title = { Text(stringResource(if (base == null) R.string.cd_add_email else R.string.ce_edit_email), fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                OutlinedTextField(value = addr, onValueChange = { addr = it }, keyboardOptions = EmailKeyboard, label = { Text(stringResource(R.string.ce_email)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                                DropdownField(stringResource(R.string.ce_type), eType.label(ctxLabel), EmailType.values().map { it.label(ctxLabel) }) { v -> eType = EmailType.values().firstOrNull { it.label(ctxLabel) == v } ?: eType }
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                        title = stringResource(if (base == null) R.string.cd_add_email else R.string.ce_edit_email),
+                        onDismiss = { showEmailDialog = false; editEmail = null },
+                        confirmText = stringResource(if (base == null) R.string.common_add else R.string.common_save),
+                        confirmEnabled = addr.isNotBlank(),
+                        onConfirm = {
+                            val list = contact.emails.toMutableList()
+                            if (base == null) {
+                                list.add(ContactEmail(java.util.UUID.randomUUID().toString(), contact.id, addr.trim(), eType, list.isEmpty()))
+                            } else {
+                                val i = list.indexOfFirst { it.id == base.id }
+                                if (i >= 0) list[i] = base.copy(email = addr.trim(), type = eType)
                             }
-                        },
-                        confirmButton = {
-                            Button(enabled = addr.isNotBlank(), onClick = {
-                                val list = contact.emails.toMutableList()
-                                if (base == null) {
-                                    list.add(ContactEmail(java.util.UUID.randomUUID().toString(), contact.id, addr.trim(), eType, list.isEmpty()))
-                                } else {
-                                    val i = list.indexOfFirst { it.id == base.id }
-                                    if (i >= 0) list[i] = base.copy(email = addr.trim(), type = eType)
-                                }
-                                AppStateStore.updateContact(contact.copy(emails = list))
-                                showEmailDialog = false; editEmail = null
-                            }) { Text(stringResource(if (base == null) R.string.common_add else R.string.common_save)) }
-                        },
-                        dismissButton = { TextButton(onClick = { showEmailDialog = false; editEmail = null }) { Text(stringResource(R.string.common_cancel)) } }
-                    )
+                            AppStateStore.updateContact(contact.copy(emails = list))
+                            showEmailDialog = false; editEmail = null
+                        }
+                    ) {
+                        OutlinedTextField(value = addr, onValueChange = { addr = it }, keyboardOptions = EmailKeyboard, label = { Text(stringResource(R.string.ce_email)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        DropdownField(stringResource(R.string.ce_type), eType.label(ctxLabel), EmailType.values().map { it.label(ctxLabel) }) { v -> eType = EmailType.values().firstOrNull { it.label(ctxLabel) == v } ?: eType }
+                    }
                 }
                 pendingRemoveEmail?.let { re ->
                     AlertDialog(
@@ -215,35 +207,30 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     val base = editMsg
                     var uname by remember { mutableStateOf(base?.value ?: "") }
                     var mType by remember { mutableStateOf(base?.type ?: MessengerType.TELEGRAM) }
-                    AlertDialog(
-                        onDismissRequest = { showMsgDialog = false; editMsg = null },
-                        title = { Text(stringResource(if (base == null) R.string.cd_add_messenger else R.string.ce_edit_messenger), fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(stringResource(R.string.ce_platform), style = MaterialTheme.typography.labelMedium, color = AppleTheme.colors.secondaryLabel)
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    MessengerType.values().forEach { mt ->
-                                        FilterChip(selected = mType == mt, onClick = { mType = mt }, label = { Text(mt.label(ctxLabel)) })
-                                    }
-                                }
-                                OutlinedTextField(value = uname, onValueChange = { uname = it }, label = { Text(stringResource(R.string.ce_username)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                        title = stringResource(if (base == null) R.string.cd_add_messenger else R.string.ce_edit_messenger),
+                        onDismiss = { showMsgDialog = false; editMsg = null },
+                        confirmText = stringResource(if (base == null) R.string.common_add else R.string.common_save),
+                        confirmEnabled = uname.isNotBlank(),
+                        onConfirm = {
+                            val list = contact.messengers.toMutableList()
+                            if (base == null) {
+                                list.add(Messenger(id = java.util.UUID.randomUUID().toString(), contactId = contact.id, type = mType, value = uname.trim(), isPrimary = list.isEmpty()))
+                            } else {
+                                val i = list.indexOfFirst { it.id == base.id }
+                                if (i >= 0) list[i] = base.copy(type = mType, value = uname.trim())
                             }
-                        },
-                        confirmButton = {
-                            Button(enabled = uname.isNotBlank(), onClick = {
-                                val list = contact.messengers.toMutableList()
-                                if (base == null) {
-                                    list.add(Messenger(id = java.util.UUID.randomUUID().toString(), contactId = contact.id, type = mType, value = uname.trim(), isPrimary = list.isEmpty()))
-                                } else {
-                                    val i = list.indexOfFirst { it.id == base.id }
-                                    if (i >= 0) list[i] = base.copy(type = mType, value = uname.trim())
-                                }
-                                AppStateStore.updateContact(contact.copy(messengers = list))
-                                showMsgDialog = false; editMsg = null
-                            }) { Text(stringResource(if (base == null) R.string.common_add else R.string.common_save)) }
-                        },
-                        dismissButton = { TextButton(onClick = { showMsgDialog = false; editMsg = null }) { Text(stringResource(R.string.common_cancel)) } }
-                    )
+                            AppStateStore.updateContact(contact.copy(messengers = list))
+                            showMsgDialog = false; editMsg = null
+                        }
+                    ) {
+                        PillChoiceRow(
+                            options = MessengerType.values().map { it.label(ctxLabel) },
+                            selected = mType.label(ctxLabel),
+                            onSelect = { v -> mType = MessengerType.values().firstOrNull { it.label(ctxLabel) == v } ?: mType }
+                        )
+                        OutlinedTextField(value = uname, onValueChange = { uname = it }, label = { Text(stringResource(R.string.ce_username)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    }
                 }
                 pendingRemoveMsg?.let { rm ->
                     AlertDialog(

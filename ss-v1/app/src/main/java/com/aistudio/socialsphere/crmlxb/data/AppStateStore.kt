@@ -304,19 +304,45 @@ object AppStateStore {
     // (PhoneDedupeTest), прод-логика/видимость снаружи модуля не меняется.
     internal fun phoneDigits(s: String): String = s.filter { it.isDigit() }.takeLast(10)
 
-    /** Пары возможных дублей: совпадение по нормализованному телефону (≥7 цифр)
-     *  или по email. Без повторов и без пар «сам с собой». */
-    fun findDuplicatePairs(): List<Pair<Contact, Contact>> {
+    /** Пара возможных дублей + ПРИЧИНА совпадения (фидбэк 2026-07-04: «непонятно
+     *  чем связаны» — совпадал канал, не показанный в превью). */
+    data class DuplicateMatch(
+        val a: Contact,
+        val b: Contact,
+        val byPhone: String? = null, // совпавший номер (последние цифры)
+        val byEmail: String? = null, // совпавший email
+    )
+
+    // Общие ящики офисов — совпадение по ним НЕ признак дубля людей
+    private val genericEmailLocalParts = setOf(
+        "info", "office", "sales", "support", "contact", "hello", "mail", "admin", "hr"
+    )
+
+    /** Пары возможных дублей: совпадение по нормализованному телефону (≥7 цифр,
+     *  НЕ общий рабочий у обоих) или по email (НЕ generic-ящик типа info@).
+     *  Без повторов и без пар «сам с собой». */
+    fun findDuplicatePairs(): List<DuplicateMatch> {
         val list = contacts.toList()
-        val result = mutableListOf<Pair<Contact, Contact>>()
+        val result = mutableListOf<DuplicateMatch>()
         for (i in list.indices) {
             for (j in i + 1 until list.size) {
                 val a = list[i]; val b = list[j]
-                val ap = a.phones.map { phoneDigits(it.number) }.filter { it.length >= 7 }
-                val bp = b.phones.map { phoneDigits(it.number) }.filter { it.length >= 7 }
-                val ae = a.emails.map { it.email.trim().lowercase() }.filter { it.isNotBlank() }
-                val be = b.emails.map { it.email.trim().lowercase() }.filter { it.isNotBlank() }
-                if (ap.any { it in bp } || ae.any { it in be }) result.add(a to b)
+                // Телефон: пары (цифры, тип); общий РАБОЧИЙ у обоих — не дубль
+                val ap = a.phones.map { phoneDigits(it.number) to it.type }.filter { it.first.length >= 7 }
+                val bp = b.phones.map { phoneDigits(it.number) to it.type }.filter { it.first.length >= 7 }
+                val phoneHit = ap.firstNotNullOfOrNull { (d, at) ->
+                    bp.firstOrNull { (bd, bt) ->
+                        bd == d && !(at == PhoneType.WORK && bt == PhoneType.WORK)
+                    }?.let { d }
+                }
+                // Email: generic-ящики (info@, office@…) пропускаем
+                fun cleanEmails(c: Contact) = c.emails
+                    .map { it.email.trim().lowercase() }
+                    .filter { it.isNotBlank() && it.substringBefore("@") !in genericEmailLocalParts }
+                val emailHit = cleanEmails(a).firstOrNull { it in cleanEmails(b) }
+                if (phoneHit != null || emailHit != null) {
+                    result.add(DuplicateMatch(a, b, byPhone = phoneHit, byEmail = emailHit))
+                }
             }
         }
         return result

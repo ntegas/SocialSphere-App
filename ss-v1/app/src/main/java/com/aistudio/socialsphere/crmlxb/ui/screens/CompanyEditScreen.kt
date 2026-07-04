@@ -257,6 +257,10 @@ fun CompanyEditScreen(
                                 // «добавить сотрудника» указывают на верный id
                                 id = editedCompanyId,
                                 name = name,
+                                // logoUri в форме сейчас не редактируется — сохраняем как
+                                // было, а не хардкодим null (иначе будущая фича лого молча
+                                // стиралась бы каждым сохранением, см. У60)
+                                logoUri = originalCompany?.logoUri,
                                 industry = industry,
                                 description = description,
                                 website = website,
@@ -550,36 +554,21 @@ fun CompanyEditScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
         
+        // Раньше это был нередактируемый диалог (все поля onValueChange={},
+        // правки молча терялись — найдено при аудите 2026-07-04). Теперь —
+        // ЕДИНЫЙ WorkplaceEditDialog (WorkplaceComponents.kt), тот же, что
+        // используется со стороны контакта (Обзор/Работа): реально сохраняет.
         showRelationEditDialog?.let { relation ->
-            val contact = AppStateStore.getContact(relation.contactId)
-            AlertDialog(
-                onDismissRequest = { showRelationEditDialog = null },
-                title = { Text(stringResource(R.string.cce_rel_with, "${contact?.firstName} ${contact?.lastName}")) },
-                text = {
-                    Column(
-                        modifier = Modifier.verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(value = relation.position ?: "", onValueChange = {}, label = { Text(stringResource(R.string.cce_position)) }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = relation.department ?: "", onValueChange = {}, label = { Text(stringResource(R.string.cce_department)) }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = relation.role ?: "", onValueChange = {}, label = { Text(stringResource(R.string.cce_role)) }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = relation.employmentStatus.label(ctxLabel), onValueChange = {}, label = { Text(stringResource(R.string.common_status)) }, modifier = Modifier.fillMaxWidth(), enabled = false)
-                        OutlinedTextField(value = relation.responsibilities ?: "", onValueChange = {}, label = { Text(stringResource(R.string.cce_responsibility)) }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = relation.managedAccounts ?: "", onValueChange = {}, label = { Text(stringResource(R.string.cce_accounts_directions)) }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = relation.workNote ?: "", onValueChange = {}, label = { Text(stringResource(R.string.cce_work_note)) }, modifier = Modifier.fillMaxWidth())
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = relation.isPrimary, onCheckedChange = {}, enabled = false)
-                            Text(stringResource(R.string.cce_main_company))
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(onClick = { showRelationEditDialog = null }) { Text(stringResource(R.string.cce_done)) }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showRelationEditDialog = null }) { Text(stringResource(R.string.common_cancel)) }
-                }
-            )
+            val relContact = AppStateStore.getContact(relation.contactId)
+            if (relContact != null) {
+                WorkplaceEditDialog(
+                    contact = relContact,
+                    rel = relation,
+                    onDismiss = { showRelationEditDialog = null }
+                )
+            } else {
+                showRelationEditDialog = null
+            }
         }
     }
 }

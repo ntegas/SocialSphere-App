@@ -135,11 +135,15 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                             )
                             Spacer(Modifier.height(6.dp))
                             OutlinedButton(onClick = {
-                                ctxLabel.startActivity(
+                                // КРАШ-ФИКС (фидбэк 2026-07-04): ctxLabel — локализованный
+                                // контекст (не Activity), прямой startActivity без NEW_TASK
+                                // роняет приложение. Единый безопасный запуск.
+                                com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.startIntentSafely(
+                                    ctxLabel,
                                     android.content.Intent(
                                         android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
                                         android.net.Uri.parse("package:" + ctxLabel.packageName)
-                                    )
+                                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                 )
                             }) { Text(stringResource(R.string.set_exact_alarms)) }
                         }

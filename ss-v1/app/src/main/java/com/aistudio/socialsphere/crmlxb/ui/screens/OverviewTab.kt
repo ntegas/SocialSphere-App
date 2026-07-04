@@ -140,16 +140,35 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                             maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
-                        // «14 июля» вместо сырого ISO «2026-07-14»
-                        val niceDate = try {
-                            java.time.LocalDate.parse(ev.effectiveDate())
-                                .format(java.time.format.DateTimeFormatter.ofPattern("d MMMM"))
-                        } catch (e: Exception) { ev.effectiveDate() }
-                        Text(
-                            niceDate,
-                            fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                            color = AppleTheme.colors.secondaryLabel
-                        )
+                        // «Сегодня» / «завтра» / «через N дн.» + дата (фидбэк
+                        // 2026-07-04: по одной дате не понять, насколько скоро)
+                        val evDate = try { java.time.LocalDate.parse(ev.effectiveDate()) } catch (e: Exception) { null }
+                        val daysUntil = evDate?.let {
+                            java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), it)
+                        }
+                        val relLabel = when (daysUntil) {
+                            null -> null
+                            0L   -> stringResource(R.string.common_today)
+                            1L   -> stringResource(R.string.common_tomorrow)
+                            else -> String.format(stringResource(R.string.home_in_days), daysUntil)
+                        }
+                        val niceDate = evDate?.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM"))
+                            ?: ev.effectiveDate()
+                        androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                relLabel ?: niceDate,
+                                fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                color = when (daysUntil) {
+                                    0L, 1L -> AppleTheme.colors.brand
+                                    else   -> AppleTheme.colors.secondaryLabel
+                                }
+                            )
+                            if (relLabel != null) Text(
+                                niceDate,
+                                fontSize = 11.sp,
+                                color = AppleTheme.colors.tertiaryLabel
+                            )
+                        }
                     }
                     if (i < upcomingItems.lastIndex)
                         HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
