@@ -71,6 +71,11 @@ fun ContactEditScreen(
     var firstName  by remember { mutableStateOf(originalContact?.firstName ?: "") }
     var lastName   by remember { mutableStateOf(originalContact?.lastName  ?: "") }
     var middleName by remember { mutableStateOf(originalContact?.middleName ?: "") }
+    // Структура имени как в Android-контактах (v13): приставка/суффикс/фонетика
+    var namePrefix        by remember { mutableStateOf(originalContact?.namePrefix ?: "") }
+    var nameSuffix         by remember { mutableStateOf(originalContact?.nameSuffix ?: "") }
+    var phoneticFirstName by remember { mutableStateOf(originalContact?.phoneticFirstName ?: "") }
+    var phoneticLastName  by remember { mutableStateOf(originalContact?.phoneticLastName ?: "") }
 
     // Mutable lists for editing
     var phones     by remember { mutableStateOf(originalContact?.phones     ?: emptyList<ContactPhone>()) }
@@ -167,6 +172,10 @@ fun ContactEditScreen(
             lastName         = lastName.trim(),
             middleName       = middleName.trim().ifBlank { null },
             nickname         = nickname.trim().ifBlank { null },
+            namePrefix       = namePrefix.trim().ifBlank { null },
+            nameSuffix       = nameSuffix.trim().ifBlank { null },
+            phoneticFirstName = phoneticFirstName.trim().ifBlank { null },
+            phoneticLastName  = phoneticLastName.trim().ifBlank { null },
             phones           = phones,
             emails           = emails,
             messengers       = messengers,
@@ -495,8 +504,24 @@ fun ContactEditScreen(
                 )
             }
 
-            // ── Имя/фамилия (парная карточка) + прозвище ──────────────
+            // ── Полная структура имени как в Android-контактах (v13): приставка/
+            // имя/фамилия/отчество/суффикс/фонетика — владелец попросил «хочу как
+            // в андроид, идентично» (5 полей структуры + 2 фонетических). ──
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // Приставка (Dr./г-н) — отдельная карточка, как в андроид-редакторе
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    BareFieldColumn(
+                        label = stringResource(R.string.ce_name_prefix), value = namePrefix,
+                        onValueChange = { namePrefix = it }, keyboardOptions = CapWords,
+                        placeholder = stringResource(R.string.ce_name_prefix_hint),
+                        modifier = Modifier.fillMaxWidth().padding(12.dp)
+                    )
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -530,6 +555,20 @@ fun ContactEditScreen(
                         modifier = Modifier.fillMaxWidth().padding(12.dp)
                     )
                 }
+                // Суффикс (мл./ст.) — как в андроид-редакторе, идёт после отчества/фамилии
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    BareFieldColumn(
+                        label = stringResource(R.string.ce_name_suffix), value = nameSuffix,
+                        onValueChange = { nameSuffix = it }, keyboardOptions = CapWords,
+                        placeholder = stringResource(R.string.ce_name_suffix_hint),
+                        modifier = Modifier.fillMaxWidth().padding(12.dp)
+                    )
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -542,6 +581,30 @@ fun ContactEditScreen(
                         placeholder = stringResource(R.string.ce_nickname_hint),
                         modifier = Modifier.fillMaxWidth().padding(12.dp)
                     )
+                }
+                // Фонетические имя/фамилия — для языков вроде японского, где
+                // произношение не следует из письменной формы (как в андроид)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth()) {
+                        BareFieldColumn(
+                            label = stringResource(R.string.ce_phonetic_first_name), value = phoneticFirstName,
+                            onValueChange = { phoneticFirstName = it }, keyboardOptions = CapWords,
+                            placeholder = stringResource(R.string.ce_phonetic_hint),
+                            modifier = Modifier.weight(1f).padding(12.dp)
+                        )
+                        Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(AppleTheme.colors.separator))
+                        BareFieldColumn(
+                            label = stringResource(R.string.ce_phonetic_last_name), value = phoneticLastName,
+                            onValueChange = { phoneticLastName = it }, keyboardOptions = CapWords,
+                            placeholder = stringResource(R.string.ce_phonetic_hint),
+                            modifier = Modifier.weight(1f).padding(12.dp)
+                        )
+                    }
                 }
             }
 

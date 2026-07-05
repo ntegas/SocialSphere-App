@@ -348,6 +348,20 @@ object AppStateStore {
         return result
     }
 
+    /** Свободный текст двух контактов при слиянии: пусто → другое; совпадают
+     *  (без учёта регистра) → одно; иначе — ОБА через " / ", ничего не теряется
+     *  молча (владелец потом сам решает, что оставить, в редактировании). */
+    private fun combineText(a: String?, b: String?): String? {
+        val ca = a?.trim()?.takeIf { it.isNotBlank() }
+        val cb = b?.trim()?.takeIf { it.isNotBlank() }
+        return when {
+            ca == null -> cb
+            cb == null -> ca
+            ca.equals(cb, ignoreCase = true) -> ca
+            else -> "$ca / $cb"
+        }
+    }
+
     /**
      * Слияние контакта other в keep. Под-данные объединяются (новые id у
      * перенесённых, чтобы не было коллизий PK), заметки/подарки/связи/ссылки
@@ -393,15 +407,31 @@ object AppStateStore {
         }
 
         val merged = keep.copy(
-            nickname        = keep.nickname ?: other.nickname,
+            // Свободный текст: если оба контакта несут РАЗНУЮ информацию, она
+            // раньше терялась НАВСЕГДА (побеждало непустое значение keep, other
+            // просто отбрасывался, второй контакт удалялся). Фидбэк владельца
+            // 2026-07-05: «мне нужна вся информация, и потом я её редактирую» —
+            // теперь при расхождении оба значения сохраняются рядом (через
+            // combineText), ничего не решается за владельца молча; он потом
+            // сам подчищает объединённую строку в редактировании.
+            nickname        = combineText(keep.nickname, other.nickname),
             photoUri        = keep.photoUri ?: other.photoUri,
-            profession      = keep.profession ?: other.profession,
-            nextStep        = keep.nextStep ?: other.nextStep,
-            canHelpWith     = keep.canHelpWith ?: other.canHelpWith,
-            iCanHelpWith    = keep.iCanHelpWith ?: other.iCanHelpWith,
-            talkingPoints   = keep.talkingPoints ?: other.talkingPoints,
-            meetContext     = keep.meetContext ?: other.meetContext,
+            profession      = combineText(keep.profession, other.profession),
+            nextStep        = combineText(keep.nextStep, other.nextStep),
+            canHelpWith     = combineText(keep.canHelpWith, other.canHelpWith),
+            iCanHelpWith    = combineText(keep.iCanHelpWith, other.iCanHelpWith),
+            talkingPoints   = combineText(keep.talkingPoints, other.talkingPoints),
+            meetContext     = combineText(keep.meetContext, other.meetContext),
             meetDate        = keep.meetDate ?: other.meetDate,
+            familyNote      = combineText(keep.familyNote, other.familyNote),
+            // Структура имени (v13) — раньше не участвовала в слиянии вообще,
+            // отчество/приставка/суффикс/фонетика другого контакта терялись.
+            middleName        = keep.middleName ?: other.middleName,
+            namePrefix         = keep.namePrefix ?: other.namePrefix,
+            nameSuffix         = keep.nameSuffix ?: other.nameSuffix,
+            phoneticFirstName  = keep.phoneticFirstName ?: other.phoneticFirstName,
+            phoneticLastName   = keep.phoneticLastName ?: other.phoneticLastName,
+            customRelationshipType = keep.customRelationshipType ?: other.customRelationshipType,
             lastContactDate = listOfNotNull(keep.lastContactDate, other.lastContactDate).maxOrNull(),
             tags            = (keep.tags + other.tags).distinct(),
             phones          = mergedPhones,
@@ -507,6 +537,33 @@ object AppStateStore {
             val dao = db()?.contactDao() ?: return@launch
             toRemove.forEach { dao.deleteGroupMember(it.id) }
             if (toAdd.isNotEmpty()) dao.insertContactGroupMembers(toAdd.map { it.toEntity() })
+        }
+    }
+
+    // ── Свои типы отношений («статусы») — фидбэк владельца 2026-07-05: создаёт
+    // свой тип, а он «не входит в фильтры, не ищется, не редактируется, не
+    // удаляется» — customRelationshipType был голым текстовым полем без CRUD,
+    // в отличие от групп. Добавляем тот же набор операций, что и для групп. ──
+
+    /** Отсортированный список уникальных пользовательских типов отношений в использовании. */
+    fun distinctCustomRelationshipTypes(): List<String> =
+        contacts.mapNotNull { it.customRelationshipType?.trim()?.takeIf { s -> s.isNotBlank() } }
+            .distinct().sortedBy { it.lowercase() }
+
+    /** Переименовать свой тип отношений ВЕЗДЕ, где он используется (все контакты разом). */
+    fun renameCustomRelationshipType(oldName: String, newName: String) {
+        val clean = newName.trim()
+        if (clean.isBlank() || clean == oldName) return
+        contacts.filter { it.customRelationshipType == oldName }.forEach {
+            updateContact(it.copy(customRelationshipType = clean))
+        }
+    }
+
+    /** Удалить свой тип отношений: у всех контактов с этим значением он сбрасывается
+     *  (relationshipType остаётся как есть — обычно OTHER, контакт не теряется). */
+    fun deleteCustomRelationshipType(name: String) {
+        contacts.filter { it.customRelationshipType == name }.forEach {
+            updateContact(it.copy(customRelationshipType = null))
         }
     }
 

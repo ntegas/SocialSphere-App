@@ -159,14 +159,23 @@ object ExportManager {
     private fun writeVCard(pw: PrintWriter, c: Contact) {
         pw.println("BEGIN:VCARD")
         pw.println("VERSION:3.0")
-        pw.println("N:${vEsc(c.lastName)};${vEsc(c.firstName)};${vEsc(c.middleName ?: "")};;")
+        // N: Family;Given;Additional;Prefixes;Suffixes (RFC 2426) — раньше
+        // приставка/суффикс не писались вообще (пустые компоненты), хотя модель
+        // их уже хранит отдельно (v13, как в Android-контактах).
+        pw.println("N:${vEsc(c.lastName)};${vEsc(c.firstName)};${vEsc(c.middleName ?: "")};${vEsc(c.namePrefix ?: "")};${vEsc(c.nameSuffix ?: "")}")
         val fullName = listOfNotNull(
+            c.namePrefix?.takeIf { it.isNotBlank() },
             c.firstName.takeIf { it.isNotBlank() },
             c.middleName?.takeIf { it.isNotBlank() },
-            c.lastName.takeIf { it.isNotBlank() }
+            c.lastName.takeIf { it.isNotBlank() },
+            c.nameSuffix?.takeIf { it.isNotBlank() }
         ).joinToString(" ")
         pw.println("FN:${vEsc(fullName)}")
         if (!c.nickname.isNullOrBlank()) pw.println("NICKNAME:${vEsc(c.nickname)}")
+        // Фонетические имя/фамилия — нестандартное X-поле (нет фиксированного
+        // тега в vCard 3.0), но Android умеет читать X-PHONETIC-*.
+        if (!c.phoneticFirstName.isNullOrBlank()) pw.println("X-PHONETIC-FIRST-NAME:${vEsc(c.phoneticFirstName)}")
+        if (!c.phoneticLastName.isNullOrBlank()) pw.println("X-PHONETIC-LAST-NAME:${vEsc(c.phoneticLastName)}")
 
         val compRel = c.companyRelations.firstOrNull { it.isPrimary }
             ?: c.companyRelations.firstOrNull()

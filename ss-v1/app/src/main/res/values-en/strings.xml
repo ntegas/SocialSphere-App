@@ -132,6 +132,7 @@
     <string name="contacts_reset_all">Reset all</string>
     <string name="filter_status">Contact status</string>
     <string name="filter_relation">Relationship type</string>
+    <string name="filter_custom_status">Custom statuses</string>
     <string name="filter_importance">Importance</string>
     <string name="filter_connection">Connection level</string>
     <string name="filter_rhythm">Communication rhythm</string>
@@ -551,6 +552,13 @@
     <string name="ce_middle_name">Middle name</string>
     <string name="ce_nickname">Nickname / what I call them</string>
     <string name="ce_nickname_hint">what you call them…</string>
+    <string name="ce_name_prefix">Prefix</string>
+    <string name="ce_name_prefix_hint">Mr., Dr.…</string>
+    <string name="ce_name_suffix">Suffix</string>
+    <string name="ce_name_suffix_hint">Jr., Sr.…</string>
+    <string name="ce_phonetic_first_name">Phonetic first name</string>
+    <string name="ce_phonetic_last_name">Phonetic last name</string>
+    <string name="ce_phonetic_hint">for languages like Japanese</string>
     <string name="ce_add_photo">Add photo</string>
     <string name="ce_phones">Phones</string>
     <string name="ce_no_phones">No phones</string>

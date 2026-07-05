@@ -184,6 +184,10 @@ fun List<Contact>.applyContactFilters(
     cityFilter: String,
     tagFilter: String = "",
     groupIds: Set<String> = emptySet(),
+    // Свои типы отношений («статусы») — раньше не участвовали в фильтре вообще,
+    // т.к. relationshipType у таких контактов = OTHER, и OTHER не было чипом
+    // (фидбэк владельца: «создал свой статус — не входит в фильтры»).
+    customRelTypes: Set<String> = emptySet(),
     sortOrder: ContactSortOrder
 ): List<Contact> {
     var list = this
@@ -194,8 +198,15 @@ fun List<Contact>.applyContactFilters(
         list = list.filter { it.id in matchIds }
     }
 
-    if (relationshipTypes.isNotEmpty())
-        list = list.filter { it.relationshipType in relationshipTypes }
+    // Стандартный тип ИЛИ свой тип — если активен хотя бы один список, матчим
+    // по любому из них (иначе выбор своего типа + стандартного одновременно
+    // исключил бы всех контактов вместо объединения выборок).
+    if (relationshipTypes.isNotEmpty() || customRelTypes.isNotEmpty()) {
+        list = list.filter { c ->
+            (relationshipTypes.isNotEmpty() && c.relationshipType in relationshipTypes) ||
+            (customRelTypes.isNotEmpty() && c.customRelationshipType in customRelTypes)
+        }
+    }
     if (importanceLevels.isNotEmpty())
         list = list.filter { it.importanceLevel in importanceLevels }
     if (connectionLevels.isNotEmpty())

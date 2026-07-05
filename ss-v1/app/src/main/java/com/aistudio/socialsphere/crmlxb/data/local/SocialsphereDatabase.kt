@@ -28,7 +28,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ContactGroupEntity::class,
         ContactGroupMemberEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 abstract class SocialsphereDatabase : RoomDatabase() {
@@ -185,6 +185,19 @@ abstract class SocialsphereDatabase : RoomDatabase() {
             }
         }
 
+        // v13 (2026-07-04): полная структура имени как в Android-контактах —
+        // приставка/суффикс/фонетические имя-фамилия. Раньше при импорте
+        // prefix/suffix из StructuredName молча склеивались в middleName
+        // (фидбэк владельца: «хочу как в андроид, идентично»).
+        internal val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE contacts ADD COLUMN namePrefix TEXT")
+                database.execSQL("ALTER TABLE contacts ADD COLUMN nameSuffix TEXT")
+                database.execSQL("ALTER TABLE contacts ADD COLUMN phoneticFirstName TEXT")
+                database.execSQL("ALTER TABLE contacts ADD COLUMN phoneticLastName TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): SocialsphereDatabase {
             return INSTANCE ?: synchronized(this) {
                 val builder = Room.databaseBuilder(
@@ -192,7 +205,7 @@ abstract class SocialsphereDatabase : RoomDatabase() {
                     SocialsphereDatabase::class.java,
                     "socialsphere_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
 
                 // Destructive fallback — ТОЛЬКО в debug. В release недостающая
                 // миграция/несовпадение схемы должны падать с явной ошибкой Room,

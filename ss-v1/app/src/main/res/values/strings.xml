@@ -132,6 +132,7 @@
     <string name="contacts_reset_all">Сбросить всё</string>
     <string name="filter_status">Статус контакта</string>
     <string name="filter_relation">Тип отношений</string>
+    <string name="filter_custom_status">Свои статусы</string>
     <string name="filter_importance">Важность</string>
     <string name="filter_connection">Уровень связи</string>
     <string name="filter_rhythm">Ритм общения</string>
@@ -551,6 +552,13 @@
     <string name="ce_middle_name">Отчество</string>
     <string name="ce_nickname">Прозвище / как зову</string>
     <string name="ce_nickname_hint">как вы зовёте…</string>
+    <string name="ce_name_prefix">Приставка</string>
+    <string name="ce_name_prefix_hint">г-н, д-р…</string>
+    <string name="ce_name_suffix">Суффикс</string>
+    <string name="ce_name_suffix_hint">мл., ст.…</string>
+    <string name="ce_phonetic_first_name">Фонетическое имя</string>
+    <string name="ce_phonetic_last_name">Фонетическая фамилия</string>
+    <string name="ce_phonetic_hint">для языков вроде японского</string>
     <string name="ce_add_photo">Добавить фото</string>
     <string name="ce_phones">Телефоны</string>
     <string name="ce_no_phones">Нет телефонов</string>

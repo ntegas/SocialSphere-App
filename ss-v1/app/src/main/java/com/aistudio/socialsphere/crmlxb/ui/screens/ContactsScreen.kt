@@ -64,6 +64,9 @@ fun ContactsScreen(
 
     // ── Active filters ────────────────────────────────────────
     var filterRelTypes    by remember { mutableStateOf(emptySet<RelationshipType>()) }
+    // Свои типы отношений («статусы») — раньше не могли быть фильтром вообще
+    // (фидбэк владельца 2026-07-05: «создаю статус сам — не входит в фильтры»)
+    var filterCustomRelTypes by remember { mutableStateOf(emptySet<String>()) }
     var filterImportance  by remember { mutableStateOf(emptySet<ImportanceLevel>()) }
     var filterConnLevel   by remember { mutableStateOf(emptySet<ConnectionLevel>()) }
     var filterRhythm      by remember { mutableStateOf(emptySet<CommunicationRhythm>()) }
@@ -76,7 +79,7 @@ fun ContactsScreen(
     val hasActiveFilters = filterRelTypes.isNotEmpty() || filterImportance.isNotEmpty() ||
         filterConnLevel.isNotEmpty() || filterRhythm.isNotEmpty() ||
         filterStatus.isNotEmpty() || filterGroups.isNotEmpty() ||
-        cityFilter.isNotBlank() || filterTag.isNotBlank()
+        cityFilter.isNotBlank() || filterTag.isNotBlank() || filterCustomRelTypes.isNotEmpty()
 
     // All unique tags across contacts for suggestion
     val allTags by remember {
@@ -98,6 +101,7 @@ fun ContactsScreen(
                 cityFilter          = cityFilter,
                 tagFilter           = filterTag,
                 groupIds            = filterGroups,
+                customRelTypes      = filterCustomRelTypes,
                 sortOrder           = sortOrder
             )
         }
@@ -121,6 +125,7 @@ fun ContactsScreen(
             filterRhythm       = filterRhythm,
             filterStatus       = filterStatus,
             filterGroups       = filterGroups,
+            filterCustomRelTypes = filterCustomRelTypes,
             cityFilter         = cityFilter,
             tagFilter          = filterTag,
             allTags            = allTags,
@@ -133,6 +138,7 @@ fun ContactsScreen(
             onRhythmChange     = { filterRhythm     = it },
             onStatusChange     = { filterStatus     = it },
             onGroupsChange     = { filterGroups     = it },
+            onCustomRelTypesChange = { filterCustomRelTypes = it },
             onCityChange       = { cityFilter       = it },
             onTagChange        = { filterTag        = it },
             onSortOrderChange  = { sortOrder        = it },
@@ -141,7 +147,7 @@ fun ContactsScreen(
                 filterRelTypes = emptySet(); filterImportance = emptySet()
                 filterConnLevel = emptySet(); filterRhythm = emptySet()
                 filterStatus = emptySet(); filterGroups = emptySet()
-                cityFilter = ""; filterTag = ""
+                cityFilter = ""; filterTag = ""; filterCustomRelTypes = emptySet()
             },
             onDismiss          = { showFilterSheet = false }
         )
@@ -418,6 +424,7 @@ private fun ContactFilterSheet(
     filterRhythm: Set<CommunicationRhythm>,
     filterStatus: Set<ContactStatus> = emptySet(),
     filterGroups: Set<String> = emptySet(),
+    filterCustomRelTypes: Set<String> = emptySet(),
     cityFilter: String,
     tagFilter: String = "",
     allTags: List<String> = emptyList(),
@@ -430,6 +437,7 @@ private fun ContactFilterSheet(
     onRhythmChange: (Set<CommunicationRhythm>) -> Unit,
     onStatusChange: (Set<ContactStatus>) -> Unit = {},
     onGroupsChange: (Set<String>) -> Unit = {},
+    onCustomRelTypesChange: (Set<String>) -> Unit = {},
     onCityChange: (String) -> Unit,
     onTagChange: (String) -> Unit = {},
     onSortOrderChange: (ContactSortOrder) -> Unit,
@@ -447,6 +455,7 @@ private fun ContactFilterSheet(
     var lRhythm     by remember { mutableStateOf(filterRhythm) }
     var lStatus     by remember { mutableStateOf(filterStatus) }
     var lGroups     by remember { mutableStateOf(filterGroups) }
+    var lCustomRelTypes by remember { mutableStateOf(filterCustomRelTypes) }
     var lCity       by remember { mutableStateOf(cityFilter) }
     var lTag        by remember { mutableStateOf(tagFilter) }
     // Живой счётчик результатов на кнопке «Применить» (по макету) — сортировка
@@ -456,13 +465,15 @@ private fun ContactFilterSheet(
             AppStateStore.contacts.applyContactFilters(
                 query = searchQuery, relationshipTypes = lRelTypes, importanceLevels = lImportance,
                 connectionLevels = lConnLevel, communicationRhythms = lRhythm, contactStatuses = lStatus,
-                cityFilter = lCity, tagFilter = lTag, groupIds = lGroups, sortOrder = sortOrder
+                cityFilter = lCity, tagFilter = lTag, groupIds = lGroups, customRelTypes = lCustomRelTypes,
+                sortOrder = sortOrder
             ).size
         }
     }
     fun pushAndClose() {
         onStatusChange(lStatus); onRelTypesChange(lRelTypes); onImportanceChange(lImportance)
         onConnLevelChange(lConnLevel); onRhythmChange(lRhythm); onGroupsChange(lGroups)
+        onCustomRelTypesChange(lCustomRelTypes)
         onCityChange(lCity); onTagChange(lTag)
         onDismiss()
     }
@@ -486,6 +497,7 @@ private fun ContactFilterSheet(
                 TextButton(onClick = {
                     lRelTypes = emptySet(); lImportance = emptySet(); lConnLevel = emptySet()
                     lRhythm = emptySet(); lStatus = emptySet(); lGroups = emptySet(); lCity = ""; lTag = ""
+                    lCustomRelTypes = emptySet()
                 }) { Text(stringResource(R.string.contacts_reset_all), color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold) }
             }
 
@@ -564,6 +576,67 @@ private fun ContactFilterSheet(
                        RelationshipType.CLIENT, RelationshipType.PARTNER, RelationshipType.ACQUAINTANCE).forEach { type ->
                     MultiSelectChip(type.label(ctxLabel), type in lRelTypes) {
                         lRelTypes = if (type in lRelTypes) lRelTypes - type else lRelTypes + type
+                    }
+                }
+            }
+
+            // Свои типы отношений («статусы») — раньше эти значения нигде не
+            // были видны как фильтр (relationshipType у них = OTHER, не чип из
+            // списка выше). Фидбэк владельца 2026-07-05: «создаю статус сам —
+            // не входит в фильтры... не могу редактировать, то есть удалять».
+            // Переименование/удаление — бьёт по ВСЕМ контактам с этим значением
+            // разом (как у групп).
+            run {
+                val customTypes by remember { derivedStateOf { AppStateStore.distinctCustomRelationshipTypes() } }
+                if (customTypes.isNotEmpty()) {
+                    var editingCustomType by remember { mutableStateOf<String?>(null) }
+                    var customTypeDraft by remember { mutableStateOf("") }
+                    FilterSection(stringResource(R.string.filter_custom_status)) {
+                        customTypes.forEach { ct ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                MultiSelectChip(ct, ct in lCustomRelTypes) {
+                                    lCustomRelTypes = if (ct in lCustomRelTypes) lCustomRelTypes - ct else lCustomRelTypes + ct
+                                }
+                                IconButton(
+                                    onClick = { editingCustomType = ct; customTypeDraft = ct },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Edit, stringResource(R.string.common_edit),
+                                        Modifier.size(14.dp), tint = AppleTheme.colors.secondaryLabel)
+                                }
+                            }
+                        }
+                    }
+                    editingCustomType?.let { ct ->
+                        AlertDialog(
+                            onDismissRequest = { editingCustomType = null },
+                            title = { Text(ct, fontWeight = FontWeight.Bold) },
+                            text = {
+                                OutlinedTextField(
+                                    value = customTypeDraft, onValueChange = { customTypeDraft = it },
+                                    label = { Text(stringResource(R.string.filter_custom_status)) },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                                )
+                            },
+                            confirmButton = {
+                                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Button(enabled = customTypeDraft.isNotBlank(), onClick = {
+                                        AppStateStore.renameCustomRelationshipType(ct, customTypeDraft)
+                                        lCustomRelTypes = lCustomRelTypes - ct + customTypeDraft.trim()
+                                        editingCustomType = null
+                                    }) { Text(stringResource(R.string.common_save)) }
+                                    TextButton(onClick = {
+                                        AppStateStore.deleteCustomRelationshipType(ct)
+                                        lCustomRelTypes = lCustomRelTypes - ct
+                                        editingCustomType = null
+                                    }) { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) }
+                                }
+                            },
+                            dismissButton = { TextButton(onClick = { editingCustomType = null }) { Text(stringResource(R.string.common_cancel)) } }
+                        )
                     }
                 }
             }

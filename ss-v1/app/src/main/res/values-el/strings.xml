@@ -132,6 +132,7 @@
     <string name="contacts_reset_all">Επαναφορά όλων</string>
     <string name="filter_status">Κατάσταση επαφής</string>
     <string name="filter_relation">Τύπος σχέσης</string>
+    <string name="filter_custom_status">Δικοί μου τύποι</string>
     <string name="filter_importance">Σημασία</string>
     <string name="filter_connection">Επίπεδο σύνδεσης</string>
     <string name="filter_rhythm">Ρυθμός επικοινωνίας</string>
@@ -551,6 +552,13 @@
     <string name="ce_middle_name">Πατρώνυμο</string>
     <string name="ce_nickname">Παρατσούκλι</string>
     <string name="ce_nickname_hint">πώς τους αποκαλείτε…</string>
+    <string name="ce_name_prefix">Πρόθεμα</string>
+    <string name="ce_name_prefix_hint">κ., δρ.…</string>
+    <string name="ce_name_suffix">Επίθεμα</string>
+    <string name="ce_name_suffix_hint">Jr., Sr.…</string>
+    <string name="ce_phonetic_first_name">Φωνητικό όνομα</string>
+    <string name="ce_phonetic_last_name">Φωνητικό επώνυμο</string>
+    <string name="ce_phonetic_hint">για γλώσσες όπως τα ιαπωνικά</string>
     <string name="ce_add_photo">Προσθήκη φωτογραφίας</string>
     <string name="ce_phones">Τηλέφωνα</string>
     <string name="ce_no_phones">Χωρίς τηλέφωνα</string>

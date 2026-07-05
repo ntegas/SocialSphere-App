@@ -41,8 +41,15 @@ data class ImportContactCandidate(
     val id: String = UUID.randomUUID().toString(),
     val firstName: String = "",
     val lastName: String = "",
-    /** Отчество/среднее имя (+префикс/суффикс) — раньше отбрасывалось. */
+    /** Отчество/среднее имя. */
     val middleName: String = "",
+    /** Структура имени как в Android (v13) — раньше приставка/суффикс молча
+     *  склеивались в middleName, теряя структуру (фидбэк владельца: «хочу как
+     *  в андроид, идентично»). */
+    val namePrefix: String = "",
+    val nameSuffix: String = "",
+    val phoneticFirstName: String = "",
+    val phoneticLastName: String = "",
     val phones: List<ContactPhone> = emptyList(),
     val emails: List<ContactEmail> = emptyList(),
     val companyName: String? = null,
@@ -124,22 +131,29 @@ object ContactImporter {
 
                 when (mimeType) {
                     ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE -> {
-                        // Полный StructuredName: DATA2=имя, DATA3=фамилия, DATA5=отчество,
-                        // DATA4=префикс, DATA6=суффикс. Раньше читались только имя и
-                        // фамилия — отчество из 3-4-словных имён терялось.
+                        // Полная структура StructuredName, как в Android-контактах:
+                        // DATA2=имя, DATA3=фамилия, DATA4=приставка, DATA5=отчество,
+                        // DATA6=суффикс, DATA7=фонетическое имя, DATA9=фонетическая
+                        // фамилия. ФИКС (2026-07-04): раньше приставка/суффикс молча
+                        // склеивались в middleName — теряя структуру. Теперь каждое
+                        // поле хранится отдельно (владелец: «хочу как в андроид,
+                        // идентично»).
                         val givenName  = it.getString(data2Idx)
                         val familyName = it.getString(data3Idx)
                         val displayName = it.getString(data1Idx)
                         val data5Idx = it.getColumnIndex(ContactsContract.Data.DATA5)
                         val data6Idx = it.getColumnIndex(ContactsContract.Data.DATA6)
+                        val data7Idx = it.getColumnIndex(ContactsContract.Data.DATA7)
+                        val data9Idx = it.getColumnIndex(ContactsContract.Data.DATA9)
                         val middle = if (data5Idx >= 0) it.getString(data5Idx) ?: "" else ""
                         val prefix = if (data4Idx >= 0) it.getString(data4Idx) ?: "" else ""
                         val suffix = if (data6Idx >= 0) it.getString(data6Idx) ?: "" else ""
+                        val phoneticFirst = if (data7Idx >= 0) it.getString(data7Idx) ?: "" else ""
+                        val phoneticLast  = if (data9Idx >= 0) it.getString(data9Idx) ?: "" else ""
 
                         var first  = (givenName ?: "").trim()
                         var last   = (familyName ?: "").trim()
-                        var mid    = listOf(prefix, middle, suffix)
-                            .filter { p -> p.isNotBlank() }.joinToString(" ").trim()
+                        var mid    = middle.trim()
                         // Структурных полей нет — раскладываем displayName без потерь:
                         // 1 слово → имя; 2 → имя+фамилия; 3+ → имя + середина + фамилия
                         if (first.isBlank() && last.isBlank() && !displayName.isNullOrBlank()) {
@@ -152,7 +166,11 @@ object ContactImporter {
                         candidates[contactId] = candidate.copy(
                             firstName  = candidate.firstName.takeIf { it.isNotBlank() } ?: first,
                             lastName   = candidate.lastName.takeIf { it.isNotBlank() } ?: last,
-                            middleName = candidate.middleName.takeIf { it.isNotBlank() } ?: mid
+                            middleName = candidate.middleName.takeIf { it.isNotBlank() } ?: mid,
+                            namePrefix = candidate.namePrefix.takeIf { it.isNotBlank() } ?: prefix.trim(),
+                            nameSuffix = candidate.nameSuffix.takeIf { it.isNotBlank() } ?: suffix.trim(),
+                            phoneticFirstName = candidate.phoneticFirstName.takeIf { it.isNotBlank() } ?: phoneticFirst.trim(),
+                            phoneticLastName  = candidate.phoneticLastName.takeIf { it.isNotBlank() } ?: phoneticLast.trim()
                         )
                     }
                     ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE -> {
@@ -280,6 +298,10 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
         var firstName  = ""
         var lastName   = ""
         var middleName = ""
+        var namePrefix = ""
+        var nameSuffix = ""
+        var phoneticFirstName = ""
+        var phoneticLastName  = ""
         val phones    = mutableListOf<ContactPhone>()
         val emails    = mutableListOf<ContactEmail>()
         var company   = ""
@@ -290,19 +312,22 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
         card.lines().forEach { raw ->
             val line = raw.trim()
             when {
-                // N:Фамилия;Имя;Отчество;Префикс;Суффикс — берём ВСЕ части
-                // (раньше отчество/префикс/суффикс отбрасывались — «пропадали
-                // слова» у имён из 3-4 слов). Матчим и «N;CHARSET=…:».
+                // N:Фамилия;Имя;Отчество;Префикс;Суффикс (RFC 2426, 5 частей) —
+                // раньше префикс/суффикс молча склеивались в middleName, теряя
+                // структуру (v13: хранятся отдельно, как в Android-контактах).
+                // Матчим и «N;CHARSET=…:».
                 line.startsWith("N:") || line.startsWith("N;") -> {
                     val parts = line.substringAfter(":", "").split(";")
                     lastName  = parts.getOrElse(0) { "" }.trim()
                     firstName = parts.getOrElse(1) { "" }.trim()
-                    middleName = listOf(
-                        parts.getOrElse(3) { "" }.trim(), // префикс — перед отчеством
-                        parts.getOrElse(2) { "" }.trim(), // отчество
-                        parts.getOrElse(4) { "" }.trim()  // суффикс
-                    ).filter { it.isNotBlank() }.joinToString(" ")
+                    middleName = parts.getOrElse(2) { "" }.trim()
+                    namePrefix = parts.getOrElse(3) { "" }.trim()
+                    nameSuffix = parts.getOrElse(4) { "" }.trim()
                 }
+                line.startsWith("X-PHONETIC-FIRST-NAME") ->
+                    phoneticFirstName = line.substringAfter(":", "").trim()
+                line.startsWith("X-PHONETIC-LAST-NAME") ->
+                    phoneticLastName = line.substringAfter(":", "").trim()
                 // FN: полное имя (fallback, если N не было) — без потери слов:
                 // 3+ слова → имя + середина(отчество) + фамилия
                 (line.startsWith("FN:") || line.startsWith("FN;")) &&
@@ -389,6 +414,10 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                 firstName   = firstName,
                 lastName    = lastName,
                 middleName  = middleName,
+                namePrefix  = namePrefix,
+                nameSuffix  = nameSuffix,
+                phoneticFirstName = phoneticFirstName,
+                phoneticLastName  = phoneticLastName,
                 phones      = phones,
                 emails      = emails,
                 companyName = company.ifBlank { null },

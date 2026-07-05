@@ -72,6 +72,10 @@ fun MapScreen(
     // Фильтр по типу отношений (фидбэк владельца: «показывать только семью/друзей/
     // коллег» — до появления полноценных групп). null = все.
     var relFilter      by remember { mutableStateOf<RelationshipType?>(null) }
+    // Свой тип отношений («статус») — раньше вообще не был виден как фильтр на
+    // карте (relationshipType таких контактов = OTHER, не входит в relFilter).
+    // Фидбэк владельца 2026-07-05: «создаю статус сам — не входит в фильтры».
+    var customRelFilter by remember { mutableStateOf<String?>(null) }
     // Фильтр по группе (v11): совместим с типом отношений — оба условия «И»
     var groupFilter    by remember { mutableStateOf<String?>(null) }
     // Фильтр по компании/должности — только для вкладки «Работа» (фидбэк владельца
@@ -204,7 +208,7 @@ fun MapScreen(
     val geoCache = remember { mutableStateMapOf<String, LatLng>() }
     val coordsOf: (MapLocationItem) -> LatLng? = { it.latLng ?: geoCache[it.addressId] }
 
-    val filteredList by remember(mapObjects, searchQuery, selectedTab, relFilter, groupFilter, companyFilter, positionFilter) {
+    val filteredList by remember(mapObjects, searchQuery, selectedTab, relFilter, customRelFilter, groupFilter, companyFilter, positionFilter) {
         derivedStateOf {
             val groupContactIds = groupFilter?.let { AppStateStore.contactIdsInGroup(it) }
             mapObjects.filter { obj ->
@@ -223,9 +227,12 @@ fun MapScreen(
                 }
                 // Фильтр отношений: активен → только контакты выбранного типа
                 // (адреса компаний при активном фильтре скрываются — у них нет типа отношений)
-                val matchRel = relFilter == null ||
+                val matchRel = (relFilter == null && customRelFilter == null) ||
                     (obj.ownerType == AddressOwnerType.CONTACT &&
-                        AppStateStore.getContact(obj.ownerId)?.relationshipType == relFilter)
+                        AppStateStore.getContact(obj.ownerId).let { c ->
+                            (relFilter != null && c?.relationshipType == relFilter) ||
+                            (customRelFilter != null && c?.customRelationshipType == customRelFilter)
+                        })
                 // Фильтр группы: только контакты-члены выбранной группы
                 val matchGroup = groupContactIds == null ||
                     (obj.ownerType == AddressOwnerType.CONTACT && obj.ownerId in groupContactIds)
@@ -488,42 +495,6 @@ fun MapScreen(
                     }
                     } // end isGmsAvailable
 
-                    // FIX (фидбэк владельца 2026-07-04): «пропала кнопка, где я
-                    // нахожусь» — раньше эта кнопка исчезала НАВСЕГДА после выдачи
-                    // разрешения (просила разрешение и только). Теперь она видна
-                    // всегда: без разрешения — запрашивает его, с разрешением —
-                    // принудительно центрирует карту на свежей позиции (полезно,
-                    // если системный кэш местоположения пуст и карта осталась на
-                    // заглушке).
-                    SmallFloatingActionButton(
-                        onClick = {
-                            if (!locationPermGranted) {
-                                permLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                            } else {
-                                selectedItem = null
-                                locateRequest++
-                            }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp),
-                        containerColor = AppleTheme.colors.card
-                    ) {
-                        Icon(
-                            Icons.Default.MyLocation,
-                            stringResource(
-                                if (!locationPermGranted) R.string.map_grant_location
-                                else R.string.map_recenter
-                            ),
-                            tint = AppleTheme.colors.brand
-                        )
-                    }
-
                     // No-coords notice
                     val noCoordCount = filteredList.count { it.latLng == null }
                     if (noCoordCount > 0) {
@@ -637,6 +608,39 @@ fun MapScreen(
                             tint = Color.White, modifier = Modifier.size(21.dp)
                         )
                     }
+                    // FIX (фидбэк владельца 2026-07-04): «пропала кнопка, где я
+                    // нахожусь» — раньше это была плавающая кнопка внутри карты
+                    // (align TopStart), но она лежала ПОД этой же панелью поиска
+                    // (тоже TopStart, на всю ширину) — панель рисуется позже и
+                    // перекрывает её целиком, кнопка была невидима и нетапабельна
+                    // с самого начала. Теперь кнопка — часть этого же ряда, не
+                    // может быть перекрыта.
+                    Box(
+                        Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(AppleTheme.colors.card)
+                            .clickable {
+                                if (!locationPermGranted) {
+                                    permLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                } else {
+                                    selectedItem = null
+                                    locateRequest++
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.MyLocation,
+                            contentDescription = stringResource(
+                                if (!locationPermGranted) R.string.map_grant_location
+                                else R.string.map_recenter
+                            ),
+                            tint = AppleTheme.colors.brand, modifier = Modifier.size(21.dp)
+                        )
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -660,9 +664,10 @@ fun MapScreen(
                     val ctxRel = LocalContext.current
                     var showRelSheet by remember { mutableStateOf(false) }
                     Spacer(Modifier.height(8.dp))
-                    val filterActive = relFilter != null || groupFilter != null
+                    val filterActive = relFilter != null || groupFilter != null || customRelFilter != null
                     val filterLabel = listOfNotNull(
                         relFilter?.label(ctxRel),
+                        customRelFilter,
                         groupFilter?.let { gid -> AppStateStore.groups.firstOrNull { it.id == gid }?.name }
                     ).joinToString(" · ").ifBlank { stringResource(R.string.map_filter_all) }
                     Row(
@@ -698,11 +703,13 @@ fun MapScreen(
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             (listOf<RelationshipType?>(null) + RelationshipType.values().toList()).forEach { rel ->
-                                val selectedRow = relFilter == rel
+                                val selectedRow = relFilter == rel && (rel != null || customRelFilter == null)
                                 Row(
                                     Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                                         .clickable {
-                                            relFilter = rel; selectedItem = null; showRelSheet = false
+                                            relFilter = rel
+                                            if (rel == null) customRelFilter = null
+                                            selectedItem = null; showRelSheet = false
                                         }
                                         .padding(horizontal = 6.dp, vertical = 13.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -718,6 +725,41 @@ fun MapScreen(
                                         Modifier.size(18.dp), tint = AppleTheme.colors.brand)
                                 }
                                 HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                            }
+                            // Свои типы отношений («статусы») — раньше на карте вообще
+                            // не были доступны как фильтр (фидбэк владельца 2026-07-05).
+                            val customTypes = remember(relFilter, groupFilter) {
+                                AppStateStore.distinctCustomRelationshipTypes()
+                            }
+                            if (customTypes.isNotEmpty()) {
+                                Text(
+                                    stringResource(R.string.filter_custom_status).uppercase(),
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel,
+                                    modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
+                                )
+                                customTypes.forEach { ct ->
+                                    val selectedRow = customRelFilter == ct
+                                    Row(
+                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                customRelFilter = if (selectedRow) null else ct
+                                                selectedItem = null; showRelSheet = false
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 13.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            ct, fontSize = 15.sp,
+                                            fontWeight = if (selectedRow) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (selectedRow) AppleTheme.colors.brand else AppleTheme.colors.label
+                                        )
+                                        if (selectedRow) Icon(Icons.Default.Check, null,
+                                            Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                                    }
+                                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                                }
                             }
                             // Группы (v11) — второй раздел того же листа
                             if (AppStateStore.groups.isNotEmpty()) {

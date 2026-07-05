@@ -241,8 +241,18 @@ fun LocalizedApp(
     config.setLayoutDirection(locale)
     val localizedContext = context.createConfigurationContext(config)
 
-    @Suppress("DEPRECATION")
-    context.resources.updateConfiguration(config, context.resources.displayMetrics)
+    // FIX: раньше эта устаревшая глобальная мутация выполнялась В ТЕЛЕ
+    // композабла — то есть при КАЖДОЙ рекомпозиции (не только при смене языка).
+    // Мутация глобального Resources() как побочный эффект вне SideEffect —
+    // источник как раз того типа гонки, что мог давать «где-то греческий текст,
+    // хотя язык — русский»: сложно гарантировать порядок относительно чтения
+    // ресурсов другими композаблами. Теперь выполняется одноразово на вход
+    // в композицию (родитель уже оборачивает в key(language), так что это и
+    // так происходит ровно при смене языка, не чаще).
+    androidx.compose.runtime.SideEffect {
+        @Suppress("DEPRECATION")
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
+    }
 
     // Сохраняем ActivityResultRegistryOwner чтобы не терялся при смене языка
     val activityResultRegistry = androidx.activity.compose.LocalActivityResultRegistryOwner.current

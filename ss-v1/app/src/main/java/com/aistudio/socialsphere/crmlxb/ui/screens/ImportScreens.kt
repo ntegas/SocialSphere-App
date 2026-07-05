@@ -628,6 +628,10 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
             firstName = candidate.firstName,
             lastName = candidate.lastName,
             middleName = candidate.middleName.ifBlank { null },
+            namePrefix = candidate.namePrefix.ifBlank { null },
+            nameSuffix = candidate.nameSuffix.ifBlank { null },
+            phoneticFirstName = candidate.phoneticFirstName.ifBlank { null },
+            phoneticLastName = candidate.phoneticLastName.ifBlank { null },
             photoUri = null,
             relationshipType = RelationshipType.OTHER,
             connectionLevel = ConnectionLevel.NORMAL,
@@ -839,7 +843,11 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
     // а связи ещё не было, проставляем (тот же баг, что и в performImport).
     val deviceLink = candidate.id.takeIf { it.startsWith("device_contact_") }
     val newMiddleName = existingContact.middleName ?: candidate.middleName.ifBlank { null }
-    
+    val newNamePrefix = existingContact.namePrefix ?: candidate.namePrefix.ifBlank { null }
+    val newNameSuffix = existingContact.nameSuffix ?: candidate.nameSuffix.ifBlank { null }
+    val newPhoneticFirst = existingContact.phoneticFirstName ?: candidate.phoneticFirstName.ifBlank { null }
+    val newPhoneticLast = existingContact.phoneticLastName ?: candidate.phoneticLastName.ifBlank { null }
+
     // Merge Addresses
     candidate.addresses.forEach { addr ->
         if (existingContact.addresses.none { it.addressLine == addr.addressLine }) {
@@ -910,12 +918,21 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
         }
     }
 
-    if (newPhones.isNotEmpty() || newEmails.isNotEmpty() || deviceLink != null || newMiddleName != existingContact.middleName) {
+    val nameFieldsChanged = newMiddleName != existingContact.middleName ||
+        newNamePrefix != existingContact.namePrefix ||
+        newNameSuffix != existingContact.nameSuffix ||
+        newPhoneticFirst != existingContact.phoneticFirstName ||
+        newPhoneticLast != existingContact.phoneticLastName
+    if (newPhones.isNotEmpty() || newEmails.isNotEmpty() || deviceLink != null || nameFieldsChanged) {
         val freshExisting = AppStateStore.contacts.find { it.id == existingId } ?: existingContact
         AppStateStore.updateContact(freshExisting.copy(
             phones = freshExisting.phones + newPhones,
             emails = freshExisting.emails + newEmails,
             middleName = newMiddleName,
+            namePrefix = newNamePrefix,
+            nameSuffix = newNameSuffix,
+            phoneticFirstName = newPhoneticFirst,
+            phoneticLastName = newPhoneticLast,
             // Связь с телефоном проставляем, только если её ещё не было —
             // не затираем существующую (контакт мог быть связан вручную с
             // ДРУГОЙ карточкой телефона, это выбор владельца).

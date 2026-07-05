@@ -426,13 +426,26 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                 val notePrefix = ctx.getString(R.string.imp_note_from_import, "")
                 val newNote = dev.notes?.takeIf { it.isNotBlank() }
                     ?.takeIf { text -> contact.notes.none { it.text == notePrefix + text } }
-                val hasContactUpdates = newPhones.isNotEmpty() || newEmails.isNotEmpty() || newAddrs.isNotEmpty() || newNote != null
+                // Структура имени (v13) — приставка/суффикс/фонетика, как в Android.
+                val newNamePrefix = contact.namePrefix ?: dev.namePrefix.ifBlank { null }
+                val newNameSuffix = contact.nameSuffix ?: dev.nameSuffix.ifBlank { null }
+                val newPhoneticFirst = contact.phoneticFirstName ?: dev.phoneticFirstName.ifBlank { null }
+                val newPhoneticLast = contact.phoneticLastName ?: dev.phoneticLastName.ifBlank { null }
+                val nameFieldsChanged = newNamePrefix != contact.namePrefix ||
+                    newNameSuffix != contact.nameSuffix ||
+                    newPhoneticFirst != contact.phoneticFirstName ||
+                    newPhoneticLast != contact.phoneticLastName
+                val hasContactUpdates = newPhones.isNotEmpty() || newEmails.isNotEmpty() || newAddrs.isNotEmpty() || newNote != null || nameFieldsChanged
                 if (hasContactUpdates) {
                     val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                     AppStateStore.updateContact(contact.copy(
                         firstName  = contact.firstName.ifBlank { dev.firstName },
                         lastName   = contact.lastName.ifBlank { dev.lastName },
                         middleName = contact.middleName ?: dev.middleName.ifBlank { null },
+                        namePrefix = newNamePrefix,
+                        nameSuffix = newNameSuffix,
+                        phoneticFirstName = newPhoneticFirst,
+                        phoneticLastName = newPhoneticLast,
                         phones     = contact.phones + newPhones,
                         emails     = contact.emails + newEmails,
                         addresses  = contact.addresses + newAddrs,

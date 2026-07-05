@@ -7,6 +7,14 @@ data class Contact(
     /** Отчество / среднее имя (как в телефонной книге) — раньше терялось при импорте. */
     val middleName: String? = null,
     val nickname: String? = null,
+    /** Структура имени как в Android-контактах (v13): приставка (Dr./г-н),
+     *  суффикс (мл./ст.), фонетические имя/фамилия (для языков вроде японского,
+     *  где произношение не следует из письменной формы). Раньше префикс/суффикс
+     *  при импорте молча склеивались в middleName — терялась структура. */
+    val namePrefix: String? = null,
+    val nameSuffix: String? = null,
+    val phoneticFirstName: String? = null,
+    val phoneticLastName: String? = null,
     val photoUri: String?,
     val relationshipType: RelationshipType,
     /** Свой тип отношений («Кум», «Тренер»…) — если задан, показывается вместо
