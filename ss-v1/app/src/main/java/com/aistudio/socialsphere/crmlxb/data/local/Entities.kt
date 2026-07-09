@@ -164,6 +164,11 @@ data class NoteEntity(
     val text: String,
     val date: String?,
     val isImportant: Boolean,
+    // v14: приватность — отдельно от isImportant (важность = попадает в Обзор/
+    // Шпаргалку и красная рамка; isLocked = скрывается блюром под «Защитой
+    // записей»). Раньше это было одно и то же поле — заметка "не секретная,
+    // но важная" пряталась, а реально приватная без галочки важности видна.
+    @ColumnInfo(defaultValue = "0") val isLocked: Boolean = false,
     val createdAt: String,
     val updatedAt: String
 )

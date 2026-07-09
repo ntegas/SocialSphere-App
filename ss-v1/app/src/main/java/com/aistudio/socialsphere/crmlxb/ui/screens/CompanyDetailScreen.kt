@@ -209,7 +209,7 @@ fun CompanyHero(company: Company, ctxLabel: android.content.Context) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(22.dp))
+            modifier = Modifier.size(80.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22)
                 // Малахитовый градиент Aurelia (точно по макету)
                 .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
                     Color(0xFF2E8B6B), Color(0xFF155539)))),
@@ -232,14 +232,14 @@ fun CompanyHero(company: Company, ctxLabel: android.content.Context) {
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Box(
-                Modifier.clip(RoundedCornerShape(13.dp)).background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13).background(AppleTheme.colors.brand.copy(alpha = 0.10f))
                     .padding(horizontal = 11.dp, vertical = 5.dp)
             ) {
                 Text(company.industry.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand)
             }
             if (mainCity.isNotEmpty()) {
                 Box(
-                    Modifier.clip(RoundedCornerShape(13.dp)).background(AppleTheme.colors.secondaryLabel.copy(alpha = 0.12f))
+                    Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13).background(AppleTheme.colors.secondaryLabel.copy(alpha = 0.12f))
                         .padding(horizontal = 11.dp, vertical = 5.dp)
                 ) {
                     Text(mainCity, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.secondaryLabel)
@@ -252,7 +252,7 @@ fun CompanyHero(company: Company, ctxLabel: android.content.Context) {
 @Composable
 private fun CompanyStat(value: String, label: String, valueColor: Color, modifier: Modifier) {
     Box(
-        modifier = modifier.clip(RoundedCornerShape(16.dp)).background(AppleTheme.colors.card).padding(vertical = 13.dp),
+        modifier = modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large).background(AppleTheme.colors.card).padding(vertical = 13.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -315,33 +315,32 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(
                 )
             } else selected?.let { sel ->
                 // Шаг 2: должность
-                AlertDialog(
-                    onDismissRequest = { showAdd = false; selected = null; position = "" },
-                    title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
-                    text = {
-                        OutlinedTextField(
-                            value = position, onValueChange = { position = it }, keyboardOptions = CapSentences,
-                            label = { Text(stringResource(R.string.cd_position)) },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true
-                        )
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                    title = "${sel.firstName} ${sel.lastName}".trim(),
+                    onDismiss = { showAdd = false; selected = null; position = "" },
+                    confirmText = stringResource(R.string.common_add),
+                    onConfirm = {
+                        AppStateStore.updateContact(sel.copy(
+                            companyRelations = sel.companyRelations + ContactCompanyRelation(
+                                id = java.util.UUID.randomUUID().toString(),
+                                contactId = sel.id,
+                                companyId = company.id,
+                                position = position.ifBlank { null },
+                                employmentStatus = EmploymentStatus.CURRENT,
+                                isPrimary = sel.companyRelations.isEmpty()
+                            )
+                        ))
+                        selected = null; search = ""; position = ""; showAdd = false
                     },
-                    confirmButton = {
-                        Button(onClick = {
-                            AppStateStore.updateContact(sel.copy(
-                                companyRelations = sel.companyRelations + ContactCompanyRelation(
-                                    id = java.util.UUID.randomUUID().toString(),
-                                    contactId = sel.id,
-                                    companyId = company.id,
-                                    position = position.ifBlank { null },
-                                    employmentStatus = EmploymentStatus.CURRENT,
-                                    isPrimary = sel.companyRelations.isEmpty()
-                                )
-                            ))
-                            selected = null; search = ""; position = ""; showAdd = false
-                        }) { Text(stringResource(R.string.common_add)) }
-                    },
-                    dismissButton = { TextButton(onClick = { selected = null }) { Text(stringResource(R.string.common_back)) } }
-                )
+                    secondaryText = stringResource(R.string.common_back),
+                    onSecondary = { selected = null }
+                ) {
+                    OutlinedTextField(
+                        value = position, onValueChange = { position = it }, keyboardOptions = CapSentences,
+                        label = { Text(stringResource(R.string.cd_position)) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                }
             }
         }
     }
@@ -358,7 +357,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(
         item {
             Card(
                 modifier  = Modifier.fillMaxWidth(),
-                shape     = RoundedCornerShape(18.dp),
+                shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
                 colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                 elevation = CardDefaults.cardElevation(1.dp)
             ) {
@@ -436,7 +435,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyContactsTab(
                     SectionLabel(stringResource(R.string.cd_phones))
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                         colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                         elevation = CardDefaults.cardElevation(1.dp)
                     ) {
@@ -461,7 +460,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyContactsTab(
                     SectionLabel(stringResource(R.string.compd_mail_site))
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                         colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                         elevation = CardDefaults.cardElevation(1.dp)
                     ) {
@@ -538,7 +537,7 @@ private fun ChannelRow(icon: androidx.compose.ui.graphics.vector.ImageVector, va
         horizontalArrangement = Arrangement.spacedBy(11.dp)
     ) {
         Box(
-            Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(tint.copy(alpha = 0.14f)),
+            Modifier.size(32.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R9).background(tint.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center
         ) { Icon(icon, null, Modifier.size(16.dp), tint = tint) }
         Column(modifier = Modifier.weight(1f)) {
@@ -558,7 +557,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyAddressesTab(
     // Декоративная мини-карта (по макету; реальная карта — на вкладке «Карта»)
     item {
         Box(
-            modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFFE6E0D4)),
+            modifier = Modifier.fillMaxWidth().height(140.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18).background(Color(0xFFE6E0D4)),
             contentAlignment = Alignment.Center
         ) {
             Box(Modifier.size(26.dp).clip(CircleShape).background(AppleTheme.colors.brand))
@@ -588,7 +587,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyAddressesTab(
             val addrIcon = if (isBranchLike) Icons.Default.Business else Icons.Default.LocationOn
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                 colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                 elevation = CardDefaults.cardElevation(1.dp)
             ) {
@@ -598,7 +597,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyAddressesTab(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Box(
-                        Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(addrTint.copy(alpha = if (isBranchLike) 0.16f else 0.12f)),
+                        Modifier.size(34.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10).background(addrTint.copy(alpha = if (isBranchLike) 0.16f else 0.12f)),
                         contentAlignment = Alignment.Center
                     ) { Icon(addrIcon, null, Modifier.size(16.dp), tint = addrTint) }
                     Column(modifier = Modifier.weight(1f)) {

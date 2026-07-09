@@ -211,11 +211,11 @@ fun AppleAppTheme(
             // разом (r28 — радиус шторок макета), large/medium — карточкам/меню без
             // явного shape. Одна правка меняет вид всех диалогов приложения.
             shapes = androidx.compose.material3.Shapes(
-                extraSmall = RoundedCornerShape(9.dp),
-                small      = RoundedCornerShape(13.dp),
-                medium     = RoundedCornerShape(16.dp),
-                large      = RoundedCornerShape(22.dp),
-                extraLarge = RoundedCornerShape(28.dp),
+                extraSmall = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R9,
+                small      = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13,
+                medium     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
+                large      = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22,
+                extraLarge = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Search,
             ),
             content = content
         )
@@ -301,12 +301,12 @@ private fun aureliaColorScheme(c: AppleColors): ColorScheme {
 
 // Радиусы из макета Aurelia: inset-группы r20, иконка-плитка r9, поиск r13.
 object AppleShapes {
-    val card    = RoundedCornerShape(20.dp) // сгруппированные inset-карточки
-    val tile    = RoundedCornerShape(16.dp) // плитки quick-action
-    val iconBox = RoundedCornerShape(9.dp)  // цветная иконка-плитка 30dp
-    val chip    = RoundedCornerShape(16.dp) // фильтр-чипы
-    val field   = RoundedCornerShape(13.dp) // поле поиска
-    val segment = RoundedCornerShape(9.dp)  // segmented control
+    val card    = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge // сгруппированные inset-карточки
+    val tile    = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large // плитки quick-action
+    val iconBox = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R9  // цветная иконка-плитка 30dp
+    val chip    = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large // фильтр-чипы
+    val field   = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13 // поле поиска
+    val segment = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R9  // segmented control
     val sheet   = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 }
 

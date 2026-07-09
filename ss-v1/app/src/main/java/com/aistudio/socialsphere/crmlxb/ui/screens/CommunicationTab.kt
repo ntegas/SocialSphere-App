@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -511,36 +510,33 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
             val filtered = deviceList.filter {
                 "${it.firstName} ${it.lastName}".contains(search, ignoreCase = true)
             }
-            AlertDialog(
-                onDismissRequest = { showLink = false; search = "" },
-                title = { Text(stringResource(R.string.sync_pick_contact), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(
-                        modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = search, onValueChange = { search = it },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true,
-                            placeholder = { Text(stringResource(R.string.ce_search_contact)) }
-                        )
-                        filtered.take(20).forEach { d ->
-                            Text(
-                                "${d.firstName} ${d.lastName}".trim().ifBlank { d.phones.firstOrNull()?.number ?: "—" },
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.fillMaxWidth()
-                                    .clickable {
-                                        AppStateStore.updateContact(contact.copy(deviceContactId = d.id))
-                                        showLink = false; search = ""
-                                    }
-                                    .padding(vertical = 8.dp)
-                            )
-                        }
-                    }
-                },
-                confirmButton = {},
-                dismissButton = { TextButton(onClick = { showLink = false; search = "" }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showLink = false; search = "" }) {
+                Text(
+                    stringResource(R.string.sync_pick_contact),
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 20.sp, fontWeight = FontWeight.W700,
+                    color = AppleTheme.colors.label,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = search, onValueChange = { search = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    placeholder = { Text(stringResource(R.string.ce_search_contact)) }
+                )
+                Spacer(Modifier.height(8.dp))
+                filtered.take(20).forEach { d ->
+                    Text(
+                        "${d.firstName} ${d.lastName}".trim().ifBlank { d.phones.firstOrNull()?.number ?: "—" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth()
+                            .clickable {
+                                AppStateStore.updateContact(contact.copy(deviceContactId = d.id))
+                                showLink = false; search = ""
+                            }
+                            .padding(vertical = 8.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -573,7 +569,7 @@ private fun ChannelRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
-            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(iconBg),
+            modifier = Modifier.size(38.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R11).background(iconBg),
             contentAlignment = Alignment.Center
         ) { Icon(icon, null, Modifier.size(18.dp), tint = iconTint) }
         Column(Modifier.weight(1f)) {

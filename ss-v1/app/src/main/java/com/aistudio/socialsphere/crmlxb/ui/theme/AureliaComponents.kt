@@ -57,7 +57,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -162,15 +164,24 @@ fun AureliaSheet(
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // ФИКС (фидбэк владельца 2026-07-06): для высокого контента (PIN-клавиатура
+    // и т.п.) шторка по умолчанию открывалась в состоянии PartiallyExpanded —
+    // нижние ряды/кнопки оказывались обрезаны снизу видимой области, и это
+    // выглядело как «шторка не открывается полностью». skipPartiallyExpanded
+    // заставляет её сразу разворачиваться на всю доступную высоту.
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
+    )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = AppleTheme.colors.sheet,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = {
             Box(
                 Modifier.padding(top = 14.dp, bottom = 11.dp)
                     .size(width = 40.dp, height = 5.dp)
-                    .clip(RoundedCornerShape(3.dp))
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R3)
                     .background(AppleTheme.colors.label.copy(alpha = 0.16f))
             )
         },
@@ -206,6 +217,14 @@ fun AureliaFormSheet(
     titleLeading: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // ФИКС (глубокий аудит 2026-07-06): раньше двойной быстрый тап по кнопке
+    // подтверждения (до того как шторка успевала закрыться) вызывал onConfirm
+    // ДВАЖДЫ — для форм добавления (заметка/подарок/важная дата и т.п.), где
+    // id генерируется внутри onConfirm, это создавало ДВЕ записи вместо одной.
+    // Это было и в исходных Button/AlertDialog ДО перевода на AureliaFormSheet
+    // (не регрессия миграции), но раз уж канонический каркас один — защита
+    // здесь чинит это сразу везде, где он используется.
+    var submitted by remember { mutableStateOf(false) }
     AureliaSheet(onDismiss = onDismiss) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -218,9 +237,9 @@ fun AureliaFormSheet(
             }
             content()
             androidx.compose.material3.Button(
-                onClick = onConfirm,
-                enabled = confirmEnabled,
-                shape = RoundedCornerShape(14.dp),
+                onClick = { if (!submitted) { submitted = true; onConfirm() } },
+                enabled = confirmEnabled && !submitted,
+                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) { Text(confirmText, fontWeight = FontWeight.Bold) }
             if (secondaryText != null && onSecondary != null) {
@@ -342,7 +361,7 @@ fun AureliaStatCard(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Box(
-                Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(tile.copy(alpha = 0.14f)),
+                Modifier.size(30.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R9).background(tile.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, null, Modifier.size(16.dp), tint = tile)
@@ -473,7 +492,7 @@ fun AureliaPickerSheet(
                     Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
             },
             singleLine = true,
-            shape = RoundedCornerShape(13.dp),
+            shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13,
             modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
         )
         androidx.compose.foundation.lazy.LazyColumn(
@@ -482,7 +501,7 @@ fun AureliaPickerSheet(
             if (createNewText != null && onCreateNew != null) {
                 item {
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14)
                             .aureliaPress { onCreateNew() }
                             .padding(vertical = 10.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -504,7 +523,7 @@ fun AureliaPickerSheet(
             if (extraActionText != null && onExtraAction != null) {
                 item {
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14)
                             .aureliaPress { onExtraAction() }
                             .padding(vertical = 10.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -533,7 +552,7 @@ fun AureliaPickerSheet(
             items(filtered.size, key = { filtered[it].id }) { i ->
                 val item = filtered[i]
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                    Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14)
                         .aureliaPress { onPick(item) }
                         .padding(vertical = 8.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -552,7 +571,7 @@ fun AureliaPickerSheet(
                         }
                     } else if (item.isCompany) {
                         Box(
-                            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                            Modifier.size(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                                 .background(AureliaAvatars.companyBrushFor(item.id)),
                             contentAlignment = Alignment.Center
                         ) {

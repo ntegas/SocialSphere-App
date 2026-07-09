@@ -116,20 +116,34 @@ fun ContactDetailScreen(
     var noteText by remember { mutableStateOf("") }
     var noteType by remember { mutableStateOf(NoteType.GENERAL) }
     var noteIsImportant by remember { mutableStateOf(false) }
+    // Приватность записи — отдельно от важности (2026-07-08, база знаний §29).
+    var noteIsLocked by remember { mutableStateOf(false) }
     // Режим приватности — скрывает «защищённые» (важные) заметки блюром.
     // Только на сессию, без персиста (как в макете). Если в Настройках включена
     // биометрия — карточка стартует ЗАКРЫТОЙ, а снятие замочка идёт через
     // системный BiometricPrompt (отпечаток или код устройства).
     val bioLockOn = AppSettings.biometricLockSafe()
     var privacyMode by remember { mutableStateOf(bioLockOn) }
-    val bioActivity = LocalContext.current as? androidx.fragment.app.FragmentActivity
+    // ФИКС (критичный баг, 2026-07-05): LocalContext.current здесь — обёртка
+    // createConfigurationContext (см. LocalizedApp), не сама Activity — прямой
+    // `as? FragmentActivity` ВСЕГДА давал null, requestReveal() уходил в else
+    // и открывал «защищённые» заметки без единого запроса аутентификации.
+    // findActivity() разматывает ContextWrapper до настоящей Activity.
+    val bioActivity = LocalContext.current.findActivity()
     val bioTitle = stringResource(R.string.bio_prompt_title)
+    var showPinReveal by remember { mutableStateOf(false) }
     fun requestReveal() {
-        if (bioLockOn && bioActivity != null) {
-            com.aistudio.socialsphere.crmlxb.utils.BiometricGate.authenticate(
-                activity = bioActivity, title = bioTitle
-            ) { privacyMode = false }
-        } else privacyMode = false
+        when {
+            !bioLockOn -> privacyMode = false
+            bioActivity != null && com.aistudio.socialsphere.crmlxb.utils.BiometricGate.isAvailable(bioActivity) ->
+                com.aistudio.socialsphere.crmlxb.utils.BiometricGate.authenticate(
+                    activity = bioActivity, title = bioTitle
+                ) { privacyMode = false }
+            AppSettings.hasPinSet() -> showPinReveal = true
+            // Ни биометрии/кода устройства, ни своего PIN нет — нечем проверять,
+            // не запираем владельца от собственных данных.
+            else -> privacyMode = false
+        }
     }
 
     if (showDeleteDialog) {
@@ -196,6 +210,14 @@ fun ContactDetailScreen(
     }
 
     // ── Группы контакта: чекбоксы членства + создание/правка/удаление групп ──
+    if (showPinReveal) {
+        PinVerifySheet(
+            title = bioTitle,
+            onSuccess = { privacyMode = false; showPinReveal = false },
+            onDismiss = { showPinReveal = false }
+        )
+    }
+
     if (showGroupsSheet) {
         var editingGroup by remember { mutableStateOf<ContactGroup?>(null) }
         var showNewGroup by remember { mutableStateOf(false) }
@@ -257,50 +279,51 @@ fun ContactDetailScreen(
             }
         }
         if (showNewGroup) {
-            AlertDialog(
-                onDismissRequest = { showNewGroup = false },
-                title = { Text(stringResource(R.string.group_new), fontWeight = FontWeight.Bold) },
-                text = {
-                    OutlinedTextField(
-                        value = groupNameDraft, onValueChange = { groupNameDraft = it },
-                        label = { Text(stringResource(R.string.group_name)) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
-                    )
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                title = stringResource(R.string.group_new),
+                onDismiss = { showNewGroup = false },
+                confirmText = stringResource(R.string.ce_create),
+                confirmEnabled = groupNameDraft.isNotBlank(),
+                onConfirm = {
+                    AppStateStore.addGroup(groupNameDraft)?.let { toggleGroup(it.id) }
+                    showNewGroup = false
                 },
-                confirmButton = {
-                    Button(enabled = groupNameDraft.isNotBlank(), onClick = {
-                        AppStateStore.addGroup(groupNameDraft)?.let { toggleGroup(it.id) }
-                        showNewGroup = false
-                    }) { Text(stringResource(R.string.ce_create)) }
-                },
-                dismissButton = { TextButton(onClick = { showNewGroup = false }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                secondaryText = stringResource(R.string.common_cancel),
+                onSecondary = { showNewGroup = false }
+            ) {
+                OutlinedTextField(
+                    value = groupNameDraft, onValueChange = { groupNameDraft = it },
+                    label = { Text(stringResource(R.string.group_name)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+            }
         }
         editingGroup?.let { g ->
-            AlertDialog(
-                onDismissRequest = { editingGroup = null },
-                title = { Text(g.name, fontWeight = FontWeight.Bold) },
-                text = {
-                    OutlinedTextField(
-                        value = groupNameDraft, onValueChange = { groupNameDraft = it },
-                        label = { Text(stringResource(R.string.group_name)) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
-                    )
-                },
-                confirmButton = {
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Button(enabled = groupNameDraft.isNotBlank(), onClick = {
-                            AppStateStore.renameGroup(g.id, groupNameDraft)
-                            editingGroup = null
-                        }) { Text(stringResource(R.string.common_save)) }
-                        TextButton(onClick = {
-                            AppStateStore.deleteGroup(g.id)
-                            editingGroup = null
-                        }) { Text(stringResource(R.string.group_delete), color = AppleTheme.colors.red) }
-                    }
-                },
-                dismissButton = { TextButton(onClick = { editingGroup = null }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { editingGroup = null }) {
+                Text(
+                    g.name,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 20.sp, fontWeight = FontWeight.W700,
+                    color = AppleTheme.colors.label,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                OutlinedTextField(
+                    value = groupNameDraft, onValueChange = { groupNameDraft = it },
+                    label = { Text(stringResource(R.string.group_name)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    enabled = groupNameDraft.isNotBlank(),
+                    onClick = { AppStateStore.renameGroup(g.id, groupNameDraft); editingGroup = null },
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
+                TextButton(
+                    onClick = { AppStateStore.deleteGroup(g.id); editingGroup = null },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(stringResource(R.string.group_delete), color = AppleTheme.colors.red) }
+            }
         }
     }
 
@@ -342,15 +365,22 @@ fun ContactDetailScreen(
                 },
                 actions = {
                     // Замок приватности (по макету): малахит-кружок когда вкл.
-                    Box(Modifier.padding(end = 4.dp)) {
-                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleButton(
-                            icon = if (privacyMode) Icons.Default.Lock else Icons.Default.LockOpen,
-                            contentDescription = stringResource(R.string.cd_privacy_toggle),
-                            style = if (privacyMode) com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Filled
-                                    else com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Neutral,
-                            size = 36.dp, iconSize = 18.dp,
-                            onClick = { if (privacyMode) requestReveal() else privacyMode = true }
-                        )
+                    // ФИКС (2026-07-08, владелец: «кнопка видна, даже если защита не
+                    // включена в настройках»): раньше показывался безусловно — можно
+                    // было тапнуть и «включить» приватность на сессию, даже когда
+                    // «Защита записей» выключена в Настройках, что не имело смысла и
+                    // путало (кнопка выглядела как реальный переключатель настройки).
+                    if (bioLockOn) {
+                        Box(Modifier.padding(end = 4.dp)) {
+                            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleButton(
+                                icon = if (privacyMode) Icons.Default.Lock else Icons.Default.LockOpen,
+                                contentDescription = stringResource(R.string.cd_privacy_toggle),
+                                style = if (privacyMode) com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Filled
+                                        else com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Neutral,
+                                size = 36.dp, iconSize = 18.dp,
+                                onClick = { if (privacyMode) requestReveal() else privacyMode = true }
+                            )
+                        }
                     }
                     // Круглая кнопка инлайн-правки ТЕКУЩЕЙ вкладки — заменяет старые
                     // отдельные «Изменить» на Обзоре/Работе/Связи (была одна на каждой
@@ -502,52 +532,47 @@ fun ContactDetailScreen(
     }
 
     // ── Добавление / правка идеи подарка ──
-    // Шторка-редактор идеи подарка (макет GIFT EDITOR; был AlertDialog старого вида)
+    // ФИКС (аудит 2026-07-06): раньше ручной дубль каркаса AureliaSheet
+    // (заголовок+кнопка вручную) вместо канонического AureliaFormSheet —
+    // работало, но не по канону; поведение не изменилось, только каркас.
     if (showAddGift || editingGift != null) {
         val g = editingGift
         var gTitle by remember(g?.id ?: "new") { mutableStateOf(g?.title ?: "") }
         var gNote  by remember(g?.id ?: "new") { mutableStateOf(g?.note ?: "") }
         var gLink  by remember(g?.id ?: "new") { mutableStateOf(g?.link ?: "") }
-        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(
-            onDismiss = { showAddGift = false; editingGift = null }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = if (g == null) stringResource(R.string.cd_gift_idea) else stringResource(R.string.cd_gift_edit),
+            onDismiss = { showAddGift = false; editingGift = null },
+            confirmText = stringResource(R.string.common_save),
+            confirmEnabled = gTitle.isNotBlank(),
+            onConfirm = {
+                if (g == null) {
+                    AppStateStore.addGift(GiftIdea(
+                        id = java.util.UUID.randomUUID().toString(),
+                        contactId = contact.id,
+                        title = gTitle.trim(),
+                        note  = gNote.trim().ifBlank { null },
+                        link  = gLink.trim().ifBlank { null },
+                        status = GiftStatus.IDEA
+                    ))
+                } else {
+                    AppStateStore.updateGift(g.copy(
+                        title = gTitle.trim(),
+                        note  = gNote.trim().ifBlank { null },
+                        link  = gLink.trim().ifBlank { null }
+                    ))
+                }
+                showAddGift = false; editingGift = null
+            },
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { showAddGift = false; editingGift = null }
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    if (g == null) stringResource(R.string.cd_gift_idea) else stringResource(R.string.cd_gift_edit),
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
-                )
-                OutlinedTextField(value = gTitle, onValueChange = { gTitle = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cd_title_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(value = gNote, onValueChange = { gNote = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cd_note)) }, modifier = Modifier.fillMaxWidth(), maxLines = 3)
-                OutlinedTextField(value = gLink, onValueChange = { gLink = it },
-                    label = { Text(stringResource(R.string.cd_link)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                Button(
-                    enabled = gTitle.isNotBlank(),
-                    onClick = {
-                        if (g == null) {
-                            AppStateStore.addGift(GiftIdea(
-                                id = java.util.UUID.randomUUID().toString(),
-                                contactId = contact.id,
-                                title = gTitle.trim(),
-                                note  = gNote.trim().ifBlank { null },
-                                link  = gLink.trim().ifBlank { null },
-                                status = GiftStatus.IDEA
-                            ))
-                        } else {
-                            AppStateStore.updateGift(g.copy(
-                                title = gTitle.trim(),
-                                note  = gNote.trim().ifBlank { null },
-                                link  = gLink.trim().ifBlank { null }
-                            ))
-                        }
-                        showAddGift = false; editingGift = null
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
-            }
+            OutlinedTextField(value = gTitle, onValueChange = { gTitle = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_title_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(value = gNote, onValueChange = { gNote = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_note)) }, modifier = Modifier.fillMaxWidth(), maxLines = 3)
+            OutlinedTextField(value = gLink, onValueChange = { gLink = it },
+                label = { Text(stringResource(R.string.cd_link)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
         }
     }
 
@@ -573,39 +598,33 @@ fun ContactDetailScreen(
         var sShoe     by remember { mutableStateOf(existing?.shoeSize ?: "") }
         var sRing     by remember { mutableStateOf(existing?.ringSize ?: "") }
         var sOther    by remember { mutableStateOf(existing?.other ?: "") }
-        AlertDialog(
-            onDismissRequest = { showSizesDialog = false },
-            title = { Text(stringResource(R.string.cd_sizes), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(value = sClothing, onValueChange = { sClothing = it },
-                        label = { Text(stringResource(R.string.cd_clothes_hint)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    OutlinedTextField(value = sShoe, onValueChange = { sShoe = it },
-                        label = { Text(stringResource(R.string.cd_shoes_hint)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    OutlinedTextField(value = sRing, onValueChange = { sRing = it },
-                        label = { Text(stringResource(R.string.cd_ring_hint)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    OutlinedTextField(value = sOther, onValueChange = { sOther = it },
-                        label = { Text(stringResource(R.string.common_other)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.cd_sizes),
+            onDismiss = { showSizesDialog = false },
+            confirmText = stringResource(R.string.common_save),
+            onConfirm = {
+                AppStateStore.setSizeInfo(contact.id, SizeInfo(
+                    id = existing?.id ?: java.util.UUID.randomUUID().toString(),
+                    contactId    = contact.id,
+                    clothingSize = sClothing.trim().ifBlank { null },
+                    shoeSize     = sShoe.trim().ifBlank { null },
+                    ringSize     = sRing.trim().ifBlank { null },
+                    other        = sOther.trim().ifBlank { null }
+                ))
+                showSizesDialog = false
             },
-            confirmButton = {
-                Button(onClick = {
-                    AppStateStore.setSizeInfo(contact.id, SizeInfo(
-                        id = existing?.id ?: java.util.UUID.randomUUID().toString(),
-                        contactId    = contact.id,
-                        clothingSize = sClothing.trim().ifBlank { null },
-                        shoeSize     = sShoe.trim().ifBlank { null },
-                        ringSize     = sRing.trim().ifBlank { null },
-                        other        = sOther.trim().ifBlank { null }
-                    ))
-                    showSizesDialog = false
-                }) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = { TextButton(onClick = { showSizesDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
-        )
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { showSizesDialog = false }
+        ) {
+            OutlinedTextField(value = sClothing, onValueChange = { sClothing = it },
+                label = { Text(stringResource(R.string.cd_clothes_hint)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(value = sShoe, onValueChange = { sShoe = it },
+                label = { Text(stringResource(R.string.cd_shoes_hint)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(value = sRing, onValueChange = { sRing = it },
+                label = { Text(stringResource(R.string.cd_ring_hint)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(value = sOther, onValueChange = { sOther = it },
+                label = { Text(stringResource(R.string.common_other)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        }
     }
 
     // ── Добавление предпочтения ──
@@ -657,7 +676,7 @@ fun ContactDetailScreen(
                         ))
                         showAddPref = false
                     },
-                    shape = RoundedCornerShape(14.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) { Text(stringResource(R.string.common_add), fontWeight = FontWeight.Bold) }
             }
@@ -665,112 +684,112 @@ fun ContactDetailScreen(
     }
 
     // ── Правка заметки — шторка нового дизайна (тип чипами + «куда попадёт») ──
+    // ФИКС (аудит 2026-07-06): AureliaSheet-дубль каркаса → канонический AureliaFormSheet.
     editingNote?.let { note ->
         var editText by remember(note.id) { mutableStateOf(note.text) }
         var editType by remember(note.id) { mutableStateOf(note.type) }
         var editImportant by remember(note.id) { mutableStateOf(note.isImportant) }
+        var editLocked by remember(note.id) { mutableStateOf(note.isLocked) }
         val editNoteTypes = NoteType.values().filter { it != NoteType.GIFT }
-        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { editingNote = null }) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    stringResource(R.string.cd_note_edit),
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
-                )
-                PillChoiceRow(
-                    options = editNoteTypes.map { it.label(ctxLabel) },
-                    selected = editType.label(ctxLabel),
-                    onSelect = { picked -> editType = editNoteTypes.firstOrNull { n -> n.label(ctxLabel) == picked } ?: editType }
-                )
-                Text(
-                    stringResource(
-                        when {
-                            editImportant -> R.string.cd_goes_important
-                            editType == NoteType.WORK -> R.string.cd_goes_work
-                            editType == NoteType.PERSONAL_DETAIL -> R.string.cd_goes_personal
-                            editType == NoteType.IMPORTANT_TO_REMEMBER -> R.string.cd_goes_important
-                            else -> R.string.cd_goes_general
-                        }
-                    ),
-                    fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
-                )
-                OutlinedTextField(
-                    value = editText,
-                    onValueChange = { editText = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cd_note_text)) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
-                    maxLines = 5
-                )
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.cd_note_edit),
+            onDismiss = { editingNote = null },
+            confirmText = stringResource(R.string.common_save),
+            confirmEnabled = editText.isNotBlank(),
+            onConfirm = {
+                AppStateStore.updateNote(note.copy(
+                    text = editText.trim(),
+                    type = editType,
+                    isImportant = editImportant,
+                    isLocked = editLocked
+                ))
+                editingNote = null
+            },
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { editingNote = null }
+        ) {
+            PillChoiceRow(
+                options = editNoteTypes.map { it.label(ctxLabel) },
+                selected = editType.label(ctxLabel),
+                onSelect = { picked -> editType = editNoteTypes.firstOrNull { n -> n.label(ctxLabel) == picked } ?: editType }
+            )
+            Text(
+                stringResource(
+                    when {
+                        editImportant -> R.string.cd_goes_important
+                        editType == NoteType.WORK -> R.string.cd_goes_work
+                        editType == NoteType.PERSONAL_DETAIL -> R.string.cd_goes_personal
+                        editType == NoteType.IMPORTANT_TO_REMEMBER -> R.string.cd_goes_important
+                        else -> R.string.cd_goes_general
+                    }
+                ),
+                fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
+            )
+            OutlinedTextField(
+                value = editText,
+                onValueChange = { editText = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_note_text)) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                maxLines = 5
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Checkbox(checked = editImportant, onCheckedChange = { editImportant = it })
+                Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
+            }
+            if (bioLockOn) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Checkbox(checked = editImportant, onCheckedChange = { editImportant = it })
-                    Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
+                    Checkbox(checked = editLocked, onCheckedChange = { editLocked = it })
+                    Text(stringResource(R.string.cd_note_lock), style = MaterialTheme.typography.bodyMedium)
                 }
-                Button(
-                    enabled = editText.isNotBlank(),
-                    onClick = {
-                        AppStateStore.updateNote(note.copy(
-                            text = editText.trim(),
-                            type = editType,
-                            isImportant = editImportant
-                        ))
-                        editingNote = null
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
             }
         }
     }
 
     // ── Правка существующей личной детали (интерес/еда/аллергия/бренд…) —
     // категория + значение, с удалением. Открывается из ленты Заметок и
-    // из «Предпочтений» на Подарках. ──
+    // из «Предпочтений» на Подарках. ФИКС (аудит 2026-07-06): AureliaSheet-дубль
+    // каркаса → канонический AureliaFormSheet; кнопка удаления — как доп.
+    // действие внутри content(), т.к. AureliaFormSheet даёт только один
+    // вторичный слот, а его цвет (secondaryLabel) не подходит для destructive. ──
     editingDetail?.let { det ->
         var detValue by remember(det.id) { mutableStateOf(det.value) }
         var detCat by remember(det.id) { mutableStateOf(det.category) }
-        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { editingDetail = null }) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    stringResource(R.string.cd_edit_detail),
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
-                )
-                DropdownField(
-                    label         = stringResource(R.string.cd_category),
-                    selectedValue = detCat.label(ctxLabel),
-                    options       = PersonalDetailCategory.values().map { it.label(ctxLabel) }
-                ) { selected ->
-                    detCat = PersonalDetailCategory.values()
-                        .firstOrNull { it.label(ctxLabel) == selected } ?: detCat
-                }
-                OutlinedTextField(
-                    value = detValue, onValueChange = { detValue = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cd_value)) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                Button(
-                    enabled = detValue.isNotBlank(),
-                    onClick = {
-                        AppStateStore.updateContact(contact.copy(
-                            personalDetails = contact.personalDetails.map {
-                                if (it.id == det.id) it.copy(category = detCat, value = detValue.trim()) else it
-                            }
-                        ))
-                        editingDetail = null
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
-                TextButton(
-                    onClick = {
-                        AppStateStore.updateContact(contact.copy(
-                            personalDetails = contact.personalDetails.filter { it.id != det.id }
-                        ))
-                        editingDetail = null
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.cd_edit_detail),
+            onDismiss = { editingDetail = null },
+            confirmText = stringResource(R.string.common_save),
+            confirmEnabled = detValue.isNotBlank(),
+            onConfirm = {
+                AppStateStore.updateContact(contact.copy(
+                    personalDetails = contact.personalDetails.map {
+                        if (it.id == det.id) it.copy(category = detCat, value = detValue.trim()) else it
+                    }
+                ))
+                editingDetail = null
             }
+        ) {
+            DropdownField(
+                label         = stringResource(R.string.cd_category),
+                selectedValue = detCat.label(ctxLabel),
+                options       = PersonalDetailCategory.values().map { it.label(ctxLabel) }
+            ) { selected ->
+                detCat = PersonalDetailCategory.values()
+                    .firstOrNull { it.label(ctxLabel) == selected } ?: detCat
+            }
+            OutlinedTextField(
+                value = detValue, onValueChange = { detValue = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_value)) },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+            TextButton(
+                onClick = {
+                    AppStateStore.updateContact(contact.copy(
+                        personalDetails = contact.personalDetails.filter { it.id != det.id }
+                    ))
+                    editingDetail = null
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) }
         }
     }
 
@@ -799,69 +818,70 @@ fun ContactDetailScreen(
 
     // Шторка «Добавить заметку»: тип — чипами + подсказка «куда попадёт»
     // (фидбэк владельца: логика заметок была непрозрачной; был AlertDialog).
+    // ФИКС (аудит 2026-07-06): AureliaSheet-дубль каркаса → канонический AureliaFormSheet.
     if (showAddDialog) {
         val noteTypes = NoteType.values().filter { it != NoteType.GIFT }
-        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(
-            onDismiss = { showAddDialog = false; noteText = "" }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.cd_add_note),
+            onDismiss = { showAddDialog = false; noteText = "" },
+            confirmText = stringResource(R.string.common_save),
+            confirmEnabled = noteText.isNotBlank(),
+            onConfirm = {
+                val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                AppStateStore.addNote(
+                    Note(
+                        id = java.util.UUID.randomUUID().toString(),
+                        contactId = contactId,
+                        companyId = null, calendarItemId = null, giftId = null,
+                        type = noteType,
+                        text = noteText.trim(),
+                        date = java.time.LocalDate.now().toString(),
+                        isImportant = noteIsImportant,
+                        isLocked = noteIsLocked,
+                        createdAt = now, updatedAt = now
+                    )
+                )
+                noteText = ""; noteIsImportant = false; noteIsLocked = false; showAddDialog = false
+            },
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { showAddDialog = false; noteText = "" }
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    stringResource(R.string.cd_add_note),
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-                    fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
-                )
-                PillChoiceRow(
-                    options = noteTypes.map { it.label(ctxLabel) },
-                    selected = noteType.label(ctxLabel),
-                    onSelect = { picked -> noteType = noteTypes.firstOrNull { n -> n.label(ctxLabel) == picked } ?: NoteType.GENERAL }
-                )
-                // Куда попадёт запись — по типу (важные — отдельная подсказка)
-                Text(
-                    stringResource(
-                        when {
-                            noteIsImportant -> R.string.cd_goes_important
-                            noteType == NoteType.WORK -> R.string.cd_goes_work
-                            noteType == NoteType.PERSONAL_DETAIL -> R.string.cd_goes_personal
-                            noteType == NoteType.IMPORTANT_TO_REMEMBER -> R.string.cd_goes_important
-                            else -> R.string.cd_goes_general
-                        }
-                    ),
-                    fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
-                )
-                OutlinedTextField(
-                    value = noteText,
-                    onValueChange = { noteText = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cd_note_text)) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
-                    maxLines = 5
-                )
+            PillChoiceRow(
+                options = noteTypes.map { it.label(ctxLabel) },
+                selected = noteType.label(ctxLabel),
+                onSelect = { picked -> noteType = noteTypes.firstOrNull { n -> n.label(ctxLabel) == picked } ?: NoteType.GENERAL }
+            )
+            // Куда попадёт запись — по типу (важные — отдельная подсказка)
+            Text(
+                stringResource(
+                    when {
+                        noteIsImportant -> R.string.cd_goes_important
+                        noteType == NoteType.WORK -> R.string.cd_goes_work
+                        noteType == NoteType.PERSONAL_DETAIL -> R.string.cd_goes_personal
+                        noteType == NoteType.IMPORTANT_TO_REMEMBER -> R.string.cd_goes_important
+                        else -> R.string.cd_goes_general
+                    }
+                ),
+                fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
+            )
+            OutlinedTextField(
+                value = noteText,
+                onValueChange = { noteText = it }, keyboardOptions = CapSentences,
+                label = { Text(stringResource(R.string.cd_note_text)) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                maxLines = 5
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Checkbox(checked = noteIsImportant, onCheckedChange = { noteIsImportant = it })
+                Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
+            }
+            // Приватность — своя, отдельная галочка (2026-07-08, база знаний §29):
+            // владелец решает по каждой записи вручную, не через «важность».
+            if (bioLockOn) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Checkbox(checked = noteIsImportant, onCheckedChange = { noteIsImportant = it })
-                    Text(stringResource(R.string.cd_note_important), style = MaterialTheme.typography.bodyMedium)
+                    Checkbox(checked = noteIsLocked, onCheckedChange = { noteIsLocked = it })
+                    Text(stringResource(R.string.cd_note_lock), style = MaterialTheme.typography.bodyMedium)
                 }
-                Button(
-                    onClick = {
-                        if (noteText.isNotBlank()) {
-                            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            AppStateStore.addNote(
-                                Note(
-                                    id = java.util.UUID.randomUUID().toString(),
-                                    contactId = contactId,
-                                    companyId = null, calendarItemId = null, giftId = null,
-                                    type = noteType,
-                                    text = noteText.trim(),
-                                    date = java.time.LocalDate.now().toString(),
-                                    isImportant = noteIsImportant,
-                                    createdAt = now, updatedAt = now
-                                )
-                            )
-                            noteText = ""; noteIsImportant = false; showAddDialog = false
-                        }
-                    },
-                    enabled = noteText.isNotBlank(),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
             }
         }
     }
@@ -949,7 +969,7 @@ fun ContactDetailScreen(
                         ) {
                             existing.forEach { pd ->
                                 Surface(
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R6,
                                     color = AppleTheme.colors.fill
                                 ) {
                                     Text(
@@ -999,7 +1019,7 @@ fun ContactDetailScreen(
                             }
                         },
                         enabled = pdText.isNotBlank(),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
                 }
@@ -1262,7 +1282,7 @@ private fun QuickCircle(
 ) {
     val gold9A = AppleTheme.colors.orange
     Column(
-        modifier = Modifier.width(52.dp).clip(RoundedCornerShape(12.dp)).clickable { onClick() },
+        modifier = Modifier.width(52.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
@@ -1314,12 +1334,12 @@ private fun androidx.compose.foundation.layout.RowScope.HeaderAction(
     onClick: () -> Unit
 ) {
     Column(
-        modifier = Modifier.weight(1f).clip(RoundedCornerShape(13.dp)).clickable { onClick() },
+        modifier = Modifier.weight(1f).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13).clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         Box(
-            modifier = Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(13.dp))
+            modifier = Modifier.fillMaxWidth().height(44.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13)
                 .background(if (accent) AppleTheme.colors.brand else AppleTheme.colors.card),
             contentAlignment = Alignment.Center
         ) {
@@ -1344,14 +1364,14 @@ private fun ContextPill(
         color = color,
         maxLines = 1,
         overflow = if (ellipsize) androidx.compose.ui.text.style.TextOverflow.Ellipsis else androidx.compose.ui.text.style.TextOverflow.Clip,
-        modifier = modifier.clip(RoundedCornerShape(10.dp)).background(bg).padding(horizontal = 10.dp, vertical = 5.dp)
+        modifier = modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10).background(bg).padding(horizontal = 10.dp, vertical = 5.dp)
     )
 }
 
 @Composable
 internal fun ActionSquare(icon: androidx.compose.ui.graphics.vector.ImageVector, cd: String, onClick: () -> Unit) {
     Box(
-        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(AppleTheme.colors.card).clickable { onClick() },
+        modifier = Modifier.size(36.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10).background(AppleTheme.colors.card).clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Icon(icon, contentDescription = cd, tint = AppleTheme.colors.brand, modifier = Modifier.size(18.dp))
@@ -1365,7 +1385,7 @@ fun StatChip(
     fgColor: androidx.compose.ui.graphics.Color
 ) {
     Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge,
         color = bgColor
     ) {
         Text(
@@ -1382,7 +1402,7 @@ fun StatChip(
 fun CardBlock(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge,
         colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
@@ -1464,7 +1484,7 @@ fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {
 @Composable
 fun SizeChip(label: String, value: String, highlight: Boolean = false) {
     Card(
-        shape = RoundedCornerShape(14.dp),
+        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
         colors = CardDefaults.cardColors(
             containerColor = if (highlight) AppleTheme.colors.red.copy(alpha = 0.1f) else AppleTheme.colors.card
         ),

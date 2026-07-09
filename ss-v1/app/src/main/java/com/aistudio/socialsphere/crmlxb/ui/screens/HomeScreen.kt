@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -135,6 +134,11 @@ fun HomeScreen(
     val strSlNew          = stringResource(R.string.home_sl_new)
     val strSlNewSub       = stringResource(R.string.home_sl_new_sub)
 
+    // Без ключа-строки (в отличие от needAttention/smartLists ниже) — тело НЕ
+    // вызывает stringResource напрямую (иконки/цвет по enum, subtitle — имена
+    // контакта/компании, не локализованный текст). Если сюда когда-нибудь
+    // добавят stringResource — добавить его же в remember(...), иначе вернётся
+    // баг «лаг при смене языка» (аудит 2026-07-06, ср. HomeScreen §52 в базе знаний).
     val upcomingEvents by remember {
         derivedStateOf {
             val todayStr = java.time.LocalDate.now().toString()
@@ -259,6 +263,8 @@ fun HomeScreen(
         }
     }
 
+    // Тот же случай, что и upcomingEvents выше — без stringResource внутри,
+    // ключ от языка не нужен; если появится локализованный текст — добавить сюда.
     val recentlyAdded by remember {
         derivedStateOf {
             AppStateStore.contacts
@@ -596,7 +602,7 @@ fun HomeScreen(
                         )
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                            shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22,
                             colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                             elevation = CardDefaults.cardElevation(1.dp)
                         ) {
@@ -639,7 +645,7 @@ fun HomeScreen(
                         )
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                            shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22,
                             colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                             elevation = CardDefaults.cardElevation(1.dp)
                         ) {
@@ -716,8 +722,7 @@ private fun HomeSearchResults(
                 Text(stringResource(R.string.common_contacts),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = AppleTheme.colors.brand,
-                    modifier = Modifier.padding(vertical = 4.dp))
+                    color = AppleTheme.colors.brand)
             }
             items(contacts, key = { it.contact.id }) { r ->
                 // FIX: clickable search result
@@ -768,8 +773,7 @@ private fun HomeSearchResults(
                 Text(stringResource(R.string.common_companies),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = AppleTheme.colors.brand,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                    color = AppleTheme.colors.brand)
             }
             items(companies, key = { it.company.id }) { r ->
                 // FIX: clickable search result
@@ -788,7 +792,7 @@ private fun HomeSearchResults(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
-                            Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+                            Modifier.size(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10)
                                 .background(AppleTheme.colors.brand),
                             contentAlignment = Alignment.Center
                         ) {
@@ -841,7 +845,7 @@ private fun HomeEventCard(event: HomeEvent, onClick: () -> Unit) {
     Card(
         onClick   = onClick,
         modifier  = Modifier.width(182.dp).height(110.dp),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge,
         colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
@@ -942,7 +946,7 @@ private fun HomeRecentCard(contact: HomeContact, onClick: () -> Unit) {
         // Фиксированная высота: строка должности опциональна, без неё карточка
         // была ниже и карточки в ряду «прыгали» по размеру.
         modifier  = Modifier.width(128.dp).height(140.dp),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
         colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
@@ -984,7 +988,7 @@ private fun SmartListCard(
                 horizontalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 Box(
-                    Modifier.size(34.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
+                    Modifier.size(34.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R9)
                         .background(smartList.color.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center
                 ) {

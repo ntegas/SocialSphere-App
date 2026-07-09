@@ -174,11 +174,15 @@ object SearchEngine {
 enum class ContactSortOrder { NAME_AZ, NAME_ZA, RECENTLY_ADDED, IMPORTANCE }
 enum class CompanySortOrder { NAME_AZ, NAME_ZA, MOST_CONTACTS, RECENTLY_ADDED }
 
+// ФИКС (аудит 2026-07-06): раньше был параметр connectionLevels — фильтр по
+// LEGACY-полю Contact.connectionLevel (слито в ContactStatus, см. Enums.kt).
+// В UI (ContactsScreen.kt) для него никогда не было чипов/секции — всегда
+// пустой Set, реального эффекта не имел. Само поле в модели/БД не трогаем
+// (сохранность данных), убран только неиспользуемый параметр фильтра.
 fun List<Contact>.applyContactFilters(
     query: String,
     relationshipTypes: Set<RelationshipType>,
     importanceLevels: Set<ImportanceLevel>,
-    connectionLevels: Set<ConnectionLevel>,
     communicationRhythms: Set<CommunicationRhythm>,
     contactStatuses: Set<ContactStatus> = emptySet(),
     cityFilter: String,
@@ -209,8 +213,6 @@ fun List<Contact>.applyContactFilters(
     }
     if (importanceLevels.isNotEmpty())
         list = list.filter { it.importanceLevel in importanceLevels }
-    if (connectionLevels.isNotEmpty())
-        list = list.filter { it.connectionLevel in connectionLevels }
     if (communicationRhythms.isNotEmpty())
         list = list.filter { it.communicationRhythm in communicationRhythms }
     if (contactStatuses.isNotEmpty())

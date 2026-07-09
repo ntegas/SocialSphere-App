@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -58,9 +57,9 @@ private fun CalFilterChip(label: String, active: Boolean, dotColor: Color? = nul
     // Спека Aurelia: h28 r14, активный — бренд/белый 700; неактивный — card,
     // вторичный текст 600, тонкая инсет-обводка + цветная точка типа (как в макете).
     Box(
-        Modifier.height(28.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+        Modifier.height(28.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14)
             .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
-            .then(if (!active) Modifier.border(1.dp, AppleTheme.colors.separator, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)) else Modifier)
+            .then(if (!active) Modifier.border(1.dp, AppleTheme.colors.separator, com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14) else Modifier)
             .clickable { onClick() }.padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -111,13 +110,13 @@ fun CalendarScreen(
             // Сегмент-контрол видов (спека Aurelia: трек fill r11 pad3, активный card r8 вес700)
             Row(
                 // Трек — нейтрально-серый rgba(120,120,128,.10), как в прототипе
-                modifier = Modifier.fillMaxWidth().height(36.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp)).background(AppleTheme.colors.neutralFill).padding(3.dp)
+                modifier = Modifier.fillMaxWidth().height(36.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R11).background(AppleTheme.colors.neutralFill).padding(3.dp)
             ) {
                 val orderedModes = listOf(CalendarViewMode.LIST, CalendarViewMode.WEEK, CalendarViewMode.MONTH)
                 orderedModes.forEach { mode ->
                     val isSelected = selectedMode == mode
                     Box(
-                        modifier = Modifier.weight(1f).fillMaxHeight().clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).background(if (isSelected) AppleTheme.colors.card else Color.Transparent).clickable { selectedMode = mode },
+                        modifier = Modifier.weight(1f).fillMaxHeight().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small).background(if (isSelected) AppleTheme.colors.card else Color.Transparent).clickable { selectedMode = mode },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(mode.title(ctxLabel), fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, color = if (isSelected) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel)
@@ -362,7 +361,7 @@ fun MonthGridView(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
-                                    .clip(if (isToday) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp))
+                                    .clip(if (isToday) androidx.compose.foundation.shape.CircleShape else com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small)
                                     .background(
                                         when {
                                             isToday -> AppleTheme.colors.brand
@@ -416,7 +415,7 @@ fun MonthGridView(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
                         colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                         elevation = CardDefaults.cardElevation(1.dp)
                     ) {
@@ -522,9 +521,9 @@ fun WeekStripView(
                         color = if (isSel) AppleTheme.colors.brand else AppleTheme.colors.secondaryLabel)
                     Box(
                         modifier = Modifier.fillMaxWidth().height(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                             .background(if (isSel) AppleTheme.colors.brand else AppleTheme.colors.card)
-                            .then(if (!isSel) Modifier.border(1.dp, AppleTheme.colors.label.copy(alpha = ringAlpha), RoundedCornerShape(12.dp)) else Modifier)
+                            .then(if (!isSel) Modifier.border(1.dp, AppleTheme.colors.label.copy(alpha = ringAlpha), com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium) else Modifier)
                             .aureliaPress { selectedDay = date },
                         contentAlignment = Alignment.Center
                     ) {
@@ -599,7 +598,7 @@ private fun WeekEventRow(event: CalendarItem, onClick: () -> Unit) {
         Text(time, fontSize = 12.sp, fontWeight = FontWeight.W600,
             color = AppleTheme.colors.tertiaryLabel,
             modifier = Modifier.width(40.dp).padding(top = 12.dp))
-        Row(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(AppleTheme.colors.card)) {
+        Row(Modifier.weight(1f).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).background(AppleTheme.colors.card)) {
             Box(Modifier.width(3.dp).fillMaxHeight().background(typeColor))
             Column(Modifier.padding(horizontal = 13.dp, vertical = 11.dp)) {
                 Text(com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel),
@@ -643,7 +642,7 @@ fun CalendarEventItem(
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
         Box(
-            modifier = Modifier.size(42.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(typeColor.copy(alpha = 0.12f)),
+            modifier = Modifier.size(42.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).background(typeColor.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) { Icon(typeIcon, null, Modifier.size(20.dp), tint = typeColor) }
         Column(modifier = Modifier.weight(1f)) {
@@ -714,7 +713,7 @@ fun CalendarTimelineRow(event: CalendarItem, isLast: Boolean, isToday: Boolean =
         Card(
             onClick   = onClick,
             modifier  = Modifier.weight(1f).padding(start = 14.dp, bottom = 12.dp),
-            shape     = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+            shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
             colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
             elevation = CardDefaults.cardElevation(1.dp)
         ) {

@@ -266,7 +266,10 @@ for path in kt_files():
 
 # У55: @Database(version = N) ⇒ в addMigrations(...) есть полная цепочка
 # MIGRATION_1_2 … MIGRATION_(N-1)_N. Ловит «голый» бамп версии без миграции
-# (как был v5→v6): без миграции срабатывает destructive fallback = потеря данных.
+# (как был v5→v6). fallbackToDestructiveMigration() убран из кода (2026-07-07,
+# см. базу знаний §26) — без миграции Room теперь падает с явным исключением
+# при апдейте, а не тихо стирает БД, но лучше поймать пропуск здесь, на сборке,
+# чем ждать крэш у владельца.
 def missing_migrations(src):
     """Возвращает список недостающих MIGRATION_x_(x+1) для объявленной version."""
     vm = re.search(r'version\s*=\s*(\d+)', src)
@@ -293,7 +296,7 @@ if os.path.exists(DB_FILE):
     miss = missing_migrations(open(DB_FILE, encoding='utf-8').read())
     if miss:
         errors.append(f'SocialsphereDatabase.kt: version поднят без миграций {miss} '
-                      f'— апдейт «поверх» сотрёт БД (destructive fallback)')
+                      f'— апдейт «поверх» упадёт с исключением Room (нет destructive fallback)')
 
 # У56: `private fun` — область ОДНОГО файла. Если функцию вызывают из другого
 # файла того же пакета (как ActionSquare/GiftMenu после выноса вкладок), K2 даёт

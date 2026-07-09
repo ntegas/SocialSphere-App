@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -109,7 +108,7 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
             // Превью акцента
             Box(
                 modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp)
-                    .height(48.dp).clip(RoundedCornerShape(14.dp)).background(AppleTheme.colors.brand),
+                    .height(48.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14).background(AppleTheme.colors.brand),
                 contentAlignment = Alignment.Center
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -122,7 +121,7 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
             Spacer(Modifier.height(22.dp))
             Box(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-                    .clip(RoundedCornerShape(16.dp)).background(AppleTheme.colors.brand.copy(alpha = 0.08f)).padding(14.dp)
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large).background(AppleTheme.colors.brand.copy(alpha = 0.08f)).padding(14.dp)
             ) {
                 Text(
                     stringResource(R.string.appearance_note),
@@ -156,14 +155,14 @@ private fun ThemePreview(
     Column(modifier = modifier.clickable { onClick() }, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .fillMaxWidth().height(120.dp).clip(RoundedCornerShape(18.dp)).background(previewBg)
-                .then(if (selected) Modifier.border(2.dp, AppleTheme.colors.brand, RoundedCornerShape(18.dp)) else Modifier)
+                .fillMaxWidth().height(120.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18).background(previewBg)
+                .then(if (selected) Modifier.border(2.dp, AppleTheme.colors.brand, com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18) else Modifier)
                 .padding(12.dp)
         ) {
             Column {
-                Box(Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(5.dp)).background(stripColor))
+                Box(Modifier.fillMaxWidth().height(14.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R5).background(stripColor))
                 Spacer(Modifier.height(8.dp))
-                Box(Modifier.fillMaxWidth(0.7f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(lineColor))
+                Box(Modifier.fillMaxWidth(0.7f).height(10.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XSmall).background(lineColor))
                 Spacer(Modifier.height(14.dp))
                 Box(
                     Modifier.size(40.dp).clip(CircleShape)

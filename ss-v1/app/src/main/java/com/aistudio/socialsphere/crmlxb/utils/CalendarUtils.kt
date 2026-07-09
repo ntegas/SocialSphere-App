@@ -58,9 +58,6 @@ fun parseFlexibleDate(raw: String?, defaultYear: Int = LocalDate.now().year): Lo
     return null
 }
 
-/** true, если дата хранится без года (vCard-стиль «--MM-DD»). */
-fun isYearlessDate(raw: String?): Boolean = raw?.trim()?.startsWith("--") == true
-
 /**
  * Человекочитаемая дата события для UI. Даты без года («--03-14») показываются
  * как «14 марта» (локаль системы; MMMM в формат-контексте даёт родительный падеж);

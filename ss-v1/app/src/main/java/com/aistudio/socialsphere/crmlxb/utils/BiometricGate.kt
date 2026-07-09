@@ -1,10 +1,27 @@
 package com.aistudio.socialsphere.crmlxb.utils
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+
+/**
+ * Разматывает обёрнутый Context до Activity. НУЖНО, потому что `LocalContext.current`
+ * внутри `LocalizedApp` (ui/screens/SettingsState.kt) — это `createConfigurationContext(...)`,
+ * НЕ сама Activity, а отдельный Context-объект (не подкласс Activity/FragmentActivity).
+ * ФИКС критичного бага (2026-07-05): `LocalContext.current as? FragmentActivity` в
+ * ContactDetailScreen.kt всегда возвращал null из-за этого — requestReveal() уходил
+ * в else-ветку и открывал «защищённые» заметки БЕЗ единого запроса аутентификации.
+ */
+tailrec fun Context.findActivity(): FragmentActivity? = when (this) {
+    is FragmentActivity -> this
+    is Activity -> null // обычная Activity, но не FragmentActivity — BiometricPrompt не встанет
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 /**
  * Разблокировка «Защищено» биометрией ИЛИ кодом устройства (PIN/паттерн) —
@@ -13,14 +30,39 @@ import androidx.fragment.app.FragmentActivity
  */
 object BiometricGate {
 
-    private const val AUTHENTICATORS =
-        BiometricManager.Authenticators.BIOMETRIC_WEAK or
-        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    private const val BIOMETRIC = BiometricManager.Authenticators.BIOMETRIC_WEAK
+    private const val DEVICE_CREDENTIAL = BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
+    private fun canAuth(context: Context, authenticators: Int): Boolean =
+        BiometricManager.from(context).canAuthenticate(authenticators) ==
+            BiometricManager.BIOMETRIC_SUCCESS
+
+    /**
+     * ФИКС (2026-07-08, владелец: «биометрия не включается», подтверждено на
+     * эмуляторе — с реально настроенным кодом устройства `canAuthenticate`
+     * комбинированным флагом `BIOMETRIC_WEAK or DEVICE_CREDENTIAL` вернул
+     * не-SUCCESS сразу для ОБЕИХ модальностей по отдельности И для комбинации,
+     * подтверждено логами BiometricService: Status 7 везде, хотя код блокировки
+     * был точно активен). Раньше был ОДИН вызов с объединённым флагом — если
+     * конкретная комбинация не поддерживается на этой прошивке/API, весь
+     * переключатель считался недоступным целиком, хотя способ РЕАЛЬНО работал.
+     * Теперь проверяем каждый способ отдельно и берём тот набор, который
+     * реально доступен (или оба) — таким образом один нерабочий комбо-вызов
+     * платформы не блокирует переключатель полностью.
+     */
+    private fun resolveAuthenticators(context: Context): Int? {
+        val bio = canAuth(context, BIOMETRIC)
+        val cred = canAuth(context, DEVICE_CREDENTIAL)
+        return when {
+            bio && cred -> BIOMETRIC or DEVICE_CREDENTIAL
+            bio -> BIOMETRIC
+            cred -> DEVICE_CREDENTIAL
+            else -> null
+        }
+    }
 
     /** Есть ли на устройстве настроенная биометрия или код блокировки. */
-    fun isAvailable(context: Context): Boolean =
-        BiometricManager.from(context).canAuthenticate(AUTHENTICATORS) ==
-            BiometricManager.BIOMETRIC_SUCCESS
+    fun isAvailable(context: Context): Boolean = resolveAuthenticators(context) != null
 
     /**
      * Показывает системный диалог; onSuccess — только при подтверждении.
@@ -33,7 +75,8 @@ object BiometricGate {
         subtitle: String? = null,
         onSuccess: () -> Unit,
     ) {
-        if (!isAvailable(activity)) { onSuccess(); return }
+        val authenticators = resolveAuthenticators(activity)
+        if (authenticators == null) { onSuccess(); return }
         val prompt = BiometricPrompt(
             activity,
             ContextCompat.getMainExecutor(activity),
@@ -48,7 +91,7 @@ object BiometricGate {
         val info = BiometricPrompt.PromptInfo.Builder()
             .setTitle(title)
             .apply { if (!subtitle.isNullOrBlank()) setSubtitle(subtitle) }
-            .setAllowedAuthenticators(AUTHENTICATORS)
+            .setAllowedAuthenticators(authenticators)
             .build()
         prompt.authenticate(info)
     }

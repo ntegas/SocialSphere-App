@@ -500,7 +500,7 @@ fun MapScreen(
                     if (noCoordCount > 0) {
                         Card(
                             modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
-                            shape    = RoundedCornerShape(10.dp),
+                            shape    = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10,
                             colors   = CardDefaults.cardColors(
                                 containerColor = AppleTheme.colors.card.copy(alpha = 0.92f)
                             )
@@ -525,13 +525,13 @@ fun MapScreen(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.82f)
                 Card(
                     modifier  = panelMod,
-                    shape     = if (showMapView) RoundedCornerShape(20.dp) else RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    shape     = if (showMapView) com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge else RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = if (showMapView) 12.dp else 8.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Box(Modifier.width(36.dp).height(5.dp).clip(RoundedCornerShape(3.dp)).background(AppleTheme.colors.separator))
+                            Box(Modifier.width(36.dp).height(5.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R3).background(AppleTheme.colors.separator))
                         }
                         if (selectedItem != null) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -590,7 +590,7 @@ fun MapScreen(
                         leadingIcon = { Icon(Icons.Default.Search, null, tint = AppleTheme.colors.secondaryLabel, modifier = Modifier.size(18.dp)) },
                         trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) } },
                         singleLine = true,
-                        shape = RoundedCornerShape(15.dp),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = AppleTheme.colors.card,
                             unfocusedContainerColor = AppleTheme.colors.card,
@@ -599,7 +599,7 @@ fun MapScreen(
                         )
                     )
                     Box(
-                        Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(AppleTheme.colors.brand).clickable { showMapView = !showMapView },
+                        Modifier.size(48.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15).background(AppleTheme.colors.brand).clickable { showMapView = !showMapView },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -616,7 +616,7 @@ fun MapScreen(
                     // с самого начала. Теперь кнопка — часть этого же ряда, не
                     // может быть перекрыта.
                     Box(
-                        Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(AppleTheme.colors.card)
+                        Modifier.size(48.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15).background(AppleTheme.colors.card)
                             .clickable {
                                 if (!locationPermGranted) {
                                     permLauncher.launch(
@@ -647,7 +647,7 @@ fun MapScreen(
                     tabs.forEachIndexed { idx, title ->
                         val active = selectedTab == idx
                         Box(
-                            Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
+                            Modifier.height(32.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
                                 .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
                                 .clickable { selectedTab = idx; selectedItem = null }
                                 .padding(horizontal = 14.dp),
@@ -671,11 +671,11 @@ fun MapScreen(
                         groupFilter?.let { gid -> AppStateStore.groups.firstOrNull { it.id == gid }?.name }
                     ).joinToString(" · ").ifBlank { stringResource(R.string.map_filter_all) }
                     Row(
-                        Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
+                        Modifier.height(32.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
                             .background(if (filterActive) AppleTheme.colors.brand else AppleTheme.colors.card)
                             .then(
                                 if (!filterActive)
-                                    Modifier.border(1.dp, AppleTheme.colors.separator, RoundedCornerShape(16.dp))
+                                    Modifier.border(1.dp, AppleTheme.colors.separator, com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
                                 else Modifier
                             )
                             .clickable { showRelSheet = true }
@@ -705,7 +705,7 @@ fun MapScreen(
                             (listOf<RelationshipType?>(null) + RelationshipType.values().toList()).forEach { rel ->
                                 val selectedRow = relFilter == rel && (rel != null || customRelFilter == null)
                                 Row(
-                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                                         .clickable {
                                             relFilter = rel
                                             if (rel == null) customRelFilter = null
@@ -741,7 +741,7 @@ fun MapScreen(
                                 customTypes.forEach { ct ->
                                     val selectedRow = customRelFilter == ct
                                     Row(
-                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                        Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                                             .clickable {
                                                 customRelFilter = if (selectedRow) null else ct
                                                 selectedItem = null; showRelSheet = false
@@ -772,7 +772,7 @@ fun MapScreen(
                                 AppStateStore.groups.sortedBy { it.name.lowercase() }.forEach { g ->
                                     val selectedRow = groupFilter == g.id
                                     Row(
-                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                        Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                                             .clickable {
                                                 groupFilter = if (selectedRow) null else g.id
                                                 selectedItem = null; showRelSheet = false
@@ -820,11 +820,11 @@ fun MapScreen(
                         positionFilter
                     ).joinToString(" · ").ifBlank { stringResource(R.string.map_filter_by_company) }
                     Row(
-                        Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
+                        Modifier.height(32.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
                             .background(if (companyFilterActive) AppleTheme.colors.brand else AppleTheme.colors.card)
                             .then(
                                 if (!companyFilterActive)
-                                    Modifier.border(1.dp, AppleTheme.colors.separator, RoundedCornerShape(16.dp))
+                                    Modifier.border(1.dp, AppleTheme.colors.separator, com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
                                 else Modifier
                             )
                             .clickable { showCompanySheet = true }
@@ -852,7 +852,7 @@ fun MapScreen(
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Row(
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                                     .clickable {
                                         companyFilter = null; positionFilter = null
                                         selectedItem = null; showCompanySheet = false
@@ -881,7 +881,7 @@ fun MapScreen(
                                 companyOptions.forEach { (id, name) ->
                                     val selectedRow = companyFilter == id
                                     Row(
-                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                        Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                                             .clickable {
                                                 companyFilter = if (selectedRow) null else id
                                                 selectedItem = null; showCompanySheet = false
@@ -911,7 +911,7 @@ fun MapScreen(
                                 positionOptions.forEach { pos ->
                                     val selectedRow = positionFilter == pos
                                     Row(
-                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                        Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                                             .clickable {
                                                 positionFilter = if (selectedRow) null else pos
                                                 selectedItem = null; showCompanySheet = false
@@ -956,9 +956,9 @@ private fun MapMarkerPin(obj: MapLocationItem, selected: Boolean) {
         if (obj.ownerType == AddressOwnerType.COMPANY) {
             Box(
                 modifier = Modifier.size(size)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                     .background(AppleTheme.colors.brand)
-                    .border(ringWidth, ringColor, RoundedCornerShape(12.dp)),
+                    .border(ringWidth, ringColor, com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Business, null, tint = Color.White, modifier = Modifier.size(size / 2))
@@ -1011,7 +1011,7 @@ fun MapListRow(obj: MapLocationItem, onClick: () -> Unit) {
     Card(
         onClick   = onClick,
         modifier  = Modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(12.dp),
+        shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium,
         colors    = CardDefaults.cardColors(
             containerColor = AppleTheme.colors.card.copy(alpha = 0.4f)
         ),
@@ -1073,7 +1073,7 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
     val ctx = LocalContext.current
     Card(
         modifier  = Modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(16.dp),
+        shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
         colors    = CardDefaults.cardColors(
             containerColor = AppleTheme.colors.card.copy(alpha = 0.4f)
         ),
@@ -1086,7 +1086,7 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
             ) {
                 if (item.ownerType == AddressOwnerType.COMPANY) {
                     Box(
-                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+                        modifier = Modifier.size(48.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                             .background(AppleTheme.colors.brand.copy(alpha = 0.10f)),
                         contentAlignment = Alignment.Center
                     ) {

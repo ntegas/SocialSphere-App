@@ -285,7 +285,7 @@ private fun SwitchRow(
         if (icon != null) {
             Box(
                 Modifier.size(30.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small)
                     .background(tile),
                 contentAlignment = Alignment.Center
             ) {

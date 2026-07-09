@@ -126,7 +126,7 @@ fun CalendarSettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Box(
-                                Modifier.size(14.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
+                                Modifier.size(14.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R5)
                                     .background(eventTypeColor(type))
                                     .clickable { colorPickerFor = type to name }
                             )
@@ -223,11 +223,11 @@ private fun EventColorPickerSheet(
 @Composable
 private fun SegButton(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier = modifier.height(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
+        modifier = modifier.height(38.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R11)
             .background(if (selected) AppleTheme.colors.brand else AppleTheme.colors.card)
             .then(
                 if (!selected) Modifier.border(1.dp, AppleTheme.colors.separator,
-                    androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
+                    com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R11)
                 else Modifier
             )
             .clickable { onClick() },

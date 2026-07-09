@@ -89,7 +89,6 @@ fun CalendarItemEditScreen(
     var showContactDropdown by remember { mutableStateOf(false) }
     var showCompanyDropdown by remember { mutableStateOf(false) }
     var showRecurrenceDropdown by remember { mutableStateOf(false) }
-    var contactQuery by remember { mutableStateOf("") }
     var showImportanceMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
     var showReminderSheet by remember { mutableStateOf(false) }
@@ -229,7 +228,7 @@ fun CalendarItemEditScreen(
             SectionCard(stringResource(R.string.cie_basic)) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                     colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
@@ -371,64 +370,71 @@ fun CalendarItemEditScreen(
                         }
                     }
                 }
-                Box {
-                    EventListRow(
-                        label = stringResource(R.string.cie_add_person),
-                        value = "",
-                        leadingIcon = Icons.Default.PersonAdd,
-                        onClick = { showContactDropdown = true }
-                    )
-                    DropdownMenu(
-                        expanded = showContactDropdown,
-                        onDismissRequest = { showContactDropdown = false; contactQuery = "" },
-                        modifier = Modifier.heightIn(max = 320.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = contactQuery,
-                            onValueChange = { contactQuery = it },
-                            placeholder = { Text(stringResource(R.string.ce_search_contact)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                        AppStateStore.contacts
+                // ФИКС (аудит 2026-07-06): раньше здесь был голый DropdownMenu без
+                // поиска для компании (и с самодельным поиском для контакта) —
+                // единственное место, не мигрировавшее на канонический
+                // AureliaPickerSheet (везде остальных пикерах — он).
+                EventListRow(
+                    label = stringResource(R.string.cie_add_person),
+                    value = "",
+                    leadingIcon = Icons.Default.PersonAdd,
+                    onClick = { showContactDropdown = true }
+                )
+                if (showContactDropdown) {
+                    // ФИКС (глубокий аудит 2026-07-06): контакт с пустыми firstName/lastName
+                    // (только nickname) давал title="" — невидимая строка в пикере, не
+                    // находимая поиском ни по чему. Фоллбэк на nickname, затем на
+                    // общую заглушку "Без имени" (уже используется для этого же случая
+                    // в другом месте кодовой базы, imp_no_name).
+                    val noNameLabel = stringResource(R.string.imp_no_name)
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                        title = stringResource(R.string.cie_add_person),
+                        items = AppStateStore.contacts
                             .filter { c -> linkedContacts.none { it.id == c.id } }
-                            .filter { c -> contactQuery.isBlank() || "${c.firstName} ${c.lastName}".contains(contactQuery, ignoreCase = true) }
-                            .take(30)
-                            .forEach { c ->
-                                DropdownMenuItem(
-                                    text = { Text("${c.firstName} ${c.lastName}".trim()) },
-                                    onClick = {
-                                        linkedContacts = linkedContacts + c
-                                        showContactDropdown = false; contactQuery = ""
-                                    }
+                            .map {
+                                val fullName = "${it.firstName} ${it.lastName}".trim()
+                                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
+                                    id = it.id,
+                                    title = fullName.ifBlank { it.nickname?.trim().orEmpty().ifBlank { noNameLabel } }
                                 )
-                            }
-                    }
-                }
-                Box {
-                    EventListRow(
-                        label = stringResource(R.string.cie_company),
-                        value = linkedCompany?.name ?: "—",
-                        onClick = { showCompanyDropdown = true },
-                        trailing = {
-                            if (linkedCompany != null) {
-                                IconButton(onClick = { linkedCompany = null }, modifier = Modifier.size(20.dp)) {
-                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cie_clear), modifier = Modifier.size(16.dp))
-                                }
-                            } else {
-                                Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
-                            }
-                        }
+                            },
+                        onPick = { picked ->
+                            AppStateStore.contacts.find { it.id == picked.id }?.let { c -> linkedContacts = linkedContacts + c }
+                            showContactDropdown = false
+                        },
+                        onDismiss = { showContactDropdown = false },
+                        searchPlaceholder = stringResource(R.string.ce_search_contact),
+                        emptyText = stringResource(R.string.picker_no_results)
                     )
-                    DropdownMenu(
-                        expanded = showCompanyDropdown,
-                        onDismissRequest = { showCompanyDropdown = false },
-                        modifier = Modifier.heightIn(max = 320.dp)
-                    ) {
-                        AppStateStore.companies.forEach { c ->
-                            DropdownMenuItem(text = { Text(c.name) }, onClick = { linkedCompany = c; showCompanyDropdown = false })
+                }
+                EventListRow(
+                    label = stringResource(R.string.cie_company),
+                    value = linkedCompany?.name ?: "—",
+                    onClick = { showCompanyDropdown = true },
+                    trailing = {
+                        if (linkedCompany != null) {
+                            IconButton(onClick = { linkedCompany = null }, modifier = Modifier.size(20.dp)) {
+                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cie_clear), modifier = Modifier.size(16.dp))
+                            }
+                        } else {
+                            Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = AppleTheme.colors.tertiaryLabel)
                         }
                     }
+                )
+                if (showCompanyDropdown) {
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickerSheet(
+                        title = stringResource(R.string.cie_company),
+                        items = AppStateStore.companies.map {
+                            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(id = it.id, title = it.name, isCompany = true)
+                        },
+                        onPick = { picked ->
+                            linkedCompany = AppStateStore.companies.find { it.id == picked.id }
+                            showCompanyDropdown = false
+                        },
+                        onDismiss = { showCompanyDropdown = false },
+                        searchPlaceholder = stringResource(R.string.ce_search_company),
+                        emptyText = stringResource(R.string.picker_no_results)
+                    )
                 }
             }
 

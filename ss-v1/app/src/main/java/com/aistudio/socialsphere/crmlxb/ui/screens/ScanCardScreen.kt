@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -114,7 +113,7 @@ fun ScanCardScreen(
             if (!reviewed) {
                 // ── Шаг 1: ввод текста визитки ──
                 Box(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+                    Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge)
                         .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
                         .padding(20.dp),
                     contentAlignment = Alignment.Center

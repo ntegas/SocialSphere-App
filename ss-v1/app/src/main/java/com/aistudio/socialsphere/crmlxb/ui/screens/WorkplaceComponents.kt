@@ -1,10 +1,12 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -24,12 +26,65 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.utils.label
+
+/**
+ * ЕДИНЫЙ блок «Профессия без компании» (v12, поле Contact.profession) —
+ * используется и в Обзоре (блок O), и на вкладке Работа (фидбэк владельца
+ * 2026-07-03: не дублировать логику по экранам). ФИКС (аудит 2026-07-06):
+ * раньше на Работе поле показывалось ТОЛЬКО когда уже заполнено (без
+ * `editing`-веточки, как у остальных полей вкладки), а в Обзоре не
+ * показывалось вообще — ровно тот случай («электрик без компании»), ради
+ * которого поле и заводили, был не виден там, где его ищут в первую очередь.
+ */
+@Composable
+fun ProfessionRow(contact: Contact, editing: Boolean) {
+    val professionText = contact.profession?.takeIf { it.isNotBlank() }
+    if (professionText == null && !editing) return
+    var showDialog by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth()
+            .then(if (editing) Modifier.clickable { showDialog = true } else Modifier)
+            .padding(vertical = 4.dp)
+    ) {
+        Text(
+            stringResource(R.string.ce_profession),
+            style = MaterialTheme.typography.labelSmall,
+            color = AppleTheme.colors.secondaryLabel
+        )
+        Text(
+            professionText ?: stringResource(R.string.cd_profession_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (professionText != null) AppleTheme.colors.label else AppleTheme.colors.secondaryLabel
+        )
+    }
+    if (showDialog) {
+        var draft by remember { mutableStateOf(contact.profession ?: "") }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.ce_profession),
+            onDismiss = { showDialog = false },
+            confirmText = stringResource(R.string.common_save),
+            onConfirm = {
+                AppStateStore.updateContact(contact.copy(profession = draft.trim().ifBlank { null }))
+                showDialog = false
+            },
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { showDialog = false }
+        ) {
+            OutlinedTextField(
+                value = draft, onValueChange = { draft = it },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+        }
+    }
+}
 
 /**
  * ЕДИНЫЙ поток «добавить место работы» (пикер компании с поиском/созданием →
@@ -240,86 +295,80 @@ fun WorkplaceEditDialog(
     var workNote by remember(rel.id) { mutableStateOf(rel.workNote ?: "") }
     var isCurrent by remember(rel.id) { mutableStateOf(rel.employmentStatus != EmploymentStatus.FORMER) }
     var isPrimary by remember(rel.id) { mutableStateOf(rel.isPrimary) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(companyName, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = position, onValueChange = { position = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cd_position)) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                OutlinedTextField(
-                    value = department, onValueChange = { department = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cd_department)) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                OutlinedTextField(
-                    value = role, onValueChange = { role = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cce_role)) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                val statusLabels = listOf(
-                    EmploymentStatus.CURRENT.label(ctxLabel),
-                    EmploymentStatus.FORMER.label(ctxLabel)
-                )
-                PillChoiceRow(
-                    options = statusLabels,
-                    selected = if (isCurrent) statusLabels[0] else statusLabels[1],
-                    onSelect = { v -> isCurrent = v == statusLabels[0] }
-                )
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Switch(checked = isPrimary, onCheckedChange = { isPrimary = it })
-                    Text(stringResource(R.string.cd_work_primary_place),
-                        style = MaterialTheme.typography.bodyMedium)
-                }
-                OutlinedTextField(
-                    value = responsibilities, onValueChange = { responsibilities = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cce_responsibility)) },
-                    modifier = Modifier.fillMaxWidth(), minLines = 2
-                )
-                OutlinedTextField(
-                    value = managedAccounts, onValueChange = { managedAccounts = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cce_accounts_directions)) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                OutlinedTextField(
-                    value = workNote, onValueChange = { workNote = it }, keyboardOptions = CapSentences,
-                    label = { Text(stringResource(R.string.cce_work_note)) },
-                    modifier = Modifier.fillMaxWidth(), minLines = 2
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val updated = rel.copy(
-                    position = position.trim().ifBlank { null },
-                    department = department.trim().ifBlank { null },
-                    role = role.trim().ifBlank { null },
-                    responsibilities = responsibilities.trim().ifBlank { null },
-                    managedAccounts = managedAccounts.trim().ifBlank { null },
-                    workNote = workNote.trim().ifBlank { null },
-                    employmentStatus = if (isCurrent) EmploymentStatus.CURRENT else EmploymentStatus.FORMER,
-                    isPrimary = isPrimary
-                )
-                AppStateStore.updateContact(contact.copy(
-                    companyRelations = contact.companyRelations.map {
-                        when {
-                            it.id == rel.id -> updated
-                            // Основное место — одно: включили здесь → у прочих снимаем
-                            isPrimary -> it.copy(isPrimary = false)
-                            else -> it
-                        }
+    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+        title = companyName,
+        onDismiss = onDismiss,
+        confirmText = stringResource(R.string.common_save),
+        onConfirm = {
+            val updated = rel.copy(
+                position = position.trim().ifBlank { null },
+                department = department.trim().ifBlank { null },
+                role = role.trim().ifBlank { null },
+                responsibilities = responsibilities.trim().ifBlank { null },
+                managedAccounts = managedAccounts.trim().ifBlank { null },
+                workNote = workNote.trim().ifBlank { null },
+                employmentStatus = if (isCurrent) EmploymentStatus.CURRENT else EmploymentStatus.FORMER,
+                isPrimary = isPrimary
+            )
+            AppStateStore.updateContact(contact.copy(
+                companyRelations = contact.companyRelations.map {
+                    when {
+                        it.id == rel.id -> updated
+                        // Основное место — одно: включили здесь → у прочих снимаем
+                        isPrimary -> it.copy(isPrimary = false)
+                        else -> it
                     }
-                ))
-                onDismiss()
-            }) { Text(stringResource(R.string.common_save)) }
+                }
+            ))
+            onDismiss()
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
-    )
+        secondaryText = stringResource(R.string.common_cancel),
+        onSecondary = onDismiss
+    ) {
+        OutlinedTextField(
+            value = position, onValueChange = { position = it }, keyboardOptions = CapSentences,
+            label = { Text(stringResource(R.string.cd_position)) },
+            modifier = Modifier.fillMaxWidth(), singleLine = true
+        )
+        OutlinedTextField(
+            value = department, onValueChange = { department = it }, keyboardOptions = CapSentences,
+            label = { Text(stringResource(R.string.cd_department)) },
+            modifier = Modifier.fillMaxWidth(), singleLine = true
+        )
+        OutlinedTextField(
+            value = role, onValueChange = { role = it }, keyboardOptions = CapSentences,
+            label = { Text(stringResource(R.string.cce_role)) },
+            modifier = Modifier.fillMaxWidth(), singleLine = true
+        )
+        val statusLabels = listOf(
+            EmploymentStatus.CURRENT.label(ctxLabel),
+            EmploymentStatus.FORMER.label(ctxLabel)
+        )
+        PillChoiceRow(
+            options = statusLabels,
+            selected = if (isCurrent) statusLabels[0] else statusLabels[1],
+            onSelect = { v -> isCurrent = v == statusLabels[0] }
+        )
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Switch(checked = isPrimary, onCheckedChange = { isPrimary = it })
+            Text(stringResource(R.string.cd_work_primary_place),
+                style = MaterialTheme.typography.bodyMedium)
+        }
+        OutlinedTextField(
+            value = responsibilities, onValueChange = { responsibilities = it }, keyboardOptions = CapSentences,
+            label = { Text(stringResource(R.string.cce_responsibility)) },
+            modifier = Modifier.fillMaxWidth(), minLines = 2
+        )
+        OutlinedTextField(
+            value = managedAccounts, onValueChange = { managedAccounts = it }, keyboardOptions = CapSentences,
+            label = { Text(stringResource(R.string.cce_accounts_directions)) },
+            modifier = Modifier.fillMaxWidth(), singleLine = true
+        )
+        OutlinedTextField(
+            value = workNote, onValueChange = { workNote = it }, keyboardOptions = CapSentences,
+            label = { Text(stringResource(R.string.cce_work_note)) },
+            modifier = Modifier.fillMaxWidth(), minLines = 2
+        )
+    }
 }

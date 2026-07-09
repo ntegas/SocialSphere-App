@@ -8,7 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -137,7 +136,7 @@ fun CheatSheetScreen(
                         },
                         enabled  = contact.phones.isNotEmpty(),
                         modifier = Modifier.weight(1f).height(48.dp),
-                        shape    = RoundedCornerShape(15.dp),
+                        shape    = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15,
                         colors   = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White)
                     ) {
                         Icon(Icons.Default.Call, null, Modifier.size(18.dp))
@@ -151,7 +150,7 @@ fun CheatSheetScreen(
                         },
                         enabled  = primaryMessenger != null || contact.phones.isNotEmpty(),
                         modifier = Modifier.weight(1f).height(48.dp),
-                        shape    = RoundedCornerShape(15.dp),
+                        shape    = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15,
                         colors   = ButtonDefaults.buttonColors(containerColor = CsChip, contentColor = CsTx)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, null, Modifier.size(18.dp))
@@ -346,13 +345,13 @@ fun CheatSheetScreen(
 @Composable
 private fun CsBlock(title: String, accent: Color, icon: ImageVector, gold: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+        modifier = Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18)
             .background(if (gold) CsGold.copy(alpha = 0.16f) else CsCard)
-            .border(1.dp, if (gold) CsGold.copy(alpha = 0.28f) else CsBorder, RoundedCornerShape(18.dp))
+            .border(1.dp, if (gold) CsGold.copy(alpha = 0.28f) else CsBorder, com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18)
             .padding(15.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(accent.copy(alpha = 0.22f)), Alignment.Center) {
+            Box(Modifier.size(24.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R7).background(accent.copy(alpha = 0.22f)), Alignment.Center) {
                 Icon(icon, null, Modifier.size(13.dp), tint = accent)
             }
             // Строки cs_* содержат ведущий эмодзи — иконка показана плиткой слева,
@@ -368,5 +367,5 @@ private fun CsBlock(title: String, accent: Color, icon: ImageVector, gold: Boole
 @Composable
 private fun CsTag(text: String) {
     Text(text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CsTx,
-        modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(CsChip).padding(horizontal = 12.dp, vertical = 6.dp))
+        modifier = Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14).background(CsChip).padding(horizontal = 12.dp, vertical = 6.dp))
 }

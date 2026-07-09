@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -474,7 +473,7 @@ fun ImportPreviewScreen(
                             DuplicateStatus.SKIPPED -> stringResource(R.string.imp_status_skip)
                         }
                         val statusColor = if (candidate.duplicateStatus == DuplicateStatus.NEW) AppleTheme.colors.brand else AppleTheme.colors.red
-                        Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(statusColor.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                        Box(modifier = Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small).background(statusColor.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                             Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
                         }
                     }

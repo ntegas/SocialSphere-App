@@ -62,13 +62,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18)
                     .background(
                         androidx.compose.ui.graphics.Brush.linearGradient(
                             listOf(gold.copy(alpha = 0.16f), gold.copy(alpha = 0.07f))
                         )
                     )
-                    .border(1.dp, gold.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
+                    .border(1.dp, gold.copy(alpha = 0.22f), com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18)
                     .then(if (editing) Modifier.clickable { showNextStepDialog = true } else Modifier)
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
@@ -90,23 +90,22 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             }
             if (showNextStepDialog) {
                 var draft by remember { mutableStateOf(contact.nextStep ?: "") }
-                AlertDialog(
-                    onDismissRequest = { showNextStepDialog = false },
-                    title = { Text(stringResource(R.string.ce_next_step), fontWeight = FontWeight.Bold) },
-                    text = {
-                        OutlinedTextField(
-                            value = draft, onValueChange = { draft = it }, keyboardOptions = CapSentences,
-                            modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4
-                        )
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                    title = stringResource(R.string.ce_next_step),
+                    onDismiss = { showNextStepDialog = false },
+                    confirmText = stringResource(R.string.common_save),
+                    onConfirm = {
+                        AppStateStore.updateContact(contact.copy(nextStep = draft.trim().ifBlank { null }))
+                        showNextStepDialog = false
                     },
-                    confirmButton = {
-                        Button(onClick = {
-                            AppStateStore.updateContact(contact.copy(nextStep = draft.trim().ifBlank { null }))
-                            showNextStepDialog = false
-                        }) { Text(stringResource(R.string.common_save)) }
-                    },
-                    dismissButton = { TextButton(onClick = { showNextStepDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
-                )
+                    secondaryText = stringResource(R.string.common_cancel),
+                    onSecondary = { showNextStepDialog = false }
+                ) {
+                    OutlinedTextField(
+                        value = draft, onValueChange = { draft = it }, keyboardOptions = CapSentences,
+                        modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4
+                    )
+                }
             }
         }
     }
@@ -200,35 +199,35 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 }
             }
             if (showAddImp) {
-                AlertDialog(
-                    onDismissRequest = { showAddImp = false; newImpVal = "" },
-                    title = { Text(stringResource(R.string.cd_remember), fontWeight = FontWeight.Bold) },
-                    text = {
-                        OutlinedTextField(
-                            value = newImpVal, onValueChange = { newImpVal = it }, keyboardOptions = CapSentences,
-                            label = { Text(stringResource(R.string.cd_note_text)) },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
-                            maxLines = 4
-                        )
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                    onDismiss = { showAddImp = false; newImpVal = "" },
+                    title = stringResource(R.string.cd_remember),
+                    confirmText = stringResource(R.string.common_add),
+                    confirmEnabled = newImpVal.isNotBlank(),
+                    onConfirm = {
+                        val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                        AppStateStore.addNote(Note(
+                            id = java.util.UUID.randomUUID().toString(),
+                            contactId = contact.id,
+                            companyId = null, calendarItemId = null, giftId = null,
+                            type = NoteType.IMPORTANT_TO_REMEMBER,
+                            text = newImpVal.trim(),
+                            date = java.time.LocalDate.now().toString(),
+                            isImportant = false,
+                            createdAt = now, updatedAt = now
+                        ))
+                        newImpVal = ""; showAddImp = false
                     },
-                    confirmButton = {
-                        Button(enabled = newImpVal.isNotBlank(), onClick = {
-                            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            AppStateStore.addNote(Note(
-                                id = java.util.UUID.randomUUID().toString(),
-                                contactId = contact.id,
-                                companyId = null, calendarItemId = null, giftId = null,
-                                type = NoteType.IMPORTANT_TO_REMEMBER,
-                                text = newImpVal.trim(),
-                                date = java.time.LocalDate.now().toString(),
-                                isImportant = false,
-                                createdAt = now, updatedAt = now
-                            ))
-                            newImpVal = ""; showAddImp = false
-                        }) { Text(stringResource(R.string.common_add)) }
-                    },
-                    dismissButton = { TextButton(onClick = { showAddImp = false; newImpVal = "" }) { Text(stringResource(R.string.common_cancel)) } }
-                )
+                    secondaryText = stringResource(R.string.common_cancel),
+                    onSecondary = { showAddImp = false; newImpVal = "" }
+                ) {
+                    OutlinedTextField(
+                        value = newImpVal, onValueChange = { newImpVal = it }, keyboardOptions = CapSentences,
+                        label = { Text(stringResource(R.string.cd_note_text)) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                        maxLines = 4
+                    )
+                }
             }
         }
     }
@@ -466,7 +465,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                 }
                                 famSelected = null; famSearch = ""; famNote = ""; showAddFamily = false
                             },
-                            shape = RoundedCornerShape(14.dp),
+                            shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
                             modifier = Modifier.fillMaxWidth().height(48.dp)
                         ) { Text(stringResource(R.string.common_add), fontWeight = FontWeight.Bold) }
                         Text(
@@ -485,6 +484,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     // ── O — OCCUPATION / Работа ─────────────────────────────
     item {
         val hasWork = contact.companyRelations.isNotEmpty()
+        // ФИКС (аудит 2026-07-06): профессия «без компании» (v12) была видна
+        // только на вкладке Работа — именно тот случай («электрик без
+        // компании»), ради которого поле и заводили, не показывался в Обзоре,
+        // где его ищут в первую очередь. ProfessionRow — общий компонент с
+        // WorkTab (WorkplaceComponents.kt), не дубль.
+        val hasProfession = !contact.profession.isNullOrBlank()
         var showAddCompany by remember { mutableStateOf(false) }
         var editingWorkRel by remember { mutableStateOf<ContactCompanyRelation?>(null) }
         var pendingRemoveCompany by remember { mutableStateOf<ContactCompanyRelation?>(null) }
@@ -508,9 +513,14 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             letter  = "O",
             title   = stringResource(R.string.cd_tab_work),
             color   = androidx.compose.ui.graphics.Color(0xFF3E7E7A), // Aurelia: тил
-            isEmpty = !hasWork,
+            isEmpty = !hasWork && !hasProfession,
             editing = editing
         ) {
+            ProfessionRow(contact = contact, editing = editing)
+            if (hasWork && hasProfession) HorizontalDivider(
+                color = AppleTheme.colors.separator, thickness = 0.5.dp,
+                modifier = Modifier.padding(vertical = 6.dp)
+            )
             // ВСЕ места работы (раньше показывалось только одно — после добавления
             // второго казалось, что «ничего не произошло», а удаление «не работало»,
             // потому что на месте удалённого всплывало другое, скрытое).
@@ -663,7 +673,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     ) {
                         items.forEach { detail ->
                             Surface(
-                                shape  = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                shape  = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small,
                                 color  = AppleTheme.colors.fill,
                                 modifier = if (editing) Modifier.clickable { pendingDeleteInterest = detail } else Modifier
                             ) {
@@ -692,49 +702,44 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             }
         }
         if (showAddInterest) {
-            AlertDialog(
-                onDismissRequest = { showAddInterest = false; newInterestVal = "" },
-                title = { Text(stringResource(R.string.cd_add_interest), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(
-                        modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(
-                                PersonalDetailCategory.INTERESTS, PersonalDetailCategory.HABITS,
-                                PersonalDetailCategory.FOOD, PersonalDetailCategory.DRINKS,
-                                PersonalDetailCategory.BRANDS
-                            ).forEach { c ->
-                                FilterChip(
-                                    selected = newInterestCat == c,
-                                    onClick  = { newInterestCat = c },
-                                    label    = { Text(c.label(ctxInt)) }
-                                )
-                            }
-                        }
-                        OutlinedTextField(
-                            value = newInterestVal, onValueChange = { newInterestVal = it }, keyboardOptions = CapSentences,
-                            label = { Text(stringResource(R.string.cd_value)) },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                title = stringResource(R.string.cd_add_interest),
+                onDismiss = { showAddInterest = false; newInterestVal = "" },
+                confirmText = stringResource(R.string.common_add),
+                confirmEnabled = newInterestVal.isNotBlank(),
+                onConfirm = {
+                    AppStateStore.updateContact(contact.copy(
+                        personalDetails = contact.personalDetails + PersonalDetail(
+                            id        = java.util.UUID.randomUUID().toString(),
+                            contactId = contact.id,
+                            category  = newInterestCat,
+                            value     = newInterestVal.trim()
+                        )
+                    ))
+                    newInterestVal = ""; showAddInterest = false
+                },
+                secondaryText = stringResource(R.string.common_cancel),
+                onSecondary = { showAddInterest = false; newInterestVal = "" }
+            ) {
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        PersonalDetailCategory.INTERESTS, PersonalDetailCategory.HABITS,
+                        PersonalDetailCategory.FOOD, PersonalDetailCategory.DRINKS,
+                        PersonalDetailCategory.BRANDS
+                    ).forEach { c ->
+                        FilterChip(
+                            selected = newInterestCat == c,
+                            onClick  = { newInterestCat = c },
+                            label    = { Text(c.label(ctxInt)) }
                         )
                     }
-                },
-                confirmButton = {
-                    Button(enabled = newInterestVal.isNotBlank(), onClick = {
-                        AppStateStore.updateContact(contact.copy(
-                            personalDetails = contact.personalDetails + PersonalDetail(
-                                id        = java.util.UUID.randomUUID().toString(),
-                                contactId = contact.id,
-                                category  = newInterestCat,
-                                value     = newInterestVal.trim()
-                            )
-                        ))
-                        newInterestVal = ""; showAddInterest = false
-                    }) { Text(stringResource(R.string.common_add)) }
-                },
-                dismissButton = { TextButton(onClick = { showAddInterest = false; newInterestVal = "" }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                }
+                OutlinedTextField(
+                    value = newInterestVal, onValueChange = { newInterestVal = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_value)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+            }
         }
     }
 
@@ -817,37 +822,37 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             }
         }
         if (showAddDream) {
-            AlertDialog(
-                onDismissRequest = { showAddDream = false; newDreamVal = "" },
-                title = { Text(stringResource(R.string.cd_add_dream), fontWeight = FontWeight.Bold) },
-                text = {
-                    OutlinedTextField(
-                        value = newDreamVal, onValueChange = { newDreamVal = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_goals_dreams)) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
-                        maxLines = 4
-                    )
-                },
-                confirmButton = {
-                    Button(enabled = newDreamVal.isNotBlank(), onClick = {
-                        val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                        AppStateStore.addNote(
-                            Note(
-                                id = java.util.UUID.randomUUID().toString(),
-                                contactId = contact.id,
-                                companyId = null, calendarItemId = null, giftId = null,
-                                type = NoteType.PERSONAL_DETAIL,
-                                text = newDreamVal.trim(),
-                                date = java.time.LocalDate.now().toString(),
-                                isImportant = false,
-                                createdAt = now, updatedAt = now
-                            )
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                title = stringResource(R.string.cd_add_dream),
+                onDismiss = { showAddDream = false; newDreamVal = "" },
+                confirmText = stringResource(R.string.common_add),
+                confirmEnabled = newDreamVal.isNotBlank(),
+                onConfirm = {
+                    val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    AppStateStore.addNote(
+                        Note(
+                            id = java.util.UUID.randomUUID().toString(),
+                            contactId = contact.id,
+                            companyId = null, calendarItemId = null, giftId = null,
+                            type = NoteType.PERSONAL_DETAIL,
+                            text = newDreamVal.trim(),
+                            date = java.time.LocalDate.now().toString(),
+                            isImportant = false,
+                            createdAt = now, updatedAt = now
                         )
-                        newDreamVal = ""; showAddDream = false
-                    }) { Text(stringResource(R.string.common_add)) }
+                    )
+                    newDreamVal = ""; showAddDream = false
                 },
-                dismissButton = { TextButton(onClick = { showAddDream = false; newDreamVal = "" }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                secondaryText = stringResource(R.string.common_cancel),
+                onSecondary = { showAddDream = false; newDreamVal = "" }
+            ) {
+                OutlinedTextField(
+                    value = newDreamVal, onValueChange = { newDreamVal = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_goals_dreams)) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                    maxLines = 4
+                )
+            }
         }
     }
 
@@ -883,7 +888,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             ) {
                 contact.tags.forEach { tag ->
                     Surface(
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(15.dp),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15,
                         color = AppleTheme.colors.brand.copy(alpha = 0.10f)
                     ) {
                         Text(
@@ -897,7 +902,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 }
                 // «+ Тег» — быстрое добавление прямо с карточки (как в макете)
                 Surface(
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(15.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15,
                     color = androidx.compose.ui.graphics.Color.Transparent,
                     border = androidx.compose.foundation.BorderStroke(1.dp, AppleTheme.colors.separator),
                     modifier = Modifier.clickable { showAddTag = true }
@@ -913,26 +918,25 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             }
         }
         if (showAddTag) {
-            AlertDialog(
-                onDismissRequest = { showAddTag = false; newTag = "" },
-                title = { Text(stringResource(R.string.cd_add_tag_title), fontWeight = FontWeight.Bold) },
-                text = {
-                    OutlinedTextField(
-                        value = newTag, onValueChange = { newTag = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.cd_tags)) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
-                    )
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                title = stringResource(R.string.cd_add_tag_title),
+                onDismiss = { showAddTag = false; newTag = "" },
+                confirmText = stringResource(R.string.common_add),
+                confirmEnabled = newTag.isNotBlank() &&
+                    contact.tags.none { it.equals(newTag.trim(), ignoreCase = true) },
+                onConfirm = {
+                    AppStateStore.updateContact(contact.copy(tags = contact.tags + newTag.trim()))
+                    newTag = ""; showAddTag = false
                 },
-                confirmButton = {
-                    Button(enabled = newTag.isNotBlank() &&
-                        contact.tags.none { it.equals(newTag.trim(), ignoreCase = true) },
-                        onClick = {
-                            AppStateStore.updateContact(contact.copy(tags = contact.tags + newTag.trim()))
-                            newTag = ""; showAddTag = false
-                        }) { Text(stringResource(R.string.common_add)) }
-                },
-                dismissButton = { TextButton(onClick = { showAddTag = false; newTag = "" }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                secondaryText = stringResource(R.string.common_cancel),
+                onSecondary = { showAddTag = false; newTag = "" }
+            ) {
+                OutlinedTextField(
+                    value = newTag, onValueChange = { newTag = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_tags)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+            }
         }
     }
 
@@ -967,36 +971,33 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
         if (showMeetDialog) {
             var ctxDraft by remember { mutableStateOf(contact.meetContext ?: "") }
             var dateDraft by remember { mutableStateOf(contact.meetDate ?: "") }
-            AlertDialog(
-                onDismissRequest = { showMeetDialog = false },
-                title = { Text(stringResource(R.string.cd_where_met), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(
-                            value = ctxDraft, onValueChange = { ctxDraft = it }, keyboardOptions = CapSentences,
-                            label = { Text(stringResource(R.string.cd_where_met)) },
-                            modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
-                        )
-                        DatePickerField(
-                            value = dateDraft,
-                            onValueChange = { dateDraft = it },
-                            label = stringResource(R.string.cd_date_iso),
-                            modifier = Modifier.fillMaxWidth(),
-                            allowNoYear = true
-                        )
-                    }
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                title = stringResource(R.string.cd_where_met),
+                onDismiss = { showMeetDialog = false },
+                confirmText = stringResource(R.string.common_save),
+                onConfirm = {
+                    AppStateStore.updateContact(contact.copy(
+                        meetContext = ctxDraft.trim().ifBlank { null },
+                        meetDate    = dateDraft.trim().ifBlank { null }
+                    ))
+                    showMeetDialog = false
                 },
-                confirmButton = {
-                    Button(onClick = {
-                        AppStateStore.updateContact(contact.copy(
-                            meetContext = ctxDraft.trim().ifBlank { null },
-                            meetDate    = dateDraft.trim().ifBlank { null }
-                        ))
-                        showMeetDialog = false
-                    }) { Text(stringResource(R.string.common_save)) }
-                },
-                dismissButton = { TextButton(onClick = { showMeetDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
-            )
+                secondaryText = stringResource(R.string.common_cancel),
+                onSecondary = { showMeetDialog = false }
+            ) {
+                OutlinedTextField(
+                    value = ctxDraft, onValueChange = { ctxDraft = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_where_met)) },
+                    modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3
+                )
+                DatePickerField(
+                    value = dateDraft,
+                    onValueChange = { dateDraft = it },
+                    label = stringResource(R.string.cd_date_iso),
+                    modifier = Modifier.fillMaxWidth(),
+                    allowNoYear = true
+                )
+            }
         }
     }
 
@@ -1115,29 +1116,26 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                 )
             } else relSelected?.let { sel ->
                 // Шаг 2: роли связи
-                AlertDialog(
-                    onDismissRequest = { showAddRelated = false; relSelected = null },
-                    title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            DropdownField(stringResource(R.string.ce_who_relation), relOtherRole, relRoles) { v -> relOtherRole = v }
-                            DropdownField(stringResource(R.string.ce_who_am_i), relMyRole, relRoles) { v -> relMyRole = v }
-                        }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                    title = "${sel.firstName} ${sel.lastName}".trim(),
+                    onDismiss = { showAddRelated = false; relSelected = null },
+                    confirmText = stringResource(R.string.common_add),
+                    onConfirm = {
+                        AppStateStore.addContactRelation(ContactRelation(
+                            id = java.util.UUID.randomUUID().toString(),
+                            firstContactId = contact.id,
+                            secondContactId = sel.id,
+                            firstRole = relMyRole,
+                            secondRole = relOtherRole
+                        ))
+                        relSelected = null; relSearch = ""; showAddRelated = false
                     },
-                    confirmButton = {
-                        Button(onClick = {
-                            AppStateStore.addContactRelation(ContactRelation(
-                                id = java.util.UUID.randomUUID().toString(),
-                                firstContactId = contact.id,
-                                secondContactId = sel.id,
-                                firstRole = relMyRole,
-                                secondRole = relOtherRole
-                            ))
-                            relSelected = null; relSearch = ""; showAddRelated = false
-                        }) { Text(stringResource(R.string.common_add)) }
-                    },
-                    dismissButton = { TextButton(onClick = { relSelected = null }) { Text(stringResource(R.string.common_back)) } }
-                )
+                    secondaryText = stringResource(R.string.common_back),
+                    onSecondary = { relSelected = null }
+                ) {
+                    DropdownField(stringResource(R.string.ce_who_relation), relOtherRole, relRoles) { v -> relOtherRole = v }
+                    DropdownField(stringResource(R.string.ce_who_am_i), relMyRole, relRoles) { v -> relMyRole = v }
+                }
             }
         }
     }
@@ -1146,7 +1144,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
     item {
         Spacer(Modifier.height(8.dp))
         Box(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            modifier = Modifier.fillMaxWidth().clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18)
                 .background(AppleTheme.colors.card).clickable { onDelete() }.padding(13.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -1170,7 +1168,7 @@ private fun FordBlock(
 ) {
     Card(
         modifier  = Modifier.fillMaxWidth(),
-        shape     = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge,
         colors    = CardDefaults.cardColors(
             containerColor = AppleTheme.colors.card
         ),

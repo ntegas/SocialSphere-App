@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import kotlin.math.abs
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -239,7 +238,7 @@ private fun <T> WheelPicker(
         // Подсветка центральной полосы
         Box(
             Modifier.fillMaxWidth().height(itemHeight)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10)
                 .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
         )
         LazyColumn(

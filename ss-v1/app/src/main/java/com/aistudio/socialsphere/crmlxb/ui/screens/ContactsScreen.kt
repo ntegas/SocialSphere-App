@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -68,7 +67,6 @@ fun ContactsScreen(
     // (фидбэк владельца 2026-07-05: «создаю статус сам — не входит в фильтры»)
     var filterCustomRelTypes by remember { mutableStateOf(emptySet<String>()) }
     var filterImportance  by remember { mutableStateOf(emptySet<ImportanceLevel>()) }
-    var filterConnLevel   by remember { mutableStateOf(emptySet<ConnectionLevel>()) }
     var filterRhythm      by remember { mutableStateOf(emptySet<CommunicationRhythm>()) }
     var filterStatus      by remember { mutableStateOf(emptySet<ContactStatus>()) }
     var filterGroups      by remember { mutableStateOf(emptySet<String>()) } // id групп
@@ -77,7 +75,7 @@ fun ContactsScreen(
     var showFilterSheet   by remember { mutableStateOf(false) }
 
     val hasActiveFilters = filterRelTypes.isNotEmpty() || filterImportance.isNotEmpty() ||
-        filterConnLevel.isNotEmpty() || filterRhythm.isNotEmpty() ||
+        filterRhythm.isNotEmpty() ||
         filterStatus.isNotEmpty() || filterGroups.isNotEmpty() ||
         cityFilter.isNotBlank() || filterTag.isNotBlank() || filterCustomRelTypes.isNotEmpty()
 
@@ -95,7 +93,6 @@ fun ContactsScreen(
                 query               = searchQuery,
                 relationshipTypes   = filterRelTypes,
                 importanceLevels    = filterImportance,
-                connectionLevels    = filterConnLevel,
                 communicationRhythms= filterRhythm,
                 contactStatuses     = filterStatus,
                 cityFilter          = cityFilter,
@@ -121,7 +118,6 @@ fun ContactsScreen(
         ContactFilterSheet(
             filterRelTypes     = filterRelTypes,
             filterImportance   = filterImportance,
-            filterConnLevel    = filterConnLevel,
             filterRhythm       = filterRhythm,
             filterStatus       = filterStatus,
             filterGroups       = filterGroups,
@@ -134,7 +130,6 @@ fun ContactsScreen(
             isGridView         = isGridView,
             onRelTypesChange   = { filterRelTypes   = it },
             onImportanceChange = { filterImportance = it },
-            onConnLevelChange  = { filterConnLevel  = it },
             onRhythmChange     = { filterRhythm     = it },
             onStatusChange     = { filterStatus     = it },
             onGroupsChange     = { filterGroups     = it },
@@ -145,7 +140,7 @@ fun ContactsScreen(
             onGridViewChange   = { isGridView       = it },
             onClear            = {
                 filterRelTypes = emptySet(); filterImportance = emptySet()
-                filterConnLevel = emptySet(); filterRhythm = emptySet()
+                filterRhythm = emptySet()
                 filterStatus = emptySet(); filterGroups = emptySet()
                 cityFilter = ""; filterTag = ""; filterCustomRelTypes = emptySet()
             },
@@ -229,7 +224,7 @@ fun ContactsScreen(
                 // Капсула поиска (спека: r13 h40, заливка .09, плейсхолдер 16sp #9A9284)
                 Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
                     Row(
-                        Modifier.fillMaxWidth().height(40.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(13.dp)).background(Color(0x17787880)).clickable { searchActive = true }.padding(horizontal = 12.dp),
+                        Modifier.fillMaxWidth().height(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13).background(Color(0x17787880)).clickable { searchActive = true }.padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.Search, null, tint = AppleTheme.colors.tertiaryLabel, modifier = Modifier.size(17.dp))
@@ -241,7 +236,6 @@ fun ContactsScreen(
             val activeChips = buildList {
                 filterRelTypes.forEach  { add(it.label(ctxLabel) to { filterRelTypes   = filterRelTypes   - it }) }
                 filterImportance.forEach{ add(it.label(ctxLabel) to { filterImportance = filterImportance - it }) }
-                filterConnLevel.forEach { add(it.label(ctxLabel) to { filterConnLevel  = filterConnLevel  - it }) }
                 filterStatus.forEach    { add(it.label(ctxLabel) to { filterStatus     = filterStatus     - it }) }
                 filterGroups.forEach { gid ->
                     val gName = AppStateStore.groups.firstOrNull { it.id == gid }?.name ?: return@forEach
@@ -352,7 +346,7 @@ fun ContactsScreen(
                         if (hasActiveFilters) {
                             TextButton(onClick = {
                                 filterRelTypes = emptySet(); filterImportance = emptySet()
-                                filterConnLevel = emptySet(); filterRhythm = emptySet(); cityFilter = ""
+                                filterRhythm = emptySet(); cityFilter = ""
                             }) { Text(stringResource(R.string.contacts_reset_filters)) }
                         }
                     }
@@ -386,7 +380,7 @@ fun ContactsScreen(
                         item(key = "c_$letter") {
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22,
                                 colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                                 elevation = CardDefaults.cardElevation(1.dp)
                             ) {
@@ -420,7 +414,6 @@ fun ContactsScreen(
 private fun ContactFilterSheet(
     filterRelTypes: Set<RelationshipType>,
     filterImportance: Set<ImportanceLevel>,
-    filterConnLevel: Set<ConnectionLevel>,
     filterRhythm: Set<CommunicationRhythm>,
     filterStatus: Set<ContactStatus> = emptySet(),
     filterGroups: Set<String> = emptySet(),
@@ -433,7 +426,6 @@ private fun ContactFilterSheet(
     isGridView: Boolean,
     onRelTypesChange: (Set<RelationshipType>) -> Unit,
     onImportanceChange: (Set<ImportanceLevel>) -> Unit,
-    onConnLevelChange: (Set<ConnectionLevel>) -> Unit,
     onRhythmChange: (Set<CommunicationRhythm>) -> Unit,
     onStatusChange: (Set<ContactStatus>) -> Unit = {},
     onGroupsChange: (Set<String>) -> Unit = {},
@@ -451,7 +443,6 @@ private fun ContactFilterSheet(
     // закрытии, а не на каждый тап (раньше это заметно тормозило).
     var lRelTypes   by remember { mutableStateOf(filterRelTypes) }
     var lImportance by remember { mutableStateOf(filterImportance) }
-    var lConnLevel  by remember { mutableStateOf(filterConnLevel) }
     var lRhythm     by remember { mutableStateOf(filterRhythm) }
     var lStatus     by remember { mutableStateOf(filterStatus) }
     var lGroups     by remember { mutableStateOf(filterGroups) }
@@ -464,7 +455,7 @@ private fun ContactFilterSheet(
         derivedStateOf {
             AppStateStore.contacts.applyContactFilters(
                 query = searchQuery, relationshipTypes = lRelTypes, importanceLevels = lImportance,
-                connectionLevels = lConnLevel, communicationRhythms = lRhythm, contactStatuses = lStatus,
+                communicationRhythms = lRhythm, contactStatuses = lStatus,
                 cityFilter = lCity, tagFilter = lTag, groupIds = lGroups, customRelTypes = lCustomRelTypes,
                 sortOrder = sortOrder
             ).size
@@ -472,7 +463,7 @@ private fun ContactFilterSheet(
     }
     fun pushAndClose() {
         onStatusChange(lStatus); onRelTypesChange(lRelTypes); onImportanceChange(lImportance)
-        onConnLevelChange(lConnLevel); onRhythmChange(lRhythm); onGroupsChange(lGroups)
+        onRhythmChange(lRhythm); onGroupsChange(lGroups)
         onCustomRelTypesChange(lCustomRelTypes)
         onCityChange(lCity); onTagChange(lTag)
         onDismiss()
@@ -495,7 +486,7 @@ private fun ContactFilterSheet(
                     fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label
                 )
                 TextButton(onClick = {
-                    lRelTypes = emptySet(); lImportance = emptySet(); lConnLevel = emptySet()
+                    lRelTypes = emptySet(); lImportance = emptySet()
                     lRhythm = emptySet(); lStatus = emptySet(); lGroups = emptySet(); lCity = ""; lTag = ""
                     lCustomRelTypes = emptySet()
                 }) { Text(stringResource(R.string.contacts_reset_all), color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold) }
@@ -547,26 +538,24 @@ private fun ContactFilterSheet(
                     }
                 }
                 if (showNewGroup) {
-                    AlertDialog(
-                        onDismissRequest = { showNewGroup = false; newGroupName = "" },
-                        title = { Text(stringResource(R.string.group_new), fontWeight = FontWeight.Bold) },
-                        text = {
-                            OutlinedTextField(
-                                value = newGroupName, onValueChange = { newGroupName = it },
-                                label = { Text(stringResource(R.string.group_name)) },
-                                modifier = Modifier.fillMaxWidth(), singleLine = true
-                            )
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                        title = stringResource(R.string.group_new),
+                        onDismiss = { showNewGroup = false; newGroupName = "" },
+                        confirmText = stringResource(R.string.ce_create),
+                        confirmEnabled = newGroupName.isNotBlank(),
+                        onConfirm = {
+                            AppStateStore.addGroup(newGroupName)?.let { lGroups = lGroups + it.id }
+                            newGroupName = ""; showNewGroup = false
                         },
-                        confirmButton = {
-                            Button(enabled = newGroupName.isNotBlank(), onClick = {
-                                AppStateStore.addGroup(newGroupName)?.let { lGroups = lGroups + it.id }
-                                newGroupName = ""; showNewGroup = false
-                            }) { Text(stringResource(R.string.ce_create)) }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showNewGroup = false; newGroupName = "" }) { Text(stringResource(R.string.common_cancel)) }
-                        }
-                    )
+                        secondaryText = stringResource(R.string.common_cancel),
+                        onSecondary = { showNewGroup = false; newGroupName = "" }
+                    ) {
+                        OutlinedTextField(
+                            value = newGroupName, onValueChange = { newGroupName = it },
+                            label = { Text(stringResource(R.string.group_name)) },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
+                    }
                 }
             }
 
@@ -611,32 +600,39 @@ private fun ContactFilterSheet(
                         }
                     }
                     editingCustomType?.let { ct ->
-                        AlertDialog(
-                            onDismissRequest = { editingCustomType = null },
-                            title = { Text(ct, fontWeight = FontWeight.Bold) },
-                            text = {
-                                OutlinedTextField(
-                                    value = customTypeDraft, onValueChange = { customTypeDraft = it },
-                                    label = { Text(stringResource(R.string.filter_custom_status)) },
-                                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                                )
-                            },
-                            confirmButton = {
-                                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Button(enabled = customTypeDraft.isNotBlank(), onClick = {
-                                        AppStateStore.renameCustomRelationshipType(ct, customTypeDraft)
-                                        lCustomRelTypes = lCustomRelTypes - ct + customTypeDraft.trim()
-                                        editingCustomType = null
-                                    }) { Text(stringResource(R.string.common_save)) }
-                                    TextButton(onClick = {
-                                        AppStateStore.deleteCustomRelationshipType(ct)
-                                        lCustomRelTypes = lCustomRelTypes - ct
-                                        editingCustomType = null
-                                    }) { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) }
-                                }
-                            },
-                            dismissButton = { TextButton(onClick = { editingCustomType = null }) { Text(stringResource(R.string.common_cancel)) } }
-                        )
+                        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { editingCustomType = null }) {
+                            Text(
+                                ct,
+                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                                fontSize = 20.sp, fontWeight = FontWeight.W700,
+                                color = AppleTheme.colors.label,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            OutlinedTextField(
+                                value = customTypeDraft, onValueChange = { customTypeDraft = it },
+                                label = { Text(stringResource(R.string.filter_custom_status)) },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Button(
+                                enabled = customTypeDraft.isNotBlank(),
+                                onClick = {
+                                    AppStateStore.renameCustomRelationshipType(ct, customTypeDraft)
+                                    lCustomRelTypes = lCustomRelTypes - ct + customTypeDraft.trim()
+                                    editingCustomType = null
+                                },
+                                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                            ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
+                            TextButton(
+                                onClick = {
+                                    AppStateStore.deleteCustomRelationshipType(ct)
+                                    lCustomRelTypes = lCustomRelTypes - ct
+                                    editingCustomType = null
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) }
+                        }
                     }
                 }
             }
@@ -713,7 +709,7 @@ private fun ContactFilterSheet(
             Button(
                 onClick = { pushAndClose() },
                 colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
-                shape = RoundedCornerShape(15.dp),
+                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15,
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) { Text("${stringResource(R.string.common_apply)} · $previewCount", fontWeight = FontWeight.Bold) }
         }
@@ -748,9 +744,9 @@ private fun MultiSelectChip(label: String, selected: Boolean, gold: Boolean = fa
     Row(
         modifier = Modifier
             .height(32.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
             .background(bg)
-            .border(1.dp, border, RoundedCornerShape(16.dp))
+            .border(1.dp, border, com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
             .clickable { onClick() }
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -776,7 +772,7 @@ private fun getContactVisuals(contact: Contact): Triple<String, String, String> 
 @Composable
 private fun ContactsSegChip(label: String, active: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.height(32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+        Modifier.height(32.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
             .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
             .clickable { onClick() }.padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -901,5 +897,5 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
 // kept for compat with HomeScreen usage
 @Composable
 fun ContactFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(selected = selected, onClick = onClick, label = { Text(label) }, shape = RoundedCornerShape(16.dp))
+    FilterChip(selected = selected, onClick = onClick, label = { Text(label) }, shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
 }

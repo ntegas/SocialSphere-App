@@ -3,7 +3,6 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -91,7 +90,7 @@ fun OnboardingScreen(onStart: () -> Unit) {
             Button(
                 onClick = onStart,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(18.dp),
+                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
                 colors = ButtonDefaults.buttonColors(containerColor = ObBrand, contentColor = ObBg)
             ) {
                 Text(stringResource(R.string.onboarding_start), fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -106,7 +105,7 @@ fun OnboardingScreen(onStart: () -> Unit) {
 private fun FeatureRow(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(
-            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(ObCard),
+            Modifier.size(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).background(ObCard),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, null, Modifier.size(20.dp), tint = ObGold)

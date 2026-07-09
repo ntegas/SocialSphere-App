@@ -132,6 +132,152 @@ object AppSettings {
     fun biometricLockSafe(): Boolean =
         try { biometricLock.value } catch (e: Exception) { false }
 
+    // ── Свой PIN-код + блокировка всего приложения (2026-07-05) ──────────────
+    // Раньше единственной опцией была биометрия/код УСТРОЙСТВА — если на
+    // телефоне не настроен отпечаток/лицо/код экрана, защиты не было вообще,
+    // и никакого экрана блокировки на запуске приложения не существовало.
+    // Свой PIN не зависит от системных настроек устройства. Храним НЕ пароль,
+    // а соль+хеш (PBKDF2WithHmacSHA256, 120k итераций) — исходный PIN нигде
+    // не сохраняется, чистый javax.crypto без новой зависимости (среда иногда
+    // офлайн для новых библиотек, см. §9 базы знаний).
+    private const val PIN_ITERATIONS = 120_000
+    private const val PIN_KEY_LENGTH = 256
+
+    private fun pbkdf2(pin: String, salt: ByteArray): ByteArray {
+        val spec = javax.crypto.spec.PBEKeySpec(pin.toCharArray(), salt, PIN_ITERATIONS, PIN_KEY_LENGTH)
+        val factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        return factory.generateSecret(spec).encoded
+    }
+
+    private fun bytesToHex(bytes: ByteArray): String =
+        bytes.joinToString("") { "%02x".format(it) }
+
+    private fun hexToBytes(hex: String): ByteArray =
+        ByteArray(hex.length / 2) { i -> hex.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
+
+    /** "saltHex:hashHex", пусто = PIN не задан. Персистентно. */
+    private val pinHashRaw: MutableState<String> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "app_pin_hash", default = "",
+            serialize = { it }, deserialize = { it }
+        )
+    }
+
+    /** ФИКС (2026-07-08, владелец: «показываешь 6 точек, хотя ввожу 4»): раньше
+     *  экраны ввода PIN всегда рисовали максимум (6) точек-плейсхолдеров,
+     *  потому что нигде не хранилась РЕАЛЬНАЯ длина заданного PIN — только
+     *  соль+хеш, из которых длину не восстановить. Теперь сохраняем длину
+     *  отдельно при setPin(), и экраны разблокировки/раскрытия рисуют ровно
+     *  столько точек, сколько владелец реально ввёл при настройке. */
+    private val pinLength: MutableState<Int> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "app_pin_length", default = 0,
+            serialize = { it.toString() }, deserialize = { it.toIntOrNull() ?: 0 }
+        )
+    }
+
+    /** Реальная длина текущего PIN (0, если не задан) — для рендера точек. */
+    fun currentPinLength(): Int = try { pinLength.value } catch (e: Exception) { 0 }
+
+    fun hasPinSet(): Boolean = try { pinHashRaw.value.isNotBlank() } catch (e: Exception) { false }
+
+    /** Задать/сменить PIN (4-6 цифр — длину проверяет UI). Сбрасывает счётчик неудачных попыток. */
+    fun setPin(pin: String) {
+        val salt = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+        val hash = pbkdf2(pin, salt)
+        pinHashRaw.value = "${bytesToHex(salt)}:${bytesToHex(hash)}"
+        pinLength.value = pin.length
+        pinFailCount.value = 0
+        pinLockedUntil.value = 0L
+    }
+
+    fun clearPin() {
+        pinHashRaw.value = ""
+        pinLength.value = 0
+        pinFailCount.value = 0
+        pinLockedUntil.value = 0L
+    }
+
+    // ── Защита от подбора PIN тапами по экрану (2026-07-06) ───────────────
+    // Раньше verifyPin() не ограничивал число попыток вообще — 4-значный PIN
+    // подбирается за конечное число тапов без всякого троттлинга. Персистентно
+    // (не в памяти), чтобы простой перезапуск процесса не сбрасывал блокировку.
+    private val pinFailCount: MutableState<Int> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "pin_fail_count", default = 0,
+            serialize = { it.toString() }, deserialize = { it.toIntOrNull() ?: 0 }
+        )
+    }
+    private val pinLockedUntil: MutableState<Long> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "pin_locked_until", default = 0L,
+            serialize = { it.toString() }, deserialize = { it.toLongOrNull() ?: 0L }
+        )
+    }
+
+    /** Эскалация: первые 4 попытки бесплатны, дальше — растущая блокировка. */
+    private fun pinLockoutDurationMs(failCount: Int): Long = when {
+        failCount < 5 -> 0L
+        failCount < 7 -> 30_000L
+        failCount < 9 -> 60_000L
+        else -> 300_000L
+    }
+
+    /** Сколько ещё мс осталось до конца блокировки (0 = можно пробовать).
+     *  ФИКС (глубокий аудит 2026-07-06): раньше `pinLockedUntil` считался от
+     *  `System.currentTimeMillis()` (настенные часы) — владелец мог в системных
+     *  Настройках перевести дату/время вперёд и снять блокировку от подбора PIN
+     *  мгновенно, без ожидания. `SystemClock.elapsedRealtime()` — монотонные
+     *  часы с момента загрузки устройства, не подвержены смене даты/времени
+     *  пользователем (сбрасываются только при перезагрузке — что само по себе
+     *  куда менее тривиальное действие, и просто снимает блокировку раньше
+     *  срока, а не открывает дыру). */
+    fun pinLockRemainingMs(): Long {
+        val until = try { pinLockedUntil.value } catch (e: Exception) { 0L }
+        val remaining = until - android.os.SystemClock.elapsedRealtime()
+        return if (remaining > 0) remaining else 0L
+    }
+
+    /** Сверка введённого PIN с сохранённым хешем. false и при отсутствии PIN
+     *  или активной блокировке — при блокировке попытка НЕ считается (иначе
+     *  блокировка продлевалась бы бесконечно от одних лишь попыток набора). */
+    fun verifyPin(pin: String): Boolean {
+        val raw = try { pinHashRaw.value } catch (e: Exception) { "" }
+        if (raw.isBlank()) return false
+        if (pinLockRemainingMs() > 0) return false
+        val parts = raw.split(":")
+        if (parts.size != 2) return false
+        val ok = try {
+            val salt = hexToBytes(parts[0])
+            val expected = hexToBytes(parts[1])
+            pbkdf2(pin, salt).contentEquals(expected)
+        } catch (e: Exception) { false }
+        if (ok) {
+            pinFailCount.value = 0
+            pinLockedUntil.value = 0L
+        } else {
+            val fails = (try { pinFailCount.value } catch (e: Exception) { 0 }) + 1
+            pinFailCount.value = fails
+            val lockMs = pinLockoutDurationMs(fails)
+            if (lockMs > 0) pinLockedUntil.value = android.os.SystemClock.elapsedRealtime() + lockMs
+        }
+        return ok
+    }
+
+    /** Блокировка ВСЕГО приложения на запуске/возврате из фона — отдельно от
+     *  «биометрия для защищённых заметок» (biometricLock выше). Требует PIN
+     *  ИЛИ биометрию — включать можно только если задан хотя бы один способ
+     *  разблокировки (проверяется в UI перед включением). */
+    val appLockEnabled: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "app_lock_enabled", default = false,
+            serialize = { it.toString() }, deserialize = { it == "true" }
+        )
+    }
+
+    fun appLockEnabledSafe(): Boolean =
+        try { appLockEnabled.value } catch (e: Exception) { false }
+
     /** Ежедневное напоминание «пора связаться» (по ритму общения). Персистентно. */
     val remindStaleContacts: MutableState<Boolean> by lazy {
         PersistedMutableState(

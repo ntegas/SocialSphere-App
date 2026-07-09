@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -26,6 +25,7 @@ import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler
+import com.aistudio.socialsphere.crmlxb.utils.findActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,8 +33,29 @@ fun PrivacySettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = context.findActivity()
     var showWipeConfirm by remember { mutableStateOf(false) }
     var wipeDone        by remember { mutableStateOf(false) }
+    val bioAvailable = remember {
+        com.aistudio.socialsphere.crmlxb.utils.BiometricGate.isAvailable(context)
+    }
+    val confirmEnableTitle = stringResource(R.string.lock_confirm_enable_title)
+    // Состояние блокировки приложения — объявлено на верхнем уровне функции
+    // (не внутри Column), т.к. читается и из диалогов ниже Scaffold.
+    var appLockEnabled by remember { AppSettings.appLockEnabled }
+    var hasPin by remember { mutableStateOf(AppSettings.hasPinSet()) }
+    var showPinSetup by remember { mutableStateOf(false) }
+    var showRemovePinConfirm by remember { mutableStateOf(false) }
+    // При ВКЛЮЧЕНИИ защиты не просто ставим флаг — сначала реально проверяем,
+    // что способ разблокировки работает (иначе владелец узнал бы о поломке
+    // только в момент, когда его уже заперло). При отключении проверка не нужна:
+    // экран уже открыт разблокированным устройством/приложением.
+    var showAppLockVerify by remember { mutableStateOf(false) }
+    var showBioLockVerify by remember { mutableStateOf(false) }
+    val canEnableLock = hasPin || bioAvailable
+    // Поднято сюда (было внутри Column) — читается и пишется из PinVerifySheet
+    // ниже Scaffold, как и appLockEnabled/hasPin.
+    var bioLock by remember { AppSettings.biometricLock }
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
@@ -60,15 +81,15 @@ fun PrivacySettingsScreen(
             // ── Локальное хранение — акцент-карта ──
             Box(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18)
                     .background(AppleTheme.colors.brand.copy(alpha = 0.08f))
-                    .border(1.dp, AppleTheme.colors.brand.copy(alpha = 0.16f), RoundedCornerShape(18.dp))
+                    .border(1.dp, AppleTheme.colors.brand.copy(alpha = 0.16f), com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18)
                     .padding(16.dp)
             ) {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         Box(
-                            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(AppleTheme.colors.brand),
+                            Modifier.size(34.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10).background(AppleTheme.colors.brand),
                             contentAlignment = Alignment.Center
                         ) { Icon(Icons.Default.Lock, null, Modifier.size(17.dp), tint = Color.White) }
                         Text(stringResource(R.string.priv_local_storage), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
@@ -85,13 +106,9 @@ fun PrivacySettingsScreen(
             // ── Защита записей: биометрия/код для «Защищено» ──
             Spacer(Modifier.height(22.dp))
             SectionCaps(stringResource(R.string.priv_protection))
-            var bioLock by remember { AppSettings.biometricLock }
-            val bioAvailable = remember {
-                com.aistudio.socialsphere.crmlxb.utils.BiometricGate.isAvailable(context)
-            }
             Box(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-                    .clip(RoundedCornerShape(18.dp)).background(AppleTheme.colors.card)
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18).background(AppleTheme.colors.card)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -100,7 +117,7 @@ fun PrivacySettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Box(
-                        Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+                        Modifier.size(30.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small)
                             .background(AppleTheme.colors.brand.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center
                     ) { Icon(Icons.Default.Fingerprint, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand) }
@@ -115,9 +132,98 @@ fun PrivacySettingsScreen(
                     }
                     Switch(
                         checked = bioLock,
-                        enabled = bioAvailable,
-                        onCheckedChange = { bioLock = it }
+                        // ФИКС (владелец сообщил: тап по тумблеру не делал ничего):
+                        // раньше был `enabled = bioAvailable` — тумблер оставался
+                        // НАВСЕГДА disabled на устройстве без биометрии, даже если
+                        // задан свой PIN (requestReveal() в ContactDetailScreen.kt
+                        // умеет проверять PIN как раз для этого случая, но включить
+                        // саму защиту без биометрии было physически невозможно).
+                        enabled = canEnableLock,
+                        onCheckedChange = { turnOn ->
+                            when {
+                                !turnOn -> bioLock = false
+                                // Реальная проверка ПЕРЕД включением, тем же
+                                // приоритетом «биометрия, иначе свой PIN», что и
+                                // у «Блокировки приложения» ниже.
+                                bioAvailable && activity != null ->
+                                    com.aistudio.socialsphere.crmlxb.utils.BiometricGate.authenticate(
+                                        activity, confirmEnableTitle
+                                    ) { bioLock = true }
+                                hasPin -> showBioLockVerify = true
+                                else -> {} // canEnableLock=false уже не даёт сюда попасть
+                            }
+                        }
                     )
+                }
+            }
+
+            // ── Блокировка приложения: PIN и/или биометрия перед всем контентом ──
+            Spacer(Modifier.height(22.dp))
+            SectionCaps(stringResource(R.string.lock_app_section))
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18).background(AppleTheme.colors.card)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                            .padding(horizontal = 15.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            Modifier.size(30.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small)
+                                .background(AppleTheme.colors.brand.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Default.Lock, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand) }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.lock_app_title), fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
+                            Text(
+                                if (canEnableLock) stringResource(R.string.lock_app_sub)
+                                else stringResource(R.string.lock_app_needs_method),
+                                fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
+                            )
+                        }
+                        Switch(
+                            checked = appLockEnabled,
+                            enabled = canEnableLock,
+                            onCheckedChange = { turnOn ->
+                                when {
+                                    !turnOn -> appLockEnabled = false
+                                    // Предпочитаем биометрию для проверки, если она
+                                    // доступна; иначе — свой PIN через ту же шторку,
+                                    // что используется для раскрытия заметок.
+                                    bioAvailable && activity != null ->
+                                        com.aistudio.socialsphere.crmlxb.utils.BiometricGate.authenticate(
+                                            activity, confirmEnableTitle
+                                        ) { appLockEnabled = true }
+                                    hasPin -> showAppLockVerify = true
+                                    else -> {} // canEnableLock=false уже не даёт сюда попасть
+                                }
+                            }
+                        )
+                    }
+                    androidx.compose.material3.HorizontalDivider(color = AppleTheme.colors.separator, modifier = Modifier.padding(start = 57.dp))
+                    PrivacyRow(
+                        icon = Icons.Default.Lock,
+                        iconTint = AppleTheme.colors.brand,
+                        title = if (hasPin) stringResource(R.string.lock_pin_change) else stringResource(R.string.lock_pin_set),
+                        subtitle = if (hasPin) stringResource(R.string.lock_pin_is_set) else stringResource(R.string.lock_pin_not_set),
+                        danger = false,
+                        chevron = true
+                    ) { showPinSetup = true }
+                    if (hasPin) {
+                        androidx.compose.material3.HorizontalDivider(color = AppleTheme.colors.separator, modifier = Modifier.padding(start = 57.dp))
+                        PrivacyRow(
+                            icon = Icons.Default.Delete,
+                            iconTint = AppleTheme.colors.alarmRed,
+                            title = stringResource(R.string.lock_pin_remove),
+                            subtitle = stringResource(R.string.lock_remove_pin_warning),
+                            danger = true,
+                            chevron = false
+                        ) { showRemovePinConfirm = true }
+                    }
                 }
             }
 
@@ -126,7 +232,7 @@ fun PrivacySettingsScreen(
             SectionCaps(stringResource(R.string.priv_android_perms))
             Box(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-                    .clip(RoundedCornerShape(18.dp)).background(AppleTheme.colors.card)
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18).background(AppleTheme.colors.card)
             ) {
                 PrivacyRow(
                     icon = Icons.Default.Security,
@@ -149,8 +255,8 @@ fun PrivacySettingsScreen(
             SectionCaps(stringResource(R.string.priv_danger_zone), AppleTheme.colors.alarmRed)
             Box(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-                    .clip(RoundedCornerShape(18.dp)).background(AppleTheme.colors.card)
-                    .border(1.dp, AppleTheme.colors.alarmRed.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18).background(AppleTheme.colors.card)
+                    .border(1.dp, AppleTheme.colors.alarmRed.copy(alpha = 0.25f), com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18)
             ) {
                 PrivacyRow(
                     icon = Icons.Default.DeleteForever,
@@ -170,6 +276,53 @@ fun PrivacySettingsScreen(
                 )
             }
         }
+    }
+
+    if (showAppLockVerify) {
+        PinVerifySheet(
+            title = confirmEnableTitle,
+            onSuccess = { appLockEnabled = true; showAppLockVerify = false },
+            onDismiss = { showAppLockVerify = false }
+        )
+    }
+
+    if (showBioLockVerify) {
+        PinVerifySheet(
+            title = confirmEnableTitle,
+            onSuccess = { bioLock = true; showBioLockVerify = false },
+            onDismiss = { showBioLockVerify = false }
+        )
+    }
+
+    if (showPinSetup) {
+        PinSetupSheet(
+            onDone = { showPinSetup = false; hasPin = AppSettings.hasPinSet() },
+            onDismiss = { showPinSetup = false }
+        )
+    }
+
+    if (showRemovePinConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRemovePinConfirm = false },
+            title = { Text(stringResource(R.string.lock_remove_pin_q), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.lock_remove_pin_warning)) },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red),
+                    onClick = {
+                        showRemovePinConfirm = false
+                        AppSettings.clearPin()
+                        hasPin = false
+                        // Без PIN и без биометрии блокировка приложения заперла
+                        // бы владельца без способа разблокировки — выключаем.
+                        if (!bioAvailable) appLockEnabled = false
+                    }
+                ) { Text(stringResource(R.string.lock_pin_remove)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemovePinConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
     }
 
     if (showWipeConfirm) {
@@ -220,7 +373,7 @@ private fun PrivacyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
-            Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(iconTint.copy(alpha = 0.14f)),
+            Modifier.size(30.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small).background(iconTint.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center
         ) { Icon(icon, null, Modifier.size(16.dp), tint = iconTint) }
         Column(modifier = Modifier.weight(1f)) {

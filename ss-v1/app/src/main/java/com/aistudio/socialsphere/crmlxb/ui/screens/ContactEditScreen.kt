@@ -268,124 +268,98 @@ fun ContactEditScreen(
             )
         } else newRelSelected?.let { sel ->
             // Шаг 2: роли (кто он мне / кто я ему)
-            AlertDialog(
-                onDismissRequest = { showAddRelation = false; newRelSelected = null },
-                title = { Text("${sel.firstName} ${sel.lastName}".trim(), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(
-                        modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        DropdownField(stringResource(R.string.ce_who_relation), newRelOtherRole, relationRoles) { v ->
-                            newRelOtherRole = v
-                            if (!myRoleTouched) newRelMyRole = inverseRole(v)
-                        }
-                        DropdownField(stringResource(R.string.ce_who_am_i), newRelMyRole, relationRoles) { v ->
-                            newRelMyRole = v; myRoleTouched = true
-                        }
-                    }
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                title = "${sel.firstName} ${sel.lastName}".trim(),
+                onDismiss = { showAddRelation = false; newRelSelected = null },
+                confirmText = stringResource(R.string.common_add),
+                onConfirm = {
+                    contactRelationsDraft = contactRelationsDraft + ContactRelation(
+                        id              = UUID.randomUUID().toString(),
+                        firstContactId  = editedContactId,
+                        secondContactId = sel.id,
+                        firstRole       = newRelMyRole,
+                        secondRole      = newRelOtherRole
+                    )
+                    newRelSelected = null
+                    showAddRelation = false
                 },
-                confirmButton = {
-                    Button(onClick = {
-                        contactRelationsDraft = contactRelationsDraft + ContactRelation(
-                            id              = UUID.randomUUID().toString(),
-                            firstContactId  = editedContactId,
-                            secondContactId = sel.id,
-                            firstRole       = newRelMyRole,
-                            secondRole      = newRelOtherRole
-                        )
-                        newRelSelected = null
-                        showAddRelation = false
-                    }) { Text(stringResource(R.string.common_add)) }
-                },
-                dismissButton = {
-                    TextButton(onClick = { newRelSelected = null }) { Text(stringResource(R.string.common_back)) }
+                secondaryText = stringResource(R.string.common_back),
+                onSecondary = { newRelSelected = null }
+            ) {
+                DropdownField(stringResource(R.string.ce_who_relation), newRelOtherRole, relationRoles) { v ->
+                    newRelOtherRole = v
+                    if (!myRoleTouched) newRelMyRole = inverseRole(v)
                 }
-            )
+                DropdownField(stringResource(R.string.ce_who_am_i), newRelMyRole, relationRoles) { v ->
+                    newRelMyRole = v; myRoleTouched = true
+                }
+            }
         }
     }
     if (showAddPhone) {
-        AlertDialog(
-            onDismissRequest = { showAddPhone = false; newPhone = "" },
-            title = { Text(stringResource(R.string.ce_add_phone), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(value = newPhone, onValueChange = { newPhone = it }, keyboardOptions = PhoneKeyboard, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth())
-                    DropdownField(stringResource(R.string.ce_type), newPhoneType.label(ctxLabel), PhoneType.values().map { it.label(ctxLabel) }) { v -> newPhoneType = PhoneType.values().firstOrNull { it.label(ctxLabel) == v } ?: PhoneType.MOBILE }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.ce_add_phone),
+            onDismiss = { showAddPhone = false; newPhone = "" },
+            confirmText = stringResource(R.string.common_add),
+            onConfirm = {
+                if (newPhone.isNotBlank()) {
+                    phones = phones + ContactPhone(UUID.randomUUID().toString(), editedContactId, newPhone.trim(), newPhoneType, phones.isEmpty())
+                    newPhone = ""; showAddPhone = false
                 }
             },
-            confirmButton = {
-                Button(onClick = {
-                    if (newPhone.isNotBlank()) {
-                        phones = phones + ContactPhone(UUID.randomUUID().toString(), editedContactId, newPhone.trim(), newPhoneType, phones.isEmpty())
-                        newPhone = ""; showAddPhone = false
-                    }
-                }) { Text(stringResource(R.string.common_add)) }
-            },
-            dismissButton = { TextButton(onClick = { showAddPhone = false; newPhone = "" }) { Text(stringResource(R.string.common_cancel)) } }
-        )
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { showAddPhone = false; newPhone = "" }
+        ) {
+            OutlinedTextField(value = newPhone, onValueChange = { newPhone = it }, keyboardOptions = PhoneKeyboard, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth())
+            DropdownField(stringResource(R.string.ce_type), newPhoneType.label(ctxLabel), PhoneType.values().map { it.label(ctxLabel) }) { v -> newPhoneType = PhoneType.values().firstOrNull { it.label(ctxLabel) == v } ?: PhoneType.MOBILE }
+        }
     }
 
     if (showAddEmail) {
-        AlertDialog(
-            onDismissRequest = { showAddEmail = false; newEmail = "" },
-            title = { Text(stringResource(R.string.ce_add_email), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(value = newEmail, onValueChange = { newEmail = it }, keyboardOptions = EmailKeyboard, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
-                    DropdownField(stringResource(R.string.ce_type), newEmailType.label(ctxLabel), EmailType.values().map { it.label(ctxLabel) }) { v -> newEmailType = EmailType.values().firstOrNull { it.label(ctxLabel) == v } ?: EmailType.PERSONAL }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.ce_add_email),
+            onDismiss = { showAddEmail = false; newEmail = "" },
+            confirmText = stringResource(R.string.common_add),
+            onConfirm = {
+                if (newEmail.isNotBlank()) {
+                    emails = emails + ContactEmail(UUID.randomUUID().toString(), editedContactId, newEmail.trim(), newEmailType, emails.isEmpty())
+                    newEmail = ""; showAddEmail = false
                 }
             },
-            confirmButton = {
-                Button(onClick = {
-                    if (newEmail.isNotBlank()) {
-                        emails = emails + ContactEmail(UUID.randomUUID().toString(), editedContactId, newEmail.trim(), newEmailType, emails.isEmpty())
-                        newEmail = ""; showAddEmail = false
-                    }
-                }) { Text(stringResource(R.string.common_add)) }
-            },
-            dismissButton = { TextButton(onClick = { showAddEmail = false; newEmail = "" }) { Text(stringResource(R.string.common_cancel)) } }
-        )
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { showAddEmail = false; newEmail = "" }
+        ) {
+            OutlinedTextField(value = newEmail, onValueChange = { newEmail = it }, keyboardOptions = EmailKeyboard, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+            DropdownField(stringResource(R.string.ce_type), newEmailType.label(ctxLabel), EmailType.values().map { it.label(ctxLabel) }) { v -> newEmailType = EmailType.values().firstOrNull { it.label(ctxLabel) == v } ?: EmailType.PERSONAL }
+        }
     }
 
     if (showAddMessenger) {
-        AlertDialog(
-            onDismissRequest = { showAddMessenger = false; newMessenger = "" },
-            title = { Text(stringResource(R.string.ce_add_messenger), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(stringResource(R.string.ce_platform), style = MaterialTheme.typography.labelMedium, color = AppleTheme.colors.secondaryLabel)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MessengerType.values().forEach { mt ->
-                            FilterChip(
-                                selected = newMessengerType == mt,
-                                onClick = { newMessengerType = mt },
-                                label = { Text(mt.label(ctxLabel)) }
-                            )
-                        }
-                    }
-                    OutlinedTextField(value = newMessenger, onValueChange = { newMessenger = it }, label = { Text(stringResource(R.string.ce_username_number)) }, modifier = Modifier.fillMaxWidth())
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.ce_add_messenger),
+            onDismiss = { showAddMessenger = false; newMessenger = "" },
+            confirmText = stringResource(R.string.common_add),
+            onConfirm = {
+                if (newMessenger.isNotBlank()) {
+                    messengers = messengers + Messenger(UUID.randomUUID().toString(), editedContactId, newMessengerType, newMessenger.trim(), null, messengers.isEmpty())
+                    newMessenger = ""; showAddMessenger = false
                 }
             },
-            confirmButton = {
-                Button(onClick = {
-                    if (newMessenger.isNotBlank()) {
-                        messengers = messengers + Messenger(UUID.randomUUID().toString(), editedContactId, newMessengerType, newMessenger.trim(), null, messengers.isEmpty())
-                        newMessenger = ""; showAddMessenger = false
-                    }
-                }) { Text(stringResource(R.string.common_add)) }
-            },
-            dismissButton = { TextButton(onClick = { showAddMessenger = false; newMessenger = "" }) { Text(stringResource(R.string.common_cancel)) } }
-        )
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { showAddMessenger = false; newMessenger = "" }
+        ) {
+            Text(stringResource(R.string.ce_platform), style = MaterialTheme.typography.labelMedium, color = AppleTheme.colors.secondaryLabel)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MessengerType.values().forEach { mt ->
+                    FilterChip(
+                        selected = newMessengerType == mt,
+                        onClick = { newMessengerType = mt },
+                        label = { Text(mt.label(ctxLabel)) }
+                    )
+                }
+            }
+            OutlinedTextField(value = newMessenger, onValueChange = { newMessenger = it }, label = { Text(stringResource(R.string.ce_username_number)) }, modifier = Modifier.fillMaxWidth())
+        }
     }
 
     Scaffold(
@@ -511,7 +485,7 @@ fun ContactEditScreen(
                 // Приставка (Dr./г-н) — отдельная карточка, как в андроид-редакторе
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                     colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
@@ -524,7 +498,7 @@ fun ContactEditScreen(
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                     colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
@@ -545,7 +519,7 @@ fun ContactEditScreen(
                 // Отчество — как в телефонной книге (импортируется из vCard/устройства)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                     colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
@@ -558,7 +532,7 @@ fun ContactEditScreen(
                 // Суффикс (мл./ст.) — как в андроид-редакторе, идёт после отчества/фамилии
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                     colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
@@ -571,7 +545,7 @@ fun ContactEditScreen(
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                     colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
@@ -586,7 +560,7 @@ fun ContactEditScreen(
                 // произношение не следует из письменной формы (как в андроид)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                     colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
@@ -633,25 +607,25 @@ fun ContactEditScreen(
             }
             if (showCustomRelDialog) {
                 var draft by remember { mutableStateOf(customRelationType) }
-                AlertDialog(
-                    onDismissRequest = { showCustomRelDialog = false },
-                    title = { Text(stringResource(R.string.ce_relation_custom_title), fontWeight = FontWeight.Bold) },
-                    text = {
-                        OutlinedTextField(
-                            value = draft, onValueChange = { draft = it }, keyboardOptions = CapSentences,
-                            label = { Text(stringResource(R.string.ce_relation_custom_hint)) },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true
-                        )
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                    title = stringResource(R.string.ce_relation_custom_title),
+                    onDismiss = { showCustomRelDialog = false },
+                    confirmText = stringResource(R.string.common_save),
+                    confirmEnabled = draft.isNotBlank(),
+                    onConfirm = {
+                        customRelationType = draft.trim()
+                        relationshipType = RelationshipType.OTHER
+                        showCustomRelDialog = false
                     },
-                    confirmButton = {
-                        Button(enabled = draft.isNotBlank(), onClick = {
-                            customRelationType = draft.trim()
-                            relationshipType = RelationshipType.OTHER
-                            showCustomRelDialog = false
-                        }) { Text(stringResource(R.string.common_save)) }
-                    },
-                    dismissButton = { TextButton(onClick = { showCustomRelDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
-                )
+                    secondaryText = stringResource(R.string.common_cancel),
+                    onSecondary = { showCustomRelDialog = false }
+                ) {
+                    OutlinedTextField(
+                        value = draft, onValueChange = { draft = it }, keyboardOptions = CapSentences,
+                        label = { Text(stringResource(R.string.ce_relation_custom_hint)) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                }
             }
 
             // ── Важность (пилюли, ключевой — золотом) ─────────────────
@@ -863,50 +837,45 @@ fun ContactEditScreen(
                 }
                 if (showNewCompanyDialog) {
                     var newCompanyName by remember { mutableStateOf("") }
-                    AlertDialog(
-                        onDismissRequest = { showNewCompanyDialog = false },
-                        title = { Text(stringResource(R.string.ce_new_company_title), fontWeight = FontWeight.Bold) },
-                        text = {
-                            OutlinedTextField(
-                                value = newCompanyName,
-                                onValueChange = { newCompanyName = it }, keyboardOptions = CapWords,
-                                label = { Text(stringResource(R.string.ce_company_name_req)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                shape = SocialShape.Small
-                            )
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                        title = stringResource(R.string.ce_new_company_title),
+                        onDismiss = { showNewCompanyDialog = false },
+                        confirmText = stringResource(R.string.ce_create),
+                        confirmEnabled = newCompanyName.isNotBlank(),
+                        onConfirm = {
+                            val clean = newCompanyName.trim()
+                            // Дедуп: компания с таким именем уже есть — выбираем её
+                            val existing = AppStateStore.companies
+                                .find { it.name.equals(clean, ignoreCase = true) }
+                            if (existing != null) {
+                                selectedCompanyId = existing.id
+                            } else {
+                                val now = java.time.LocalDateTime.now()
+                                    .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                val company = Company(
+                                    id = UUID.randomUUID().toString(),
+                                    name = clean,
+                                    industry = Industry.OTHER,
+                                    createdAt = now,
+                                    updatedAt = now
+                                )
+                                AppStateStore.addCompany(company)
+                                selectedCompanyId = company.id
+                            }
+                            showNewCompanyDialog = false
                         },
-                        confirmButton = {
-                            Button(
-                                enabled = newCompanyName.isNotBlank(),
-                                onClick = {
-                                    val clean = newCompanyName.trim()
-                                    // Дедуп: компания с таким именем уже есть — выбираем её
-                                    val existing = AppStateStore.companies
-                                        .find { it.name.equals(clean, ignoreCase = true) }
-                                    if (existing != null) {
-                                        selectedCompanyId = existing.id
-                                    } else {
-                                        val now = java.time.LocalDateTime.now()
-                                            .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                                        val company = Company(
-                                            id = UUID.randomUUID().toString(),
-                                            name = clean,
-                                            industry = Industry.OTHER,
-                                            createdAt = now,
-                                            updatedAt = now
-                                        )
-                                        AppStateStore.addCompany(company)
-                                        selectedCompanyId = company.id
-                                    }
-                                    showNewCompanyDialog = false
-                                }
-                            ) { Text(stringResource(R.string.ce_create)) }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showNewCompanyDialog = false }) { Text(stringResource(R.string.common_cancel)) }
-                        }
-                    )
+                        secondaryText = stringResource(R.string.common_cancel),
+                        onSecondary = { showNewCompanyDialog = false }
+                    ) {
+                        OutlinedTextField(
+                            value = newCompanyName,
+                            onValueChange = { newCompanyName = it }, keyboardOptions = CapWords,
+                            label = { Text(stringResource(R.string.ce_company_name_req)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = SocialShape.Small
+                        )
+                    }
                 }
                 if (selectedCompanyId.isNotBlank()) {
                     OutlinedTextField(value = companyPosition, onValueChange = { companyPosition = it }, keyboardOptions = CapSentences, label = { Text(stringResource(R.string.ce_position)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small)
@@ -1092,7 +1061,7 @@ fun ContactEditScreen(
 fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
         colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -1199,14 +1168,14 @@ fun ContactItemRow(
 ) {
     Row(
         modifier = modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14)
             .background(AppleTheme.colors.card)
             .padding(horizontal = 10.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
-            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(iconBg),
+            modifier = Modifier.size(36.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10).background(iconBg),
             contentAlignment = Alignment.Center
         ) { Icon(icon, null, Modifier.size(18.dp), tint = iconTint) }
         OutlinedTextField(

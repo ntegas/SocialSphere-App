@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -74,7 +73,7 @@ private fun LanguageRow(badge: String, title: String, selected: Boolean, onClick
         horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
         Box(
-            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+            modifier = Modifier.size(30.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small)
                 .background(if (selected) AppleTheme.colors.brand.copy(alpha = 0.12f) else AppleTheme.colors.neutralFill),
             contentAlignment = Alignment.Center
         ) {

@@ -200,6 +200,11 @@ data class Note(
     val text: String,
     val date: String? = null,
     val isImportant: Boolean,
+    // Приватность записи — независимо от isImportant (важность = попадает в
+    // Обзор/Шпаргалку; isLocked = скрывается блюром при включённой «Защите
+    // записей»). Владелец решает по каждой записи отдельно, как в iOS Notes/
+    // WhatsApp Chat Lock — не автоматика по типу/вкладке.
+    val isLocked: Boolean = false,
     val createdAt: String,
     val updatedAt: String
 )

@@ -195,6 +195,7 @@ fun Note.toEntity(): NoteEntity = NoteEntity(
     text = text,
     date = date,
     isImportant = isImportant,
+    isLocked = isLocked,
     createdAt = createdAt,
     updatedAt = updatedAt
 )
@@ -391,6 +392,7 @@ fun NoteEntity.toDomain(): Note = Note(
     text = text,
     date = date,
     isImportant = isImportant,
+    isLocked = isLocked,
     createdAt = createdAt,
     updatedAt = updatedAt
 )

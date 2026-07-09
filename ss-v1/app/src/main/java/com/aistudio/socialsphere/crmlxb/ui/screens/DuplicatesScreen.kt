@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -84,7 +83,7 @@ fun DuplicatesScreen(
             // ── Ручное объединение: выбрать два любых контакта ──
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
                 colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                 elevation = CardDefaults.cardElevation(1.dp)
             ) {
@@ -103,7 +102,7 @@ fun DuplicatesScreen(
                                 pendingMerge = keep to drop
                             }
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppleTheme.colors.brand, contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().height(42.dp)
@@ -122,7 +121,7 @@ fun DuplicatesScreen(
                     val drop = if (keep.id == a.id) b else a
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
                         colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                         elevation = CardDefaults.cardElevation(1.dp)
                     ) {
@@ -170,7 +169,7 @@ fun DuplicatesScreen(
                             )
                             Button(
                                 onClick = { pendingMerge = keep to drop },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = AppleTheme.colors.brand,
                                     contentColor = Color.White
@@ -270,7 +269,7 @@ fun DuplicatesScreen(
 private fun ManualPickRow(label: String, picked: Contact?, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
             .background(AppleTheme.colors.neutralFill)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),

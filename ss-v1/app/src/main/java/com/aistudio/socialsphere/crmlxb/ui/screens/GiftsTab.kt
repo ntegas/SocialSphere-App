@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -152,90 +151,80 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
             val remindOptions = listOf(
                 ReminderTime.NONE, ReminderTime.ON_DAY, ReminderTime.DAY_1, ReminderTime.WEEK_1
             )
-            AlertDialog(
-                onDismissRequest = { showAddDate = false },
-                title = { Text(stringResource(R.string.cd_add_important_date), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(
-                        modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(stringResource(R.string.cd_date_type), style = MaterialTheme.typography.labelMedium)
-                        androidx.compose.foundation.layout.FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            typeOptions.forEach { t ->
-                                FilterChip(selected = dType == t, onClick = { dType = t },
-                                    label = { Text(t.label(ctx)) })
-                            }
-                        }
-                        OutlinedTextField(
-                            value = dTitle, onValueChange = { dTitle = it }, keyboardOptions = CapSentences,
-                            label = { Text(stringResource(R.string.cd_date_title_opt)) },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true
-                        )
-                        DatePickerField(
-                            value = dDate,
-                            onValueChange = { dDate = it },
-                            label = stringResource(R.string.cd_date_iso),
-                            modifier = Modifier.fillMaxWidth(),
-                            allowNoYear = true // ДР/годовщина без известного года — «--MM-DD»
-                        )
-                        Text(stringResource(R.string.cd_date_reminder), style = MaterialTheme.typography.labelMedium)
-                        androidx.compose.foundation.layout.FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            remindOptions.forEach { r ->
-                                FilterChip(selected = dRemind == r, onClick = { dRemind = r },
-                                    label = { Text(r.label(ctx)) })
-                            }
-                        }
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+                title = stringResource(R.string.cd_add_important_date),
+                onDismiss = { showAddDate = false },
+                confirmText = stringResource(R.string.common_add),
+                confirmEnabled = dDate.isNotBlank(),
+                onConfirm = {
+                    val itemId = java.util.UUID.randomUUID().toString()
+                    val now = java.time.LocalDateTime.now()
+                        .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    val reminders = when (dRemind) {
+                        ReminderTime.ON_DAY, ReminderTime.AT_EVENT ->
+                            listOf(ReminderRule(java.util.UUID.randomUUID().toString(), itemId, ReminderType.AT_TIME))
+                        ReminderTime.DAY_1 ->
+                            listOf(ReminderRule(java.util.UUID.randomUUID().toString(), itemId, ReminderType.BEFORE, 1, ReminderOffsetUnit.DAYS))
+                        ReminderTime.WEEK_1 ->
+                            listOf(ReminderRule(java.util.UUID.randomUUID().toString(), itemId, ReminderType.BEFORE, 1, ReminderOffsetUnit.WEEKS))
+                        else -> emptyList()
                     }
+                    val item = CalendarItem(
+                        id = itemId,
+                        title = dTitle.ifBlank { dType.label(ctx) },
+                        type = dType,
+                        startDate = dDate.trim(),
+                        isAllDay = true,
+                        status = CalendarItemStatus.ACTIVE,
+                        importance = if (dType == CalendarItemType.BIRTHDAY) ImportanceLevel.KEY else ImportanceLevel.NORMAL,
+                        recurrenceRule = if (dType == CalendarItemType.BIRTHDAY ||
+                            dType == CalendarItemType.ANNIVERSARY || dType == CalendarItemType.NAMEDAY)
+                            RecurrenceMode.YEARLY.toRRule() else null,
+                        links = listOf(CalendarItemLink(
+                            java.util.UUID.randomUUID().toString(), itemId,
+                            CalendarTargetType.CONTACT, contact.id)),
+                        reminders = reminders,
+                        createdAt = now, updatedAt = now
+                    )
+                    AppStateStore.addCalendarItem(item)
+                    com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+                        .rescheduleReminders(ctx, emptyList(), item)
+                    showAddDate = false
                 },
-                confirmButton = {
-                    Button(
-                        enabled = dDate.isNotBlank(),
-                        onClick = {
-                            val itemId = java.util.UUID.randomUUID().toString()
-                            val now = java.time.LocalDateTime.now()
-                                .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            val reminders = when (dRemind) {
-                                ReminderTime.ON_DAY, ReminderTime.AT_EVENT ->
-                                    listOf(ReminderRule(java.util.UUID.randomUUID().toString(), itemId, ReminderType.AT_TIME))
-                                ReminderTime.DAY_1 ->
-                                    listOf(ReminderRule(java.util.UUID.randomUUID().toString(), itemId, ReminderType.BEFORE, 1, ReminderOffsetUnit.DAYS))
-                                ReminderTime.WEEK_1 ->
-                                    listOf(ReminderRule(java.util.UUID.randomUUID().toString(), itemId, ReminderType.BEFORE, 1, ReminderOffsetUnit.WEEKS))
-                                else -> emptyList()
-                            }
-                            val item = CalendarItem(
-                                id = itemId,
-                                title = dTitle.ifBlank { dType.label(ctx) },
-                                type = dType,
-                                startDate = dDate.trim(),
-                                isAllDay = true,
-                                status = CalendarItemStatus.ACTIVE,
-                                importance = if (dType == CalendarItemType.BIRTHDAY) ImportanceLevel.KEY else ImportanceLevel.NORMAL,
-                                recurrenceRule = if (dType == CalendarItemType.BIRTHDAY ||
-                                    dType == CalendarItemType.ANNIVERSARY || dType == CalendarItemType.NAMEDAY)
-                                    RecurrenceMode.YEARLY.toRRule() else null,
-                                links = listOf(CalendarItemLink(
-                                    java.util.UUID.randomUUID().toString(), itemId,
-                                    CalendarTargetType.CONTACT, contact.id)),
-                                reminders = reminders,
-                                createdAt = now, updatedAt = now
-                            )
-                            AppStateStore.addCalendarItem(item)
-                            com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
-                                .rescheduleReminders(ctx, emptyList(), item)
-                            showAddDate = false
-                        }
-                    ) { Text(stringResource(R.string.common_add)) }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showAddDate = false }) { Text(stringResource(R.string.common_cancel)) }
+                secondaryText = stringResource(R.string.common_cancel),
+                onSecondary = { showAddDate = false }
+            ) {
+                Text(stringResource(R.string.cd_date_type), style = MaterialTheme.typography.labelMedium)
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    typeOptions.forEach { t ->
+                        FilterChip(selected = dType == t, onClick = { dType = t },
+                            label = { Text(t.label(ctx)) })
+                    }
                 }
-            )
+                OutlinedTextField(
+                    value = dTitle, onValueChange = { dTitle = it }, keyboardOptions = CapSentences,
+                    label = { Text(stringResource(R.string.cd_date_title_opt)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                DatePickerField(
+                    value = dDate,
+                    onValueChange = { dDate = it },
+                    label = stringResource(R.string.cd_date_iso),
+                    modifier = Modifier.fillMaxWidth(),
+                    allowNoYear = true // ДР/годовщина без известного года — «--MM-DD»
+                )
+                Text(stringResource(R.string.cd_date_reminder), style = MaterialTheme.typography.labelMedium)
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    remindOptions.forEach { r ->
+                        FilterChip(selected = dRemind == r, onClick = { dRemind = r },
+                            label = { Text(r.label(ctx)) })
+                    }
+                }
+            }
         }
     }
 
@@ -422,7 +411,7 @@ private fun GiftRow(
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
                 .background(AureliaTheme.colors.gold.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center
         ) {
@@ -457,7 +446,7 @@ private fun GiftStatusPill(status: GiftStatus) {
     }
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(13.dp))
+            .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13)
             .background(bg)
             .padding(horizontal = 11.dp, vertical = 4.dp)
     ) {

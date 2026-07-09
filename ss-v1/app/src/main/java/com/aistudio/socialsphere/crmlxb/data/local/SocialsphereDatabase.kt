@@ -1,7 +1,6 @@
 package com.aistudio.socialsphere.crmlxb.data.local
 
 import android.content.Context
-import com.aistudio.socialsphere.crmlxb.BuildConfig
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -28,7 +27,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ContactGroupEntity::class,
         ContactGroupMemberEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 abstract class SocialsphereDatabase : RoomDatabase() {
@@ -198,24 +197,38 @@ abstract class SocialsphereDatabase : RoomDatabase() {
             }
         }
 
+        // v14 (2026-07-08): приватность заметки — отдельно от isImportant (см. базу
+        // знаний §29). isImportant остаётся «попадает в Обзор/Шпаргалку + красная
+        // рамка», isLocked — «скрывается блюром под Защитой записей», владелец
+        // выбирает по каждой записи вручную (как iOS Notes/WhatsApp Chat Lock).
+        internal val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE notes ADD COLUMN isLocked INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getDatabase(context: Context): SocialsphereDatabase {
             return INSTANCE ?: synchronized(this) {
-                val builder = Room.databaseBuilder(
+                // ФИКС КРИТИЧНОГО БАГА (2026-07-07, владелец: «теряю данные при
+                // каждом обновлении»): здесь стоял `fallbackToDestructiveMigration()`
+                // для DEBUG-сборок — а владелец пользуется именно debug-сборкой
+                // (отдельного release-процесса нет), т.е. КАЖДЫЙ раз, когда Room
+                // не находил идеального совпадения схемы (после почти любой правки
+                // Entity), он МОЛЧА стирал всю БД и создавал её заново — ни падения,
+                // ни предупреждения, просто пустые контакты/заметки/даты при
+                // следующем запуске. Все переходы 1→13 покрыты миграциями без
+                // пропусков (см. ниже) — fallback не нужен, он был ложной защитой
+                // «на всякий случай», которая на практике стирала боевые данные
+                // владельца. Теперь при отсутствии валидного пути миграции Room
+                // упадёт с явным исключением (описывающим несовпадение схемы) —
+                // это заметно и чинится, а не тихая потеря данных.
+                val instance = Room.databaseBuilder(
                     context.applicationContext,
                     SocialsphereDatabase::class.java,
                     "socialsphere_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
-
-                // Destructive fallback — ТОЛЬКО в debug. В release недостающая
-                // миграция/несовпадение схемы должны падать с явной ошибкой Room,
-                // а НЕ тихо стирать боевую БД владельца (правило: потеря данных
-                // недопустима). Пропуск миграции теперь ловится на сборке гардом
-                // У55 и exportSchema; этот fallback — лишь удобство для debug-данных.
-                if (BuildConfig.DEBUG) {
-                    builder.fallbackToDestructiveMigration()
-                }
-                val instance = builder.build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                .build()
                 INSTANCE = instance
                 instance
             }

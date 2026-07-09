@@ -11,15 +11,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -33,6 +39,7 @@ import com.aistudio.socialsphere.crmlxb.ui.theme.MyApplicationTheme
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.data.local.SocialsphereDatabase
 import com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings
+import com.aistudio.socialsphere.crmlxb.utils.findActivity
 
 // FragmentActivity (наследник ComponentActivity) — требование androidx.biometric
 // BiometricPrompt для разблокировки «Защищено»; остальное поведение не меняется.
@@ -84,6 +91,20 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     }
 }
 
+// Состояние блокировки приложения — НЕ персистентное (нарочно): после смерти
+// процесса приложение должно снова запросить PIN/биометрию, это безопасный
+// дефолт. backgroundedAt переживает только сворачивание/разворачивание в
+// рамках одного процесса — ровно то, что нужно для grace-периода.
+private object AppLockState {
+    var unlocked by mutableStateOf(false)
+    var backgroundedAt: Long? = null
+}
+
+// Не перезапрашиваем PIN/биометрию, если приложение свернули меньше чем на
+// это время — иначе ExternalActionHandler.startIntentSafely (звонок/SMS/карты)
+// внешним интентом сворачивает приложение и тут же запирал бы его снова.
+private const val APP_LOCK_GRACE_MS = 30_000L
+
 @Composable
 fun SocialsphereApp() {
     // Первый запуск — экран приветствия (макет Aurelia). После «Начать» ставим
@@ -91,6 +112,30 @@ fun SocialsphereApp() {
     val onboardingDone by AppSettings.onboardingCompleted
     if (!onboardingDone) {
         OnboardingScreen(onStart = { AppSettings.onboardingCompleted.value = true })
+        return
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> AppLockState.backgroundedAt = System.currentTimeMillis()
+                Lifecycle.Event.ON_START -> {
+                    val bgAt = AppLockState.backgroundedAt
+                    if (bgAt != null && System.currentTimeMillis() - bgAt > APP_LOCK_GRACE_MS) {
+                        AppLockState.unlocked = false
+                    }
+                    AppLockState.backgroundedAt = null
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (AppSettings.appLockEnabledSafe() && !AppLockState.unlocked) {
+        AppLockScreen(onUnlocked = { AppLockState.unlocked = true })
         return
     }
 
@@ -104,6 +149,9 @@ fun SocialsphereApp() {
         Triple("map", R.string.nav_map, Icons.Default.Map)
     )
 
+    val navBackStackEntryOuter by navController.currentBackStackEntryAsState()
+    val showBottomBarOuter = navigationItems.any { it.first == navBackStackEntryOuter?.destination?.route }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         // ФИКС «слишком большой отступ сверху на всех экранах»: внешний Scaffold
@@ -114,9 +162,9 @@ fun SocialsphereApp() {
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentDestination = navBackStackEntry?.destination
-            
+
             val showBottomBar = navigationItems.any { it.first == currentDestination?.route }
-            
+
             if (showBottomBar) {
                 // Навигация по вкладке — канонический паттерн нижней навигации Android:
                 // один navigate с popUpTo(start){saveState} + restoreState + singleTop.
@@ -178,9 +226,17 @@ fun SocialsphereApp() {
             // FIX (фидбэк владельца 2026-07-04): клавиатура перекрывала поля ввода
             // по всему приложению — edge-to-edge (enableEdgeToEdge) + обнулённые
             // contentWindowInsets на внешнем Scaffold означают, что НИЧТО не
-            // подстраивалось под IME. imePadding() здесь один раз чинит это для
-            // всех экранов сразу.
-            modifier = Modifier.padding(innerPadding).imePadding()
+            // подстраивалось под IME. imePadding() чинит это для всех экранов —
+            // НО только там, где нет соседнего нижнего меню: на 5 вкладках
+            // (Home/Contacts/...) bottomBar не двигается с клавиатурой, а
+            // imePadding здесь дополнительно сжимал контент НАД ним — между
+            // контентом и неподвижным меню появлялась серая полоса фона,
+            // растущая вместе с клавиатурой (фидбэк владельца 2026-07-05).
+            // На вкладках search живёт в верхнем баре — сдвигать контент вверх
+            // там не нужно вообще; на push-экранах (формы/детали) bottomBar
+            // скрыт, конфликта нет — imePadding работает как задумано.
+            modifier = Modifier.padding(innerPadding)
+                .then(if (showBottomBarOuter) Modifier else Modifier.imePadding())
         ) {
             composable("home") {
                 HomeScreen(
@@ -389,7 +445,11 @@ fun SocialsphereApp() {
             }
         }
         
-        val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+        // ФИКС: тот же баг, что и в BiometricGate (2026-07-05) — LocalContext.current
+        // здесь тоже приходит через обёртку LocalizedApp/createConfigurationContext,
+        // прямой `as? Activity` всегда давал null, и диплинк «открыть из
+        // уведомления» на самом деле никогда не срабатывал.
+        val activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
         androidx.compose.runtime.LaunchedEffect(activity?.intent) {
             val calendarItemId = activity?.intent?.getStringExtra("calendarItemId")
             if (calendarItemId != null) {

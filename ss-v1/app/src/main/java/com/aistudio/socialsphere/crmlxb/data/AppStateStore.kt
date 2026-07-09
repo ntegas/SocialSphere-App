@@ -574,6 +574,17 @@ object AppStateStore {
      * ДО deleteContact (его каскад чистит notes по contactId). Контакт удаляется.
      * @return id созданной компании или null (контакт не найден / пустое имя).
      */
+    // ФИКС (аудит 2026-07-06): раньше переносились ТОЛЬКО phones/emails/addresses/
+    // notes, а фото, привязанные события календаря и т.д. молча пропадали вместе
+    // с удалённым контактом — диалог подтверждения предупреждал не обо всём.
+    // Company НЕ имеет полей под messengers/gifts/personalDetails/sizeInfo/tags/
+    // familyNote/profession/contactRelations/группы (это личные, не деловые
+    // понятия — добавлять их значило бы превращать Company в клон Contact), так
+    // что эти поля переносить некуда — они по-прежнему теряются, но теперь
+    // честно и полностью перечислены в тексте подтверждения (cd_convert_company_text).
+    // Перенесены дополнительно: фото → логотип компании (поле уже существовало,
+    // просто не заполнялось), ссылки календарных событий на контакт → на компанию
+    // (тот же паттерн ретаргетинга, что при слиянии дублей, см. mergeContacts).
     fun convertContactToCompany(contactId: String): String? {
         val c = getContact(contactId) ?: return null
         val name = listOfNotNull(c.firstName, c.middleName, c.lastName)
@@ -584,6 +595,7 @@ object AppStateStore {
         val company = Company(
             id = companyId,
             name = name,
+            logoUri = c.photoUri,
             industry = Industry.OTHER,
             phones = c.phones.map { it.copy(id = generateId(), contactId = companyId, isPrimary = false) },
             emails = c.emails.map { it.copy(id = generateId(), contactId = companyId, isPrimary = false) },
@@ -598,6 +610,16 @@ object AppStateStore {
         notes.filter { it.contactId == contactId }.toList().forEach {
             updateNote(it.copy(contactId = null, companyId = companyId))
         }
+        // Ссылки событий: targetType CONTACT/contactId → COMPANY/companyId.
+        calendarItems.filter { ci -> ci.links.any { it.targetType == CalendarTargetType.CONTACT && it.targetId == contactId } }
+            .toList().forEach { ci ->
+                val newLinks = ci.links.map {
+                    if (it.targetType == CalendarTargetType.CONTACT && it.targetId == contactId)
+                        it.copy(targetType = CalendarTargetType.COMPANY, targetId = companyId)
+                    else it
+                }.distinctBy { it.targetType to it.targetId }
+                updateCalendarItem(ci.copy(links = newLinks))
+            }
         deleteContact(contactId)
         return companyId
     }

@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -229,7 +228,7 @@ fun CompaniesScreen(
                     ) { onNavigateToCreateCompany() }
                 }
                 Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
-                    Row(Modifier.fillMaxWidth().height(40.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(13.dp)).background(AppleTheme.colors.neutralFill).clickable { searchActive = true }.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth().height(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13).background(AppleTheme.colors.neutralFill).clickable { searchActive = true }.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Search, null, tint = AppleTheme.colors.tertiaryLabel, modifier = Modifier.size(17.dp))
                         Text(stringResource(R.string.comp_search_hint), fontSize = 16.sp, color = AppleTheme.colors.tertiaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
@@ -320,7 +319,7 @@ fun CompaniesScreen(
                     item {
                         Card(
                             modifier  = Modifier.fillMaxWidth(),
-                            shape     = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                            shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22,
                             colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                             elevation = CardDefaults.cardElevation(1.dp)
                         ) {
@@ -367,7 +366,7 @@ fun CompanyRow(company: Company, onClick: () -> Unit) {
     ) {
         // Лого 46/r14 — общая палитра компаний (AureliaAvatars.companyBrushFor)
         Box(
-            modifier = Modifier.size(46.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+            modifier = Modifier.size(46.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14)
                 .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.companyBrushFor(company.id)),
             contentAlignment = Alignment.Center
         ) {
@@ -381,7 +380,7 @@ fun CompanyRow(company: Company, onClick: () -> Unit) {
         }
         if (peopleCount > 0) {
             Box(
-                Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(11.dp))
+                Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R11)
                     .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
                     .padding(horizontal = 9.dp, vertical = 4.dp)
             ) {
@@ -399,7 +398,7 @@ fun CompanyRow(company: Company, onClick: () -> Unit) {
 @Composable
 private fun CompaniesSortChip(label: String, active: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp))
+        Modifier.height(30.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15)
             .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.neutralFill)
             .clickable { onClick() }.padding(horizontal = 13.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -414,11 +413,11 @@ private fun CompaniesSortChip(label: String, active: Boolean, onClick: () -> Uni
 @Composable
 private fun CompaniesSegChip(label: String, active: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.height(32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+        Modifier.height(32.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
             .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
             .then(
                 if (!active) Modifier.border(1.dp, AppleTheme.colors.separator,
-                    androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
                 else Modifier
             )
             .clickable { onClick() }.padding(horizontal = 15.dp),

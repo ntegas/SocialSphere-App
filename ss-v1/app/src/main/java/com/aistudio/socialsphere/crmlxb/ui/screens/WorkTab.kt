@@ -44,12 +44,17 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
     // Кнопка «Изменить»/«Готово» этой вкладки убрана — режим правки теперь
     // включается ОДНОЙ кнопкой в шапке карточки контакта, общей на все вкладки.
     // Профессия без компании (v12) — видна на вкладке Работа даже когда
-    // мест работы нет («электрик», «нотариус»).
+    // мест работы нет («электрик», «нотариус»). ФИКС (аудит 2026-07-06):
+    // раньше не показывалась пустой в режиме правки (единственное поле
+    // вкладки без `|| editing`) — теперь общий ProfessionRow (тот же, что
+    // и в Обзоре) сам решает это через свой параметр editing.
     item {
-        if (!contact.profession.isNullOrBlank()) {
-            CardBlock(title = stringResource(R.string.ce_profession)) {
-                Text(contact.profession, style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold)
+        // Без CardBlock-заголовка: ProfessionRow сам подписывает поле —
+        // повторять «Профессия» дважды (заголовок карточки + внутренний
+        // лейбл) не нужно.
+        if (!contact.profession.isNullOrBlank() || editing) {
+            CardBlock {
+                ProfessionRow(contact = contact, editing = editing)
             }
         }
     }
@@ -115,7 +120,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
-                            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(AppleTheme.colors.brand),
+                            modifier = Modifier.size(44.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).background(AppleTheme.colors.brand),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(company.name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -211,7 +216,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                     ))
                     onEditingChange(false)
                 },
-                shape = RoundedCornerShape(12.dp),
+                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium,
                 modifier = Modifier.fillMaxWidth().height(42.dp)
             ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
         }
@@ -316,44 +321,33 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                 }
 
                 if (showAddrDialog) {
-                    val base = editAddr
-                    var aLine by remember { mutableStateOf(base?.addressLine ?: "") }
-                    var aCity by remember { mutableStateOf(base?.city ?: "") }
-                    var aPostal by remember { mutableStateOf(base?.postalCode ?: "") }
-                    var aCountry by remember { mutableStateOf(base?.country ?: "") }
-                    var aType by remember { mutableStateOf(base?.addressType ?: AddressType.WORK) }
-                    val typeOptions = AddressType.values().filter { it in workTypes }
-                    AlertDialog(
-                        onDismissRequest = { showAddrDialog = false; editAddr = null },
-                        title = { Text(stringResource(if (base == null) R.string.cd_add_address else R.string.ce_edit_address), fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(
-                                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedTextField(value = aLine, onValueChange = { aLine = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_street_req)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(value = aCity, onValueChange = { aCity = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_city)) }, modifier = Modifier.weight(1f), singleLine = true)
-                                    OutlinedTextField(value = aPostal, onValueChange = { aPostal = it }, label = { Text(stringResource(R.string.ce_postal_code)) }, modifier = Modifier.weight(1f), singleLine = true)
-                                }
-                                OutlinedTextField(value = aCountry, onValueChange = { aCountry = it }, keyboardOptions = CapWords, label = { Text(stringResource(R.string.ce_country)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                                DropdownField(stringResource(R.string.ce_address_type), aType.label(ctxLabel), typeOptions.map { it.label(ctxLabel) }) { v -> aType = typeOptions.firstOrNull { it.label(ctxLabel) == v } ?: aType }
+                    // ФИКС (аудит 2026-07-06): раньше здесь был свой дубль диалога с
+                    // урезанным списком типов (только WORK/OFFICE/BRANCH/LEGAL) —
+                    // сменить тип обратно на «домашний»/«другое» можно было только
+                    // со вкладки Связь. Общий AddressEditDialog (AddressComponents.kt)
+                    // даёт ПОЛНЫЙ список типов везде, как и задумано.
+                    val addrScope = rememberCoroutineScope()
+                    AddressEditDialog(
+                        base = editAddr,
+                        ownerId = contact.id,
+                        scope = addrScope,
+                        // Новый адрес с ЭТОЙ вкладки по умолчанию — рабочий, иначе
+                        // (дефолт HOME) он сразу пропал бы из списка Работы, в
+                        // котором показаны только рабочие типы (workAddrs выше).
+                        defaultType = AddressType.WORK,
+                        onDismiss = { showAddrDialog = false; editAddr = null },
+                        onCommit = { a ->
+                            val updated = if (allAddrs.none { it.id == a.id }) allAddrs + a
+                                          else allAddrs.map { if (it.id == a.id) a else it }
+                            AppStateStore.updateContact(contact.copy(addresses = updated))
+                        },
+                        onGeocoded = { a ->
+                            AppStateStore.getContact(contact.id)?.let { fresh ->
+                                AppStateStore.updateContact(fresh.copy(
+                                    addresses = fresh.addresses.map { if (it.id == a.id) a else it }
+                                ))
                             }
-                        },
-                        confirmButton = {
-                            Button(enabled = aLine.isNotBlank(), onClick = {
-                                val targetId = base?.id ?: java.util.UUID.randomUUID().toString()
-                                val a = Address(
-                                    id = targetId, ownerType = AddressOwnerType.CONTACT, ownerId = contact.id,
-                                    addressType = aType, addressLine = aLine.trim(), city = aCity.trim(), country = aCountry.trim(),
-                                    postalCode = aPostal.trim().ifBlank { null }, latitude = base?.latitude, longitude = base?.longitude
-                                )
-                                val updated = if (base == null) allAddrs + a else allAddrs.map { if (it.id == targetId) a else it }
-                                AppStateStore.updateContact(contact.copy(addresses = updated))
-                                showAddrDialog = false; editAddr = null
-                            }) { Text(stringResource(if (base == null) R.string.common_add else R.string.common_save)) }
-                        },
-                        dismissButton = { TextButton(onClick = { showAddrDialog = false; editAddr = null }) { Text(stringResource(R.string.common_cancel)) } }
+                        }
                     )
                 }
                 pendingRemoveAddr?.let { ra ->

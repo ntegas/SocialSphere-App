@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -62,7 +61,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
         Button(
             onClick = onShowAdd,
             modifier = Modifier.fillMaxWidth().height(44.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
             colors = ButtonDefaults.buttonColors(
                 containerColor = AppleTheme.colors.brand,
                 contentColor   = Color.White
@@ -90,7 +89,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                     Text(stringResource(R.string.cd_no_notes_yet), color = AppleTheme.colors.secondaryLabel)
                     Text(stringResource(R.string.cd_tap_add_hint),
                         style = MaterialTheme.typography.bodySmall,
-                        color = AppleTheme.colors.separator)
+                        color = AppleTheme.colors.tertiaryLabel)
                 }
             }
             return@item
@@ -153,7 +152,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                     }
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                        shape    = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        shape    = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
                         colors   = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
                         border   = if (note.isImportant) BorderStroke(2.4.dp, AppleTheme.colors.red) else null,
                         elevation = CardDefaults.cardElevation(0.dp)
@@ -169,7 +168,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                         verticalAlignment     = Alignment.CenterVertically
                                     ) {
                                         Surface(
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                                            shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10,
                                             color = badgeColor.copy(alpha = if (note.isImportant) 0.14f else 0.18f)
                                         ) {
                                             Row(
@@ -177,10 +176,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                                 horizontalArrangement = Arrangement.spacedBy(3.dp),
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
-                                                if (note.isImportant)
+                                                // «Защищено» — по isLocked (2026-07-08, база знаний §29),
+                                                // независимо от isImportant. Важность красит бейдж/рамку
+                                                // (звонкое напоминание), приватность — своя, ручная галочка.
+                                                if (note.isLocked)
                                                     Icon(Icons.Outlined.Lock, null, Modifier.size(10.dp), tint = badgeColor)
                                                 Text(
-                                                    if (note.isImportant) stringResource(R.string.cd_note_protected)
+                                                    if (note.isLocked) stringResource(R.string.cd_note_protected)
                                                     else note.type.label(ctxLabel),
                                                     style    = MaterialTheme.typography.labelSmall,
                                                     fontWeight = FontWeight.Bold,
@@ -217,6 +219,22 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                                     leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)) },
                                                     onClick = { menuOpen = false; onEditNote(note) }
                                                 )
+                                                // Скрыть/показать — ручной, отдельный от «важности» переключатель
+                                                // приватности конкретной записи (2026-07-08, база знаний §29:
+                                                // владелец решает по каждой записи, не автоматика по типу).
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(
+                                                        if (note.isLocked) R.string.cd_note_unlock else R.string.cd_note_lock
+                                                    )) },
+                                                    leadingIcon = {
+                                                        Icon(if (note.isLocked) Icons.Outlined.LockOpen else Icons.Outlined.Lock,
+                                                            null, Modifier.size(18.dp))
+                                                    },
+                                                    onClick = {
+                                                        menuOpen = false
+                                                        AppStateStore.updateNote(note.copy(isLocked = !note.isLocked))
+                                                    }
+                                                )
                                                 DropdownMenuItem(
                                                     text = { Text(stringResource(R.string.common_delete), color = AppleTheme.colors.red) },
                                                     leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(18.dp),
@@ -228,9 +246,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                     }
                                 }
                                 Spacer(Modifier.height(6.dp))
-                                // Приватность: важные («защищённые») заметки скрываются
-                                // блюром при включённом режиме приватности (замок в шапке).
-                                val protectedHidden = privacyMode && note.isImportant
+                                // Приватность: заметки с isLocked скрываются блюром при включённом
+                                // режиме приватности (замок в шапке) — независимо от «важности».
+                                val protectedHidden = privacyMode && note.isLocked
                                 Box {
                                     // Маскируем ВСЕГДА при скрытии: blur — только визуальный
                                     // эффект, под ним в семантике лежал реальный текст —
@@ -246,7 +264,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                                         Column(
                                             modifier = Modifier
                                                 .matchParentSize()
-                                                .clip(RoundedCornerShape(6.dp))
+                                                .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R6)
                                                 .background(AppleTheme.colors.card.copy(alpha = 0.4f))
                                                 .clickable { onTogglePrivacy() },
                                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -290,14 +308,14 @@ fun androidx.compose.foundation.lazy.LazyListScope.notesTab(
                 dreamNotes.forEach { note ->
                     Row(
                         modifier = Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14)
                             .background(AppleTheme.colors.card)
                             .padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Box(
-                            Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+                            Modifier.size(36.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10)
                                 .background(AureliaTheme.colors.gold.copy(alpha = 0.16f)),
                             contentAlignment = Alignment.Center
                         ) {

@@ -1,6 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.theme
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -97,11 +96,11 @@ val LocalAureliaColors = staticCompositionLocalOf { AureliaLightColors }
 
 // ── Формы (радиусы из макета) ────────────────────────────────────────────
 object AureliaShapes {
-    val cardLarge = RoundedCornerShape(28.dp)
-    val card = RoundedCornerShape(20.dp)
-    val stat = RoundedCornerShape(20.dp)
-    val chip = RoundedCornerShape(14.dp)
-    val iconBox = RoundedCornerShape(9.dp)
+    val cardLarge = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Search
+    val card = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge
+    val stat = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.XLarge
+    val chip = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14
+    val iconBox = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R9
 }
 
 // ── Типографика: настоящие Playfair Display (serif) и Manrope (sans).
