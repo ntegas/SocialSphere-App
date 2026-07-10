@@ -58,7 +58,12 @@ fun CalendarItemEditScreen(
     var importance by remember { mutableStateOf(originalItem?.importance ?: ImportanceLevel.NORMAL) }
     var status by remember { mutableStateOf(originalItem?.status ?: CalendarItemStatus.ACTIVE) }
 
-    var startDate by remember { mutableStateOf(originalItem?.startDate ?: "") }
+    // Новое событие: дата по умолчанию — СЕГОДНЯ, как в Google Calendar (пустой
+    // даты не бывает). Баг §30/#79: пустой startDate сохранялся — событие уходило
+    // в БД, но не показывалось ни в Ленте, ни в Месяце, напоминание не считалось.
+    var startDate by remember {
+        mutableStateOf(originalItem?.startDate ?: java.time.LocalDate.now().toString())
+    }
     var startTime by remember { mutableStateOf(originalItem?.startTime ?: "") }
     var endDate by remember { mutableStateOf(originalItem?.endDate ?: "") }
     var endTime by remember { mutableStateOf(originalItem?.endTime ?: "") }
@@ -216,6 +221,9 @@ fun CalendarItemEditScreen(
 
                             onNavigateBack()
                         },
+                    // Вторая линия защиты #79: в правке поле даты можно стереть —
+                    // без даты событие «невидимо», поэтому Готово неактивна.
+                    enabled = startDate.isNotBlank(),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = androidx.compose.ui.graphics.Color.White),
