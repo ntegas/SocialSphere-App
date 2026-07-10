@@ -171,7 +171,7 @@ fun CheatSheetScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Box(
                         Modifier.size(60.dp).clip(CircleShape)
-                            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFE59A6B), Color(0xFFC45D34))))
+                            .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(contact.id))
                             .border(2.dp, CsGold.copy(alpha = 0.5f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {

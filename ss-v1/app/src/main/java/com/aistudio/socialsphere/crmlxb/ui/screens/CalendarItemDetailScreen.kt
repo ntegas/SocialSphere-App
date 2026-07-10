@@ -244,9 +244,13 @@ fun CalendarItemDetailScreen(
                                 ReminderType.CUSTOM_DATE_TIME -> stringResource(R.string.cid_at_exact, reminder.exactDateTime ?: "")
                                 ReminderType.NONE -> stringResource(R.string.cid_status_no)
                             }
-                            // Crude status indication for visual purposes
-                            val isPastApprox = event.startDate.compareTo(java.time.LocalDate.now().toString()) < 0 && event.recurrenceRule?.contains("YEARLY") != true
-                            val statusStr = if (isPastApprox) stringResource(R.string.cid_status_past) else stringResource(R.string.cid_status_scheduled)
+                            // Статус — из ТОГО ЖЕ расчёта, что ставит будильник
+                            // (NotificationScheduler), а не по одной дате события:
+                            // раньше «за 1 час» к прошедшему утру показывал
+                            // «Запланировано», хотя будильник не регистрировался.
+                            val scheduled = com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+                                .isReminderScheduled(event, reminder)
+                            val statusStr = if (scheduled) stringResource(R.string.cid_status_scheduled) else stringResource(R.string.cid_status_past)
                             Text("• $text$statusStr", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
@@ -419,7 +423,7 @@ fun RelatedContactCard(contact: Contact, onClick: () -> Unit) {
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme.colors.avatarTerracotta),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(contact.id)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

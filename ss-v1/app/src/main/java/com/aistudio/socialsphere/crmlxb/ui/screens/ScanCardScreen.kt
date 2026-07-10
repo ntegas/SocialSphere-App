@@ -190,9 +190,11 @@ fun ScanCardScreen(
                     lastName.firstOrNull()?.toString().orEmpty()).ifBlank { "?" }
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Контакт ещё не создан (нет id) — превью красим по имени;
+                    // после сохранения экраны красят по id, цвет может отличаться.
                     Box(
                         Modifier.size(56.dp).clip(CircleShape)
-                            .background(AureliaTheme.colors.avatarTerracotta),
+                            .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor("$firstName $lastName")),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)

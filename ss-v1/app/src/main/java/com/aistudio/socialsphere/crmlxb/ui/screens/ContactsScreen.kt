@@ -802,15 +802,9 @@ fun ContactListCard(
         else                      -> Color.Transparent
     }
 
-    // Палитра аватаров Aurelia (терракот/сейдж/слива/тил/золото) вместо iOS-радуги.
-    val grads = listOf(
-        listOf(Color(0xFFE59A6B), Color(0xFFC45D34)),
-        listOf(Color(0xFF9DBE92), Color(0xFF5E8C66)),
-        listOf(Color(0xFFB58CB6), Color(0xFF7E5180)),
-        listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A)),
-        listOf(Color(0xFFD8B26A), Color(0xFFB68A36))
-    )
-    val g = grads[kotlin.math.abs(contact.id.hashCode()) % grads.size]
+    // Цвет аватара — ЕДИНСТВЕННЫЙ источник AureliaAvatars.brushFor(id):
+    // один и тот же контакт одного цвета на всех экранах (баг §28: Анна была
+    // зелёной в списке и оранжевой на карточке из-за локальных копий палитры).
     Row(
         modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -824,7 +818,7 @@ fun ContactListCard(
                 modifier = Modifier.size(44.dp).clip(CircleShape)
             )
         } else Box(
-            modifier = Modifier.size(44.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Brush.linearGradient(g)),
+            modifier = Modifier.size(44.dp).clip(CircleShape).background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(contact.id)),
             contentAlignment = Alignment.Center
         ) {
             Text(

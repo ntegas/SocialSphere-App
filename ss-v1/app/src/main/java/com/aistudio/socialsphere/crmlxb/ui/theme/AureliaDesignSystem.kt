@@ -4,7 +4,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -50,9 +49,9 @@ data class AureliaColors(
     val divider: Color,
     val fill: Color,
     val onBrand: Color,       // текст на малахите
-    // Градиенты аватаров
-    val avatarTerracotta: Brush,
-    val avatarSage: Brush,
+    // Градиенты аватаров НЕ здесь: цвет аватара — только AureliaAvatars.brushFor(id),
+    // чтобы контакт был одного цвета на всех экранах (фикс §28; токены-«одиночки»
+    // avatarTerracotta/avatarSage провоцировали красить всех одним цветом).
     val isDark: Boolean,
 )
 
@@ -68,8 +67,6 @@ val AureliaLightColors = AureliaColors(
     divider = Divider,
     fill = Fill,
     onBrand = Color(0xFFF7F4ED),
-    avatarTerracotta = Brush.linearGradient(listOf(Color(0xFFE59A6B), Color(0xFFC45D34))),
-    avatarSage = Brush.linearGradient(listOf(Color(0xFF9DBE92), Color(0xFF5E8C66))),
     isDark = false,
 )
 
@@ -87,8 +84,6 @@ val AureliaDarkColors = AureliaColors(
     divider = Color(0x14FFFFFF),          // rgba(255,255,255,.08)
     fill = Color(0x0DFFFFFF),             // rgba(255,255,255,.05)
     onBrand = Color(0xFF12100C),          // тёмный текст на светлом малахите
-    avatarTerracotta = Brush.linearGradient(listOf(Color(0xFFE59A6B), Color(0xFFC45D34))),
-    avatarSage = Brush.linearGradient(listOf(Color(0xFF7FBDB2), Color(0xFF3E7E7A))),
     isDark = true,
 )
 

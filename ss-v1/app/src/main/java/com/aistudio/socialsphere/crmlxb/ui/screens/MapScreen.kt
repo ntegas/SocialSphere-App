@@ -941,7 +941,7 @@ fun MapScreen(
 
 /**
  * Пин на карте в стиле Aurelia: контакт — круглый градиент-аватар с инициалами
- * (тот же токен [AureliaTheme.colors.avatarTerracotta], что и в [MapItemDetailCard]),
+ * (цвет по хешу ownerId через [AureliaAvatars.brushFor] — как в списке/карточке),
  * компания — плитка с иконкой на брендовом фоне. Выбранный элемент — крупнее,
  * с золотой окантовкой вместо обычной card-рамки.
  */
@@ -970,7 +970,7 @@ private fun MapMarkerPin(obj: MapLocationItem, selected: Boolean) {
             Box(
                 modifier = Modifier.size(size)
                     .clip(CircleShape)
-                    .background(AureliaTheme.colors.avatarTerracotta)
+                    .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(obj.ownerId))
                     .border(ringWidth, ringColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -1093,13 +1093,13 @@ fun MapItemDetailCard(item: MapLocationItem, onOpen: () -> Unit) {
                         Icon(Icons.Default.Business, null, tint = AppleTheme.colors.brand)
                     }
                 } else {
-                    // Аватар-пин в стиле Aurelia: терракотовый градиент + инициалы
+                    // Аватар в стиле Aurelia: градиент по хешу ownerId + инициалы
                     val initials = item.title.split(" ")
                         .mapNotNull { it.firstOrNull()?.toString() }
                         .take(2).joinToString("")
                     Box(
                         modifier = Modifier.size(48.dp).clip(CircleShape)
-                            .background(AureliaTheme.colors.avatarTerracotta),
+                            .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(item.ownerId)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(initials, color = Color.White,

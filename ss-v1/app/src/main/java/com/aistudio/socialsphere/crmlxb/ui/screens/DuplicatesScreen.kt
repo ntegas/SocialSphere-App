@@ -303,7 +303,7 @@ private fun DuplicateContactLine(c: Contact) {
 @Composable
 private fun DuplicateAvatar(c: Contact) {
     Box(
-        modifier = Modifier.size(40.dp).clip(CircleShape).background(AureliaTheme.colors.avatarTerracotta),
+        modifier = Modifier.size(40.dp).clip(CircleShape).background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(c.id)),
         contentAlignment = Alignment.Center
     ) {
         Text(

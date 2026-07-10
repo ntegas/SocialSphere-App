@@ -1117,7 +1117,9 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                 val headerPhoto = contact.photoUri?.let { java.io.File(it) }?.takeIf { it.exists() }
                 Box(
                     modifier = Modifier.size(56.dp).clip(CircleShape)
-                        .background(AureliaTheme.colors.avatarTerracotta)
+                        // Цвет по хешу id (AureliaAvatars) — тот же, что в списке
+                        // контактов; фикс §28 «зелёная в списке, оранжевая на карточке».
+                        .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(contact.id))
                         .then(
                             if (importanceRing != Color.Transparent)
                                 Modifier.border(2.5.dp, importanceRing, CircleShape)

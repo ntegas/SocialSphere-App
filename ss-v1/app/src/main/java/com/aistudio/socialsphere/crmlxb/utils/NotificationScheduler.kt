@@ -176,6 +176,18 @@ object NotificationScheduler {
         return (calendarItemId + "|" + reminderRuleId).hashCode()
     }
 
+    /**
+     * Будет ли это напоминание реально отправлено. ЕДИНЫЙ источник истины с
+     * scheduleReminder(): та же calculateNotificationTime + то же сравнение с «сейчас».
+     * ФИКС §28: UI раньше сравнивал только ДАТУ события и показывал «Запланировано»
+     * для напоминаний, чьё время уже прошло и будильник НЕ ставился (подтверждено
+     * dumpsys alarm) — владелец видел «Запланировано» у мёртвого напоминания.
+     */
+    fun isReminderScheduled(calendarItem: CalendarItem, reminderRule: ReminderRule): Boolean {
+        val t = calculateNotificationTime(calendarItem, reminderRule) ?: return false
+        return t >= System.currentTimeMillis()
+    }
+
     private fun calculateNotificationTime(calendarItem: CalendarItem, reminderRule: ReminderRule): Long? {
         try {
             val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
