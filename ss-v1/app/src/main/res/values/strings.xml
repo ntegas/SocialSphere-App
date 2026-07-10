@@ -404,7 +404,6 @@
     <string name="appearance_theme">Тема приложения</string>
     <string name="appearance_light">светлая</string>
     <string name="appearance_dark">тёмная</string>
-    <string name="appearance_note">Примечание: полное переключение тёмной темы требует перезапуска приложения. В следующей версии добавим автоматический режим.</string>
     <string name="appearance_accent">Акцент</string>
     <string name="appearance_accent_preview">Так выглядит акцент</string>
     <string name="accent_malachite">Малахит</string>

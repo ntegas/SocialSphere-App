@@ -271,6 +271,16 @@ object AppStateStore {
         val relationIds = contactRelations
             .filter { it.firstContactId == contactId || it.secondContactId == contactId }
             .map { it.id }
+        // Каскад (§28/#80): убираем ссылки календарных событий на удаляемый
+        // контакт — тем же путём, что конвертация в компанию (updateCalendarItem
+        // чистит и память, и calendar_item_links в БД). Раньше строки оставались
+        // сиротами: UI молча скрывал событие через getContact() ?: null.
+        calendarItems.filter { ci -> ci.links.any { it.targetType == CalendarTargetType.CONTACT && it.targetId == contactId } }
+            .toList().forEach { ci ->
+                updateCalendarItem(ci.copy(links = ci.links.filterNot {
+                    it.targetType == CalendarTargetType.CONTACT && it.targetId == contactId
+                }))
+            }
         contacts.removeAll { it.id == contactId }
         notes.removeAll { it.contactId == contactId }
         gifts.removeAll { it.contactId == contactId }

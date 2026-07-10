@@ -117,18 +117,9 @@ fun AppearanceSettingsScreen(onNavigateBack: () -> Unit) {
                 }
             }
 
-            // ── Примечание о тёмной теме ──
-            Spacer(Modifier.height(22.dp))
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp)
-                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large).background(AppleTheme.colors.brand.copy(alpha = 0.08f)).padding(14.dp)
-            ) {
-                Text(
-                    stringResource(R.string.appearance_note),
-                    fontSize = 13.sp, lineHeight = 19.sp,
-                    color = AppleTheme.colors.secondaryLabel
-                )
-            }
+            // Примечание «нужен перезапуск» удалено (§28: тема переключается
+            // мгновенно — Compose перерисовывает всё дерево, диалоги включительно;
+            // текст ещё и обещал несуществующий «автоматический режим»).
         }
     }
 }

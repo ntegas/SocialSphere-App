@@ -404,7 +404,6 @@
     <string name="appearance_theme">App theme</string>
     <string name="appearance_light">light</string>
     <string name="appearance_dark">dark</string>
-    <string name="appearance_note">Note: full dark theme switch requires an app restart. An automatic mode is coming in the next version.</string>
     <string name="appearance_accent">Accent</string>
     <string name="appearance_accent_preview">This is your accent</string>
     <string name="accent_malachite">Malachite</string>

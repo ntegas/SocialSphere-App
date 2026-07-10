@@ -404,7 +404,6 @@
     <string name="appearance_theme">Θέμα εφαρμογής</string>
     <string name="appearance_light">φωτεινό</string>
     <string name="appearance_dark">σκοτεινό</string>
-    <string name="appearance_note">Σημείωση: η πλήρης αλλαγή σκοτεινού θέματος απαιτεί επανεκκίνηση. Αυτόματη λειτουργία στην επόμενη έκδοση.</string>
     <string name="appearance_accent">Τόνος</string>
     <string name="appearance_accent_preview">Έτσι φαίνεται ο τόνος</string>
     <string name="accent_malachite">Μαλαχίτης</string>
