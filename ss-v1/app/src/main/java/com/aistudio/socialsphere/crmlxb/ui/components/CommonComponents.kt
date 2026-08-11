@@ -45,17 +45,54 @@ fun ContactAvatar(name: String, size: Int = 48, color: Color = AppleTheme.colors
     }
 }
 
+/**
+ * Text для ЗНАЧЕНИЙ данных контакта/компании (имя, телефон, email, мессенджер,
+ * адрес, компания/должность) — оборачивает в SelectionContainer, чтобы долгое
+ * нажатие давало стандартное Android-выделение и копирование. Параметры
+ * повторяют часто используемый набор у Text(...), чтобы замена была прямой
+ * (Text(...) → CopyableText(...)) без переверстки.
+ * НЕ применять к бейджам-меткам («Мобильный»/«Основной»), чипам, кнопкам
+ * действий и заголовкам секций — это не значения данных, а UI-контролы
+ * (владелец явно разграничил это 2026-07-22).
+ */
+@Composable
+fun CopyableText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    fontSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
+    fontWeight: FontWeight? = null,
+    fontFamily: androidx.compose.ui.text.font.FontFamily? = null,
+    letterSpacing: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
+    style: androidx.compose.ui.text.TextStyle = LocalTextStyle.current,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+) {
+    androidx.compose.foundation.text.selection.SelectionContainer(modifier) {
+        Text(
+            text = text,
+            color = color,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            fontFamily = fontFamily,
+            letterSpacing = letterSpacing,
+            style = style,
+            maxLines = maxLines,
+            overflow = overflow
+        )
+    }
+}
+
 @Composable
 fun ConfirmDeleteDialog(title: String, body: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
+    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+        onDismiss = onDismiss,
         icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
-        title = { Text(title, fontWeight = FontWeight.Bold) },
-        text  = { Text(body) },
-        confirmButton = {
-            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red)) { Text("Удалить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+        title = title,
+        text = body,
+        confirmText = stringResource(R.string.common_delete),
+        destructive = true,
+        onConfirm = onConfirm,
     )
 }
 
@@ -65,7 +102,7 @@ fun SocialTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composab
     TopAppBar(
         title = { Text(title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") }
+            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) }
         },
         actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
@@ -305,11 +342,23 @@ private fun WheelDateSheet(
 
     fun setDate(d: java.time.LocalDate) { year = d.year; month = d.monthValue; day = d.dayOfMonth; noYear = false }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // confirmValueChange запрещает закрытие свайпом/тапом-снаружи/«Назад» —
+    // неаккуратный тап по WheelPicker иногда распознаётся как drag-to-dismiss
+    // самой ModalBottomSheet (M3 перехватывает жест ВЫШЕ по дереву, раньше
+    // чем список успевает его получить — NestedScroll-фикс внутри самого
+    // WheelPicker такое не ловит), и шторка захлопывалась, сбрасывая весь
+    // выбор (жалоба владельца). Взамен — явная кнопка «Отмена» в шапке,
+    // которая всегда работает, т.к. дёргает onDismiss напрямую, в обход
+    // sheetState.hide()/confirmValueChange.
+    val sheetState = rememberModalBottomSheetState(confirmValueChange = { it != SheetValue.Hidden })
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            }
             Text(
                 if (noYear) "$day ${monthNames[month - 1]}" else "$day ${monthNames[month - 1]} $year",
                 style = MaterialTheme.typography.titleMedium,
@@ -368,11 +417,18 @@ private fun WheelTimeSheet(
     val hours   = (0..23).toList()
     val minutes = (0..59).toList()
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // См. WheelDateSheet выше — тот же фикс случайного захлопывания шторки
+    // при неаккуратном тапе по WheelPicker: запрет закрытия свайпом/«Назад»
+    // + явная кнопка «Отмена».
+    val sheetState = rememberModalBottomSheetState(confirmValueChange = { it != SheetValue.Hidden })
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            }
             Text(
                 String.format("%02d:%02d", hour, minute),
                 style = MaterialTheme.typography.titleMedium,

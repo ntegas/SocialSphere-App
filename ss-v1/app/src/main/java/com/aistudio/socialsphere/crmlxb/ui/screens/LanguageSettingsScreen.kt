@@ -48,12 +48,7 @@ fun LanguageSettingsScreen(
                 val langs = AppLanguage.values()
                 langs.forEachIndexed { idx, lang ->
                     val selected = AppSettings.currentLanguage.value == lang
-                    val badge = when (lang) {
-                        AppLanguage.RUSSIAN -> "Ru"
-                        AppLanguage.ENGLISH -> "En"
-                        AppLanguage.GREEK   -> "Ελ"
-                    }
-                    LanguageRow(badge, lang.displayName, selected) { AppSettings.currentLanguage.value = lang }
+                    LanguageRow(lang.badge, lang.displayName, selected) { AppSettings.setLanguage(lang) }
                     if (idx < langs.lastIndex) AppleDivider(startInset = 58.dp)
                 }
             }

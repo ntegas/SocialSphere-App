@@ -49,6 +49,7 @@ data class ImportContactCandidate(
     val namePrefix: String = "",
     val nameSuffix: String = "",
     val phoneticFirstName: String = "",
+    val phoneticMiddleName: String = "",
     val phoneticLastName: String = "",
     val phones: List<ContactPhone> = emptyList(),
     val emails: List<ContactEmail> = emptyList(),
@@ -144,11 +145,13 @@ object ContactImporter {
                         val data5Idx = it.getColumnIndex(ContactsContract.Data.DATA5)
                         val data6Idx = it.getColumnIndex(ContactsContract.Data.DATA6)
                         val data7Idx = it.getColumnIndex(ContactsContract.Data.DATA7)
+                        val data8Idx = it.getColumnIndex(ContactsContract.Data.DATA8)
                         val data9Idx = it.getColumnIndex(ContactsContract.Data.DATA9)
                         val middle = if (data5Idx >= 0) it.getString(data5Idx) ?: "" else ""
                         val prefix = if (data4Idx >= 0) it.getString(data4Idx) ?: "" else ""
                         val suffix = if (data6Idx >= 0) it.getString(data6Idx) ?: "" else ""
                         val phoneticFirst = if (data7Idx >= 0) it.getString(data7Idx) ?: "" else ""
+                        val phoneticMiddle = if (data8Idx >= 0) it.getString(data8Idx) ?: "" else ""
                         val phoneticLast  = if (data9Idx >= 0) it.getString(data9Idx) ?: "" else ""
 
                         var first  = (givenName ?: "").trim()
@@ -170,6 +173,7 @@ object ContactImporter {
                             namePrefix = candidate.namePrefix.takeIf { it.isNotBlank() } ?: prefix.trim(),
                             nameSuffix = candidate.nameSuffix.takeIf { it.isNotBlank() } ?: suffix.trim(),
                             phoneticFirstName = candidate.phoneticFirstName.takeIf { it.isNotBlank() } ?: phoneticFirst.trim(),
+                            phoneticMiddleName = candidate.phoneticMiddleName.takeIf { it.isNotBlank() } ?: phoneticMiddle.trim(),
                             phoneticLastName  = candidate.phoneticLastName.takeIf { it.isNotBlank() } ?: phoneticLast.trim()
                         )
                     }
@@ -225,17 +229,22 @@ object ContactImporter {
                         val cityIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.CITY)
                         val countryIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY)
                         val formattedAddrIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS)
+                        // Район (2026-07-13) — StructuredPostal.NEIGHBORHOOD, раньше терялся
+                        // при импорте (читались только STREET/CITY/COUNTRY).
+                        val neighborhoodIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.NEIGHBORHOOD)
 
                         val street = if (streetIdx >= 0) it.getString(streetIdx) else null
                         val city = if (cityIdx >= 0) it.getString(cityIdx) else null
                         val country = if (countryIdx >= 0) it.getString(countryIdx) else null
                         val formattedAddress = if (formattedAddrIdx >= 0) it.getString(formattedAddrIdx) else null
-                        
+                        val neighborhood = if (neighborhoodIdx >= 0) it.getString(neighborhoodIdx) else null
+
                         val addrLine = street ?: formattedAddress ?: ""
                         if (addrLine.isNotBlank() || !city.isNullOrBlank() || !country.isNullOrBlank()) {
                             val addr = Address(
                                 id = UUID.randomUUID().toString(),
                                 addressLine = addrLine,
+                                district = neighborhood?.takeIf { n -> n.isNotBlank() },
                                 city = city ?: "",
                                 country = country ?: "",
                                 ownerId = candidate.id,
@@ -285,7 +294,18 @@ object ContactImporter {
             }
         }
         
-        return candidates.values.toList()
+        // ФИКС (аудит 2026-08-11, жалоба владельца: «постоянно добавляются какие-то
+        // контакты типа групп/компаний, непонятно что» — «мы это уже решали, и всё
+        // равно появляется»): этот фильтр УЖЕ применён в parseVCard/parseCsv («Группы/
+        // метки телефонной книги приходят как карточки без контактов» — Урок,
+        // регресс-тесты vcard_cardWithoutPhoneOrEmail_isDropped/
+        // csv_rowWithoutNameOrPhone_isSkipped), но никогда не был применён здесь —
+        // getDeviceContacts() отдавал АБСОЛЮТНО ВСЕ строки ContactsContract.Data,
+        // включая ярлыки групп синхронизации, WhatsApp/другие сервис-аккаунты и
+        // прочие непользовательские записи без единого телефона/email. Тот же
+        // класс бага, что уже чинили — просто в третьем (и главном) из трёх путей
+        // импорта, который не был затронут прошлым фиксом.
+        return candidates.values.filter { it.phones.isNotEmpty() || it.emails.isNotEmpty() }
     }
 }
 
@@ -301,6 +321,7 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
         var namePrefix = ""
         var nameSuffix = ""
         var phoneticFirstName = ""
+        var phoneticMiddleName = ""
         var phoneticLastName  = ""
         val phones    = mutableListOf<ContactPhone>()
         val emails    = mutableListOf<ContactEmail>()
@@ -326,6 +347,8 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                 }
                 line.startsWith("X-PHONETIC-FIRST-NAME") ->
                     phoneticFirstName = line.substringAfter(":", "").trim()
+                line.startsWith("X-PHONETIC-MIDDLE-NAME") ->
+                    phoneticMiddleName = line.substringAfter(":", "").trim()
                 line.startsWith("X-PHONETIC-LAST-NAME") ->
                     phoneticLastName = line.substringAfter(":", "").trim()
                 // FN: полное имя (fallback, если N не было) — без потери слов:
@@ -417,6 +440,7 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                 namePrefix  = namePrefix,
                 nameSuffix  = nameSuffix,
                 phoneticFirstName = phoneticFirstName,
+                phoneticMiddleName = phoneticMiddleName,
                 phoneticLastName  = phoneticLastName,
                 phones      = phones,
                 emails      = emails,
@@ -536,14 +560,21 @@ private fun splitCsvLine(line: String): List<String> {
  *  «--MM-DD» и «--MMDD» (без года) сохраняются КАК «--MM-DD» — год неизвестен,
  *  и раньше подставлявшийся фиктивный 1972 показывал ложный возраст. Формат
  *  «--MM-DD» понимают parseFlexibleDate/displayEventDate (CalendarUtils).
- *  «yyyy-MM-dd…» → первые 10 символов; иначе null. */
+ *  «yyyy-MM-dd…» → первые 10 символов; иначе пробуем нестрогий числовой
+ *  dd<sep>MM<sep>yyyy — некоторые OEM-синки (Xiaomi/Samsung/Huawei и т.п.)
+ *  пишут Event.START_DATE не по ISO, тот же класс формата, что уже учтён в
+ *  parseFlexibleDate (CalendarUtils.kt) для отображения, но раньше не был учтён
+ *  здесь — из-за строгого LocalDate.parse(ISO) такие дни рождения тихо
+ *  пропускались при импорте (баг, найден по жалобе владельца: «не все дни
+ *  рождения проимпортировались»). */
 internal fun normalizeBirthday(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
+    val s = raw.trim()
     val yearless = when {
-        raw.startsWith("--") && raw.length >= 7 && raw[4] == '-' ->
-            raw.substring(2, 7)                                   // --MM-DD → MM-DD
-        raw.startsWith("--") && raw.length >= 6 ->
-            raw.substring(2, 4) + "-" + raw.substring(4, 6)       // --MMDD → MM-DD
+        s.startsWith("--") && s.length >= 7 && s[4] == '-' ->
+            s.substring(2, 7)                                   // --MM-DD → MM-DD
+        s.startsWith("--") && s.length >= 6 ->
+            s.substring(2, 4) + "-" + s.substring(4, 6)         // --MMDD → MM-DD
         else -> null
     }
     if (yearless != null) {
@@ -552,9 +583,18 @@ internal fun normalizeBirthday(raw: String?): String? {
             java.time.LocalDate.parse("1972-$yearless"); "--$yearless"
         } catch (e: Exception) { null }
     }
-    if (raw.length < 10) return null
-    val candidate = raw.take(10)
-    return try {
-        java.time.LocalDate.parse(candidate); candidate
-    } catch (e: Exception) { null }
+    if (s.length >= 10) {
+        val candidate = s.take(10)
+        try {
+            java.time.LocalDate.parse(candidate)
+            return candidate
+        } catch (e: Exception) { /* falls through to legacy numeric formats */ }
+    }
+    Regex("""^(\d{1,2})[ ./](\d{1,2})[ ./](\d{4})$""").find(s)?.let { m ->
+        val (d, mo, y) = m.destructured
+        return try {
+            java.time.LocalDate.of(y.toInt(), mo.toInt(), d.toInt()).toString()
+        } catch (e: Exception) { null }
+    }
+    return null
 }

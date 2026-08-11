@@ -40,6 +40,11 @@ import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
 import com.aistudio.socialsphere.crmlxb.utils.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -60,30 +65,35 @@ fun ContactsScreen(
     // ── View / sort (контролы теперь внутри листа «Фильтры», по макету) ──
     var isGridView    by remember { mutableStateOf(false) }
     var sortOrder     by remember { mutableStateOf(ContactSortOrder.NAME_AZ) }
+    val listState        = androidx.compose.foundation.lazy.rememberLazyListState()
+    val indexScrollScope = rememberCoroutineScope()
 
     // ── Active filters ────────────────────────────────────────
     var filterRelTypes    by remember { mutableStateOf(emptySet<RelationshipType>()) }
     // Свои типы отношений («статусы») — раньше не могли быть фильтром вообще
     // (фидбэк владельца 2026-07-05: «создаю статус сам — не входит в фильтры»)
     var filterCustomRelTypes by remember { mutableStateOf(emptySet<String>()) }
-    var filterImportance  by remember { mutableStateOf(emptySet<ImportanceLevel>()) }
     var filterRhythm      by remember { mutableStateOf(emptySet<CommunicationRhythm>()) }
     var filterStatus      by remember { mutableStateOf(emptySet<ContactStatus>()) }
     var filterGroups      by remember { mutableStateOf(emptySet<String>()) } // id групп
     var filterTag         by remember { mutableStateOf("") }
+    // Новая управляемая система тегов (Entity Tag с id/category) — отдельно от
+    // легаси filterTag выше (свободный текст Contact.tags). НЕ путать: это
+    // фильтры по AppStateStore.tags / distinctCategories().
+    var filterTagIds        by remember { mutableStateOf(emptySet<String>()) }
+    var filterTagCategories by remember { mutableStateOf(emptySet<String>()) }
     var cityFilter        by remember { mutableStateOf("") }
     var showFilterSheet   by remember { mutableStateOf(false) }
 
-    val hasActiveFilters = filterRelTypes.isNotEmpty() || filterImportance.isNotEmpty() ||
+    val hasActiveFilters = filterRelTypes.isNotEmpty() ||
         filterRhythm.isNotEmpty() ||
         filterStatus.isNotEmpty() || filterGroups.isNotEmpty() ||
-        cityFilter.isNotBlank() || filterTag.isNotBlank() || filterCustomRelTypes.isNotEmpty()
+        cityFilter.isNotBlank() || filterTag.isNotBlank() || filterCustomRelTypes.isNotEmpty() ||
+        filterTagIds.isNotEmpty() || filterTagCategories.isNotEmpty()
 
-    // All unique tags across contacts for suggestion
+    // All unique tags across contacts for suggestion — единый источник, см. AppStateStore.allTags()
     val allTags by remember {
-        derivedStateOf {
-            AppStateStore.contacts.flatMap { it.tags }.distinct().sorted()
-        }
+        derivedStateOf { AppStateStore.allTags() }
     }
 
     // ── Filtered list (derivedStateOf = recompute only when deps change) ──
@@ -92,14 +102,17 @@ fun ContactsScreen(
             AppStateStore.contacts.applyContactFilters(
                 query               = searchQuery,
                 relationshipTypes   = filterRelTypes,
-                importanceLevels    = filterImportance,
+                importanceLevels    = emptySet(),
                 communicationRhythms= filterRhythm,
                 contactStatuses     = filterStatus,
                 cityFilter          = cityFilter,
                 tagFilter           = filterTag,
                 groupIds            = filterGroups,
                 customRelTypes      = filterCustomRelTypes,
-                sortOrder           = sortOrder
+                tagIds              = filterTagIds,
+                tagCategories       = filterTagCategories,
+                sortOrder           = sortOrder,
+                nameSortField       = AppSettings.contactSortField.value
             )
         }
     }
@@ -117,7 +130,6 @@ fun ContactsScreen(
     if (showFilterSheet) {
         ContactFilterSheet(
             filterRelTypes     = filterRelTypes,
-            filterImportance   = filterImportance,
             filterRhythm       = filterRhythm,
             filterStatus       = filterStatus,
             filterGroups       = filterGroups,
@@ -125,24 +137,28 @@ fun ContactsScreen(
             cityFilter         = cityFilter,
             tagFilter          = filterTag,
             allTags            = allTags,
+            filterTagIds       = filterTagIds,
+            filterTagCategories = filterTagCategories,
             searchQuery        = searchQuery,
             sortOrder          = sortOrder,
             isGridView         = isGridView,
             onRelTypesChange   = { filterRelTypes   = it },
-            onImportanceChange = { filterImportance = it },
             onRhythmChange     = { filterRhythm     = it },
             onStatusChange     = { filterStatus     = it },
             onGroupsChange     = { filterGroups     = it },
             onCustomRelTypesChange = { filterCustomRelTypes = it },
             onCityChange       = { cityFilter       = it },
             onTagChange        = { filterTag        = it },
+            onTagIdsChange     = { filterTagIds     = it },
+            onTagCategoriesChange = { filterTagCategories = it },
             onSortOrderChange  = { sortOrder        = it },
             onGridViewChange   = { isGridView       = it },
             onClear            = {
-                filterRelTypes = emptySet(); filterImportance = emptySet()
+                filterRelTypes = emptySet()
                 filterRhythm = emptySet()
                 filterStatus = emptySet(); filterGroups = emptySet()
                 cityFilter = ""; filterTag = ""; filterCustomRelTypes = emptySet()
+                filterTagIds = emptySet(); filterTagCategories = emptySet()
             },
             onDismiss          = { showFilterSheet = false }
         )
@@ -224,7 +240,7 @@ fun ContactsScreen(
                 // Капсула поиска (спека: r13 h40, заливка .09, плейсхолдер 16sp #9A9284)
                 Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
                     Row(
-                        Modifier.fillMaxWidth().height(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13).background(Color(0x17787880)).clickable { searchActive = true }.padding(horizontal = 12.dp),
+                        Modifier.fillMaxWidth().height(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13).background(AppleTheme.colors.neutralFill).clickable { searchActive = true }.padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.Search, null, tint = AppleTheme.colors.tertiaryLabel, modifier = Modifier.size(17.dp))
@@ -233,13 +249,23 @@ fun ContactsScreen(
                 }
             }
             // ── Active filter chips strip ─────────────────────
+            // ФИКС (аудит 2026-08-11, жалоба «фильтры куда-то пропадают» — сами
+            // значения не сбрасывались, но 4 типа фильтра не показывали чип, из-за
+            // чего активный фильтр выглядел невидимым/забытым): добавлены Ритм,
+            // Свои типы отношений, Теги и Категории — раньше сужали список молча.
             val activeChips = buildList {
                 filterRelTypes.forEach  { add(it.label(ctxLabel) to { filterRelTypes   = filterRelTypes   - it }) }
-                filterImportance.forEach{ add(it.label(ctxLabel) to { filterImportance = filterImportance - it }) }
                 filterStatus.forEach    { add(it.label(ctxLabel) to { filterStatus     = filterStatus     - it }) }
+                filterRhythm.forEach    { add(it.label(ctxLabel) to { filterRhythm     = filterRhythm     - it }) }
+                filterCustomRelTypes.forEach { ct -> add(ct to { filterCustomRelTypes = filterCustomRelTypes - ct }) }
                 filterGroups.forEach { gid ->
                     val gName = AppStateStore.groups.firstOrNull { it.id == gid }?.name ?: return@forEach
                     add("👥 $gName" to { filterGroups = filterGroups - gid })
+                }
+                filterTagCategories.forEach { cat -> add(cat to { filterTagCategories = filterTagCategories - cat }) }
+                filterTagIds.forEach { tid ->
+                    val tName = AppStateStore.tags.firstOrNull { it.id == tid }?.name ?: return@forEach
+                    add("#$tName" to { filterTagIds = filterTagIds - tid })
                 }
                 if (filterTag.isNotBlank())  add("#$filterTag"    to { filterTag   = "" })
                 if (cityFilter.isNotBlank()) add("📍 $cityFilter" to { cityFilter  = "" })
@@ -278,12 +304,9 @@ fun ContactsScreen(
                     modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val noQuick = filterImportance.isEmpty() && !filterRelTypes.contains(RelationshipType.CLIENT) && !filterRelTypes.contains(RelationshipType.FAMILY)
+                    val noQuick = !filterRelTypes.contains(RelationshipType.CLIENT) && !filterRelTypes.contains(RelationshipType.FAMILY)
                     ContactsSegChip(stringResource(R.string.contacts_seg_all) + " · " + AppStateStore.contacts.size, noQuick) {
-                        filterImportance = emptySet(); filterRelTypes = emptySet()
-                    }
-                    ContactsSegChip(stringResource(R.string.contacts_seg_key), filterImportance.contains(ImportanceLevel.KEY)) {
-                        filterImportance = if (filterImportance.contains(ImportanceLevel.KEY)) emptySet() else setOf(ImportanceLevel.KEY)
+                        filterRelTypes = emptySet()
                     }
                     ContactsSegChip(stringResource(R.string.contacts_seg_clients), filterRelTypes.contains(RelationshipType.CLIENT)) {
                         filterRelTypes = if (filterRelTypes.contains(RelationshipType.CLIENT)) emptySet() else setOf(RelationshipType.CLIENT)
@@ -293,7 +316,7 @@ fun ContactsScreen(
                     }
                 }
                 Box(
-                    Modifier.size(34.dp).clip(CircleShape).background(Color(0x1F767680)).clickable { showFilterSheet = true },
+                    Modifier.size(34.dp).clip(CircleShape).background(AppleTheme.colors.neutralFill).clickable { showFilterSheet = true },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Tune, stringResource(R.string.contacts_filters), Modifier.size(18.dp), tint = AppleTheme.colors.brand)
@@ -344,9 +367,14 @@ fun ContactsScreen(
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                         if (hasActiveFilters) {
+                            // Раньше чистило только 3 из 7 фильтров — filterStatus/filterGroups/
+                            // filterTag/filterCustomRelTypes оставались активными, и пользователь
+                            // не понимал, почему список остаётся пустым после «Сбросить фильтры».
+                            // Приведено в соответствие с onClear в ContactFilterSheet.
                             TextButton(onClick = {
-                                filterRelTypes = emptySet(); filterImportance = emptySet()
-                                filterRhythm = emptySet(); cityFilter = ""
+                                filterRelTypes = emptySet(); filterRhythm = emptySet()
+                                filterStatus = emptySet(); filterGroups = emptySet()
+                                cityFilter = ""; filterTag = ""; filterCustomRelTypes = emptySet()
                             }) { Text(stringResource(R.string.contacts_reset_filters)) }
                         }
                     }
@@ -364,41 +392,69 @@ fun ContactsScreen(
                     }
                 }
             } else {
-                val grouped = if (sortOrder == ContactSortOrder.NAME_AZ || sortOrder == ContactSortOrder.NAME_ZA)
-                    filteredContacts.groupBy { (it.firstName.ifEmpty { it.lastName }).trim().firstOrNull()?.uppercaseChar()?.toString() ?: "#" }
+                val nameSortField = AppSettings.contactSortField.value
+                val isAlphaSort = sortOrder == ContactSortOrder.NAME_AZ || sortOrder == ContactSortOrder.NAME_ZA
+                val grouped = if (isAlphaSort)
+                    filteredContacts.groupBy { contactSortLetter(it, nameSortField) }
                         .toList().sortedBy { it.first }.let { if (sortOrder == ContactSortOrder.NAME_ZA) it.reversed() else it }
                 else listOf("" to filteredContacts)
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    modifier       = Modifier.fillMaxSize()
-                ) {
-                    grouped.forEach { (letter, group) ->
-                        if (letter.isNotEmpty()) item(key = "h_$letter") {
-                            Text(letter, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel,
-                                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 6.dp, bottom = 7.dp))
-                        }
-                        item(key = "c_$letter") {
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22,
-                                colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-                                elevation = CardDefaults.cardElevation(1.dp)
-                            ) {
-                                Column {
-                                    group.forEachIndexed { i, contact ->
-                                        ContactListCard(
-                                            contact          = contact,
-                                            highlight        = searchQuery,
-                                            onClick          = { onNavigateToContact(contact.id) },
-                                            onFilterByType   = { type -> filterRelTypes = setOf(type) },
-                                            onFilterByRhythm = { rhythm -> filterRhythm = setOf(rhythm) }
-                                        )
-                                        if (i < group.lastIndex) com.aistudio.socialsphere.crmlxb.ui.theme.AppleDivider(71.dp)
+                // Буква → индекс item в LazyColumn (заголовок группы), для алфавитного индекса.
+                val letterItemIndex = remember(grouped) {
+                    val map = mutableMapOf<String, Int>()
+                    var idx = 0
+                    grouped.forEach { (letter, _) ->
+                        if (letter.isNotEmpty()) { map[letter] = idx; idx += 3 } else idx += 1
+                    }
+                    map
+                }
+                Box(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state          = listState,
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        modifier       = Modifier.fillMaxSize()
+                    ) {
+                        grouped.forEach { (letter, group) ->
+                            if (letter.isNotEmpty()) item(key = "h_$letter") {
+                                Text(letter, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel,
+                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 6.dp, bottom = 7.dp))
+                            }
+                            item(key = "c_$letter") {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22,
+                                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                                    elevation = CardDefaults.cardElevation(1.dp)
+                                ) {
+                                    Column {
+                                        group.forEachIndexed { i, contact ->
+                                            ContactListCard(
+                                                contact          = contact,
+                                                highlight        = searchQuery,
+                                                onClick          = { onNavigateToContact(contact.id) },
+                                                onFilterByType   = { type -> filterRelTypes = setOf(type) },
+                                                onFilterByRhythm = { rhythm -> filterRhythm = setOf(rhythm) }
+                                            )
+                                            if (i < group.lastIndex) com.aistudio.socialsphere.crmlxb.ui.theme.AppleDivider(71.dp)
+                                        }
                                     }
                                 }
                             }
+                            if (letter.isNotEmpty()) item(key = "s_$letter") { Spacer(Modifier.height(10.dp)) }
                         }
-                        if (letter.isNotEmpty()) item(key = "s_$letter") { Spacer(Modifier.height(10.dp)) }
+                    }
+                    // Алфавитный индекс — только когда список реально отсортирован по имени/фамилии
+                    // (для «Недавние»/«Важность» буквенных секций нет, индекс был бы бессмысленным).
+                    if (isAlphaSort && grouped.size > 1) {
+                        AlphabetIndexBar(
+                            letters          = alphabetForContacts(AppSettings.currentLanguage.value, letterItemIndex.keys),
+                            activeLetters    = letterItemIndex.keys,
+                            onLetterSelected = { letter ->
+                                letterItemIndex[letter]?.let { idx ->
+                                    indexScrollScope.launch { listState.scrollToItem(idx) }
+                                }
+                            },
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 16.dp)
+                        )
                     }
                 }
             }
@@ -411,9 +467,13 @@ fun ContactsScreen(
 // ═══════════════════════════════════════════════════════════
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ContactFilterSheet(
+internal fun ContactFilterSheet(
     filterRelTypes: Set<RelationshipType>,
-    filterImportance: Set<ImportanceLevel>,
+    // Важность (ImportanceLevel) убрана из UI (2026-07-23) — параметры оставлены
+    // с дефолтами ради обратной совместимости вызова из DuplicatesScreen.kt
+    // (список для слияния дублей больше не показывает и не редактирует чип
+    // важности, но сигнатуру шторки менять по всем вызовам не требовалось).
+    filterImportance: Set<ImportanceLevel> = emptySet(),
     filterRhythm: Set<CommunicationRhythm>,
     filterStatus: Set<ContactStatus> = emptySet(),
     filterGroups: Set<String> = emptySet(),
@@ -421,17 +481,24 @@ private fun ContactFilterSheet(
     cityFilter: String,
     tagFilter: String = "",
     allTags: List<String> = emptyList(),
+    // Новая управляемая система тегов (Entity Tag с id/category) — отдельные
+    // параметры от легаси tagFilter/allTags выше (свободный текст Contact.tags).
+    // НЕ путать секции в UI ниже: filter_tag (легаси) vs filter_category/filter_tag_new (новое).
+    filterTagIds: Set<String> = emptySet(),
+    filterTagCategories: Set<String> = emptySet(),
     searchQuery: String = "",
     sortOrder: ContactSortOrder,
     isGridView: Boolean,
     onRelTypesChange: (Set<RelationshipType>) -> Unit,
-    onImportanceChange: (Set<ImportanceLevel>) -> Unit,
+    onImportanceChange: (Set<ImportanceLevel>) -> Unit = {},
     onRhythmChange: (Set<CommunicationRhythm>) -> Unit,
     onStatusChange: (Set<ContactStatus>) -> Unit = {},
     onGroupsChange: (Set<String>) -> Unit = {},
     onCustomRelTypesChange: (Set<String>) -> Unit = {},
     onCityChange: (String) -> Unit,
     onTagChange: (String) -> Unit = {},
+    onTagIdsChange: (Set<String>) -> Unit = {},
+    onTagCategoriesChange: (Set<String>) -> Unit = {},
     onSortOrderChange: (ContactSortOrder) -> Unit,
     onGridViewChange: (Boolean) -> Unit,
     onClear: () -> Unit,
@@ -449,6 +516,8 @@ private fun ContactFilterSheet(
     var lCustomRelTypes by remember { mutableStateOf(filterCustomRelTypes) }
     var lCity       by remember { mutableStateOf(cityFilter) }
     var lTag        by remember { mutableStateOf(tagFilter) }
+    var lTagIds        by remember { mutableStateOf(filterTagIds) }
+    var lTagCategories by remember { mutableStateOf(filterTagCategories) }
     // Живой счётчик результатов на кнопке «Применить» (по макету) — сортировка
     // и вид списка не влияют на количество, применяются сразу, без буфера.
     val previewCount by remember {
@@ -457,6 +526,7 @@ private fun ContactFilterSheet(
                 query = searchQuery, relationshipTypes = lRelTypes, importanceLevels = lImportance,
                 communicationRhythms = lRhythm, contactStatuses = lStatus,
                 cityFilter = lCity, tagFilter = lTag, groupIds = lGroups, customRelTypes = lCustomRelTypes,
+                tagIds = lTagIds, tagCategories = lTagCategories,
                 sortOrder = sortOrder
             ).size
         }
@@ -466,6 +536,7 @@ private fun ContactFilterSheet(
         onRhythmChange(lRhythm); onGroupsChange(lGroups)
         onCustomRelTypesChange(lCustomRelTypes)
         onCityChange(lCity); onTagChange(lTag)
+        onTagIdsChange(lTagIds); onTagCategoriesChange(lTagCategories)
         onDismiss()
     }
     ModalBottomSheet(onDismissRequest = { pushAndClose() }, shape = SocialShape.Sheet) {
@@ -489,13 +560,18 @@ private fun ContactFilterSheet(
                     lRelTypes = emptySet(); lImportance = emptySet()
                     lRhythm = emptySet(); lStatus = emptySet(); lGroups = emptySet(); lCity = ""; lTag = ""
                     lCustomRelTypes = emptySet()
+                    lTagIds = emptySet(); lTagCategories = emptySet()
                 }) { Text(stringResource(R.string.contacts_reset_all), color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold) }
             }
 
             // Сортировка (была отдельным рядом чипов над списком — перенесена
             // сюда, в один узел контролов вместе с фильтрами, по макету)
             FilterSection(stringResource(R.string.contacts_sort_title)) {
-                ContactSortOrder.values().forEach { order ->
+                // ImportanceLevel убран из UI (2026-07-23, решение владельца) — этот
+                // вариант сортировки скрыт из списка тем же паттерном, что и
+                // CommunicationRhythm.CUSTOM выше по коду (enum-значение остаётся,
+                // просто не рендерится чипом).
+                ContactSortOrder.values().filter { it != ContactSortOrder.IMPORTANCE }.forEach { order ->
                     val label = when (order) {
                         ContactSortOrder.NAME_AZ        -> stringResource(R.string.contacts_sort_name_az)
                         ContactSortOrder.NAME_ZA        -> stringResource(R.string.contacts_sort_name_za)
@@ -637,19 +713,11 @@ private fun ContactFilterSheet(
                 }
             }
 
-            // Importance — «Ключевой»/«Важный» выделены золотом (по макету), как
-            // и везде в приложении, где orange == gold в палитре Aurelia.
-            FilterSection(stringResource(R.string.filter_importance)) {
-                ImportanceLevel.values().forEach { level ->
-                    MultiSelectChip(
-                        label = level.label(ctxLabel),
-                        selected = level in lImportance,
-                        gold = level != ImportanceLevel.NORMAL
-                    ) {
-                        lImportance = if (level in lImportance) lImportance - level else lImportance + level
-                    }
-                }
-            }
+            // ImportanceLevel убран из UI ПОЛНОСТЬЮ (2026-07-23, решение владельца) —
+            // фильтр по важности здесь больше не рендерится (было FilterSection
+            // filter_importance с чипами Обычный/Важный/Ключевой). lImportance
+            // остаётся в состоянии шторки только для обратной совместимости
+            // сигнатуры ContactFilterSheet, которую всё ещё вызывает DuplicatesScreen.kt.
 
             // Rhythm
             FilterSection(stringResource(R.string.filter_rhythm)) {
@@ -706,6 +774,36 @@ private fun ContactFilterSheet(
                 }
             }
 
+            // Новая управляемая система тегов (AppStateStore.tags/distinctCategories) —
+            // ДВЕ ОТДЕЛЬНЫЕ секции с однозначно другими подписями (filter_category /
+            // filter_tag_new), намеренно расположены сразу после легаси-секции «Тег»
+            // выше, чтобы визуально было видно, что это разные механики. Легаси-секция
+            // выше НЕ переименована и НЕ тронута.
+            run {
+                val categories by remember { derivedStateOf { AppStateStore.distinctCategories() } }
+                if (categories.isNotEmpty()) {
+                    FilterSection(stringResource(R.string.filter_category)) {
+                        categories.forEach { cat ->
+                            MultiSelectChip(cat, cat in lTagCategories) {
+                                lTagCategories = if (cat in lTagCategories) lTagCategories - cat else lTagCategories + cat
+                            }
+                        }
+                    }
+                }
+            }
+            run {
+                val managedTags by remember { derivedStateOf { AppStateStore.tags.sortedBy { it.name.lowercase() } } }
+                if (managedTags.isNotEmpty()) {
+                    FilterSection(stringResource(R.string.filter_tag_new)) {
+                        managedTags.forEach { t ->
+                            MultiSelectChip(t.name, t.id in lTagIds) {
+                                lTagIds = if (t.id in lTagIds) lTagIds - t.id else lTagIds + t.id
+                            }
+                        }
+                    }
+                }
+            }
+
             Button(
                 onClick = { pushAndClose() },
                 colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
@@ -720,7 +818,7 @@ private fun ContactFilterSheet(
 // AppleTheme.colors.goldLabel (тёмное золото на светлом, светлое на тёмном).
 
 @Composable
-private fun FilterSection(title: String, content: @Composable FlowRowScope.() -> Unit) {
+fun FilterSection(title: String, content: @Composable FlowRowScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             title.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold,
@@ -737,7 +835,7 @@ private fun FilterSection(title: String, content: @Composable FlowRowScope.() ->
 // (MaterialTheme без colorScheme, см. §12 KNOWLEDGE.md), поэтому selected-
 // состояние рендерилось дефолтным Material You, а не малахитом.
 @Composable
-private fun MultiSelectChip(label: String, selected: Boolean, gold: Boolean = false, onClick: () -> Unit) {
+fun MultiSelectChip(label: String, selected: Boolean, gold: Boolean = false, onClick: () -> Unit) {
     val bg = when { selected && gold -> AureliaTheme.colors.gold.copy(alpha = 0.18f); selected -> AppleTheme.colors.brand; else -> AppleTheme.colors.card }
     val border = when { selected && gold -> AppleTheme.colors.goldLabel; selected -> AppleTheme.colors.brand; else -> AppleTheme.colors.separator }
     val fg = when { selected && gold -> AppleTheme.colors.goldLabel; selected -> Color.White; else -> AppleTheme.colors.secondaryLabel }
@@ -762,9 +860,12 @@ private fun MultiSelectChip(label: String, selected: Boolean, gold: Boolean = fa
 private fun getContactVisuals(contact: Contact): Triple<String, String, String> {
     val compRel = contact.companyRelations.firstOrNull { it.isPrimary } ?: contact.companyRelations.firstOrNull()
     val company  = compRel?.companyId?.let { AppStateStore.getCompany(it) }?.name ?: ""
-    // Должность в компании, иначе — свободная профессия (v12)
-    val position = compRel?.position?.takeIf { it.isNotBlank() }
-        ?: contact.profession ?: ""
+    // ФИКС (аудит 2026-08-11): показываем должность в компании И профессию,
+    // если обе заполнены и различаются — раньше одно молча прятало другое
+    // (см. тот же фикс в ContactDetailScreen.ContactHeader).
+    val companyPosition = compRel?.position?.takeIf { it.isNotBlank() }
+    val profession = contact.profession?.trim()?.takeIf { it.isNotBlank() }
+    val position = listOfNotNull(companyPosition, profession?.takeIf { it != companyPosition }).joinToString(" · ")
     val city     = AppStateStore.addresses.find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }?.city ?: ""
     return Triple(company, position, city)
 }
@@ -792,15 +893,7 @@ fun ContactListCard(
 ) {
     val ctxLabel = LocalContext.current
     val (company, position, city) = getContactVisuals(contact)
-    val name = "${contact.firstName} ${contact.lastName}".trim()
-
-    // Единая семантика с карточкой контакта: Ключевой — золото, Важный — терракот
-    // (раньше тут было наоборот и бледнее — красный/золото вразнобой с ободком).
-    val importanceTint = when (contact.importanceLevel) {
-        ImportanceLevel.KEY       -> AppleTheme.colors.importanceKey
-        ImportanceLevel.IMPORTANT -> AppleTheme.colors.importanceHigh
-        else                      -> Color.Transparent
-    }
+    val name = formatContactName(contact, AppSettings.contactNameFormat.value)
 
     // Цвет аватара — ЕДИНСТВЕННЫЙ источник AureliaAvatars.brushFor(id):
     // один и тот же контакт одного цвета на всех экранах (баг §28: Анна была
@@ -829,8 +922,6 @@ fun ContactListCard(
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (importanceTint != Color.Transparent)
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(importanceTint))
             }
             val relLabel = contact.customRelationshipType?.takeIf { it.isNotBlank() } ?: contact.relationshipType.label(ctxLabel)
             val sub = listOf(relLabel, position.ifEmpty { company }).filter { it.isNotEmpty() }.joinToString(" · ")
@@ -847,12 +938,11 @@ fun ContactListCard(
 fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Unit) {
     val ctxLabel = LocalContext.current
     val (company, position, _) = getContactVisuals(contact)
-    val name = "${contact.firstName} ${contact.lastName}".trim()
-    val importanceTint = when (contact.importanceLevel) {
-        ImportanceLevel.KEY       -> AppleTheme.colors.importanceKey
-        ImportanceLevel.IMPORTANT -> AppleTheme.colors.importanceHigh
-        else                      -> AppleTheme.colors.brand.copy(alpha = 0.10f)
-    }
+    val name = formatContactName(contact, AppSettings.contactNameFormat.value)
+    // ImportanceLevel убран из UI (2026-07-23) — раньше red/orange-акцент
+    // аватара и точка справа несли важность контакта, теперь фиксированный
+    // приглушённый бренд-акцент, как у карточек без особого статуса.
+    val avatarTint = AppleTheme.colors.brand
 
     Card(
         onClick   = onClick,
@@ -864,13 +954,13 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
         Column(modifier = Modifier.padding(12.dp).fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(importanceTint.copy(alpha = 0.25f)),
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(avatarTint.copy(alpha = 0.10f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         (contact.firstName.firstOrNull()?.toString() ?: "") + (contact.lastName.firstOrNull()?.toString() ?: ""),
                         fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                        color = importanceTint
+                        color = avatarTint
                     )
                 }
                 Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
@@ -881,8 +971,6 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
             }
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                 Text(contact.customRelationshipType?.takeIf { it.isNotBlank() } ?: contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.brand)
-                if (contact.importanceLevel != ImportanceLevel.NORMAL)
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(importanceTint))
             }
         }
     }
@@ -892,4 +980,141 @@ fun ContactGridCard(contact: Contact, highlight: String = "", onClick: () -> Uni
 @Composable
 fun ContactFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     FilterChip(selected = selected, onClick = onClick, label = { Text(label) }, shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
+}
+
+// ═══════════════════════════════════════════════════════════
+// АЛФАВИТНЫЙ ИНДЕКС (fast-scroll sidebar, паттерн Android Contacts/iOS)
+// ═══════════════════════════════════════════════════════════
+
+/** Базовый алфавит языка приложения (не locale устройства — приложение само
+ *  переключает язык через AppLanguage). Диапазоны символов подобраны явно
+ *  (не Char-range для греческого — U+03A2 в блоке прописных греческих букв
+ *  не назначен, диапазон дал бы «пустой» символ). */
+fun alphabetForLanguage(language: AppLanguage): List<String> = when (language) {
+    AppLanguage.RUSSIAN -> ('А'..'Я').map { it.toString() } + "#"
+    AppLanguage.GREEK   -> listOf(
+        "Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ","Ν","Ξ","Ο","Π",
+        "Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω"
+    ) + "#"
+    AppLanguage.ENGLISH -> ('A'..'Z').map { it.toString() } + "#"
+}
+
+/**
+ * ФИКС (2026-07-11, живой тест владельца: «алфавитный индекс только на русском,
+ * хотя контакты на разных языках»). `alphabetForLanguage` в баре показывал ТОЛЬКО
+ * буквы текущего языка интерфейса — если UI на русском, а имя контакта латиницей
+ * ("John"), буквы A-Z в баре не было вообще, кликнуть/проскрабить до неё было
+ * нельзя (сам список группировался верно — `contactSortLetter` locale-независим
+ * через `uppercaseChar()`, баг был только в сайдбаре). Как AOSP Contacts (ICU
+ * AlphabeticIndex строит индекс из данных, не только из locale UI) — берём
+ * родной алфавит языка интерфейса как основу (порядок/раскладка привычные) и
+ * дописываем перед «#» те буквы, что реально встречаются у контактов, но не
+ * входят в этот алфавит (другой скрипт).
+ */
+fun alphabetForContacts(language: AppLanguage, activeLetters: Set<String>): List<String> {
+    val base = alphabetForLanguage(language)
+    val baseSet = base.toSet()
+    val extra = activeLetters.filter { it != "#" && it !in baseSet }.sorted()
+    if (extra.isEmpty()) return base
+    return base.dropLast(1) + extra + "#"
+}
+
+private fun letterAtOffset(y: Float, barHeightPx: Float, letters: List<String>): String {
+    if (letters.isEmpty()) return "#"
+    if (barHeightPx <= 0f) return letters.first()
+    val slot = barHeightPx / letters.size
+    val idx = (y / slot).toInt().coerceIn(0, letters.lastIndex)
+    return letters[idx]
+}
+
+/** Если под пальцем буква без контактов — прыгаем к ближайшей букве, у которой
+ *  контакты реально есть (как в Android Contacts: серые буквы не мёртвые). */
+private fun nearestActiveLetter(letter: String, letters: List<String>, active: Set<String>): String {
+    if (letter in active || active.isEmpty()) return letter
+    val idx = letters.indexOf(letter)
+    if (idx < 0) return letter
+    for (d in 1 until letters.size) {
+        letters.getOrNull(idx - d)?.let { if (it in active) return it }
+        letters.getOrNull(idx + d)?.let { if (it in active) return it }
+    }
+    return letter
+}
+
+/** Боковой скролл-индекс с drag-to-scrub и всплывающей буквой при перетаскивании —
+ *  паттерн Android Contacts/iOS Контакты. Тап и протяжка обрабатываются вручную
+ *  одним pointerInput (а не отдельными detectTapGestures/detectDragGestures),
+ *  иначе первый детектор перехватывает down-событие и второй не запускается. */
+@Composable
+private fun AlphabetIndexBar(
+    letters: List<String>,
+    activeLetters: Set<String>,
+    onLetterSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var barHeightPx by remember { mutableStateOf(0f) }
+    var bubbleLetter by remember { mutableStateOf<String?>(null) }
+
+    Box(modifier = modifier.width(22.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .onGloballyPositioned { barHeightPx = it.size.height.toFloat() }
+                .pointerInput(letters, activeLetters) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var current = letterAtOffset(down.position.y, barHeightPx, letters)
+                        bubbleLetter = current
+                        onLetterSelected(nearestActiveLetter(current, letters, activeLetters))
+                        do {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (change.pressed) {
+                                val letter = letterAtOffset(change.position.y, barHeightPx, letters)
+                                if (letter != current) {
+                                    current = letter
+                                    bubbleLetter = letter
+                                    onLetterSelected(nearestActiveLetter(letter, letters, activeLetters))
+                                }
+                                change.consume()
+                            }
+                        } while (event.changes.any { it.pressed })
+                        bubbleLetter = null
+                    }
+                },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // weight(1f) вместо SpaceEvenly — гарантирует, что ВСЕ буквы (33 кириллицы
+            // + "#") всегда влезают в доступную высоту, даже когда шрифт по умолчанию
+            // даёт line-height больше fontSize (на реальном экране SpaceEvenly с
+            // Text(fontSize=9.sp) без явного lineHeight обрезал буквы Ш–Я — каждая
+            // строка занимала ~63px вместо ожидаемых ~24px из-за унаследованного
+            // line-height типографики).
+            letters.forEach { letter ->
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        letter,
+                        fontSize = 9.sp,
+                        lineHeight = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (letter in activeLetters) AppleTheme.colors.brand
+                                else AppleTheme.colors.tertiaryLabel.copy(alpha = 0.5f)
+                    )
+                }
+            }
+        }
+
+        bubbleLetter?.let { letter ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = (-38).dp)
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(AppleTheme.colors.brand),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(letter, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
 }

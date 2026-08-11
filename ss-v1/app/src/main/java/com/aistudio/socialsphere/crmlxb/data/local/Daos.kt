@@ -1,6 +1,7 @@
 package com.aistudio.socialsphere.crmlxb.data.local
 
 import androidx.room.*
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ContactDao {
@@ -67,6 +68,19 @@ interface ContactDao {
     @Query("DELETE FROM contact_company_relations WHERE contactId = :contactId")
     suspend fun deleteCompanyRelationsForContact(contactId: String)
 
+    // Обратный каскад: при удалении КОМПАНИИ нужно убрать её связи с
+    // контактами тоже — раньше строки оставались сиротами и «оживали»
+    // после reloadFromDb() (баг §35, найден повторным аудитом).
+    @Query("DELETE FROM contact_company_relations WHERE companyId = :companyId")
+    suspend fun deleteCompanyRelationsForCompany(companyId: String)
+
+    // Точечное удаление одной связи — нужно mergeCompanies(): при слиянии
+    // компаний "чужая" связь-дубликат (тот же contactId+position, что уже
+    // есть у итоговой компании) удаляется отдельно от себя, не каскадом по
+    // contactId (иначе снесло бы и связь с самой итоговой компанией).
+    @Query("DELETE FROM contact_company_relations WHERE id = :relationId")
+    suspend fun deleteCompanyRelation(relationId: String)
+
     @Query("DELETE FROM contact_relations WHERE id = :relationId")
     suspend fun deleteContactRelation(relationId: String)
 
@@ -103,6 +117,31 @@ interface ContactDao {
 
     @Query("DELETE FROM contact_group_members WHERE id = :memberId")
     suspend fun deleteGroupMember(memberId: String)
+
+    // ── Теги контакта (плоский управляемый список, зеркало групп) ──
+    @Query("SELECT * FROM tags")
+    fun getTags(): Flow<List<TagEntity>>
+
+    @Query("SELECT * FROM contact_tag_members")
+    fun getContactTagMembers(): Flow<List<ContactTagMemberEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTag(tag: TagEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContactTagMembers(members: List<ContactTagMemberEntity>)
+
+    @Query("DELETE FROM tags WHERE id = :tagId")
+    suspend fun deleteTag(tagId: String)
+
+    @Query("DELETE FROM contact_tag_members WHERE tagId = :tagId")
+    suspend fun deleteTagMembersForTag(tagId: String)
+
+    @Query("DELETE FROM contact_tag_members WHERE contactId = :contactId")
+    suspend fun deleteTagMembersForContact(contactId: String)
+
+    @Query("DELETE FROM contact_tag_members WHERE id = :id")
+    suspend fun deleteTagMember(id: String)
 }
 
 @Dao

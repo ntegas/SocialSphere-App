@@ -40,6 +40,14 @@
 # Moshi — JSON сериализация
 -keep class com.aistudio.socialsphere.crmlxb.model.** { *; }
 -keepclassmembers class com.aistudio.socialsphere.crmlxb.model.** { *; }
+# ФИКС (2026-07-11, найдено на первом release-выпуске в Play Console): BackupData
+# (ExportManager.kt) — корневой класс JSON-бэкапа, но живёт в пакете utils, не
+# model, — правило выше его не покрывало. R8 переименовывал имена параметров
+# конструктора, Moshi (рефлексия, KotlinJsonAdapterFactory) переставал
+# сопоставлять JSON-ключи с полями → parseJsonBackup() ловил исключение и тихо
+# возвращал null (см. try/catch там же) — импорт бэкапа молча не срабатывал
+# ТОЛЬКО в release-сборке, debug не воспроизводил баг вообще.
+-keep class com.aistudio.socialsphere.crmlxb.utils.BackupData { *; }
 -keep @com.squareup.moshi.JsonClass class * { *; }
 -keepclassmembers class * {
     @com.squareup.moshi.FromJson *;

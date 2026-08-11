@@ -320,6 +320,21 @@ fun ImportPreviewScreen(
     val candidates = ImportSession.candidates
     val ctx = LocalContext.current
     var isCheckingDuplicates by remember { mutableStateOf(false) }
+    // ФИКС (аудит 2026-08-11, жалоба владельца: «добавил контакт в телефон — сложно
+    // найти его одного в списке, нет фильтров»): при большом списке кандидатов найти
+    // ОДИН нужный (например, только что добавленный в телефон) вручную скроллом было
+    // невозможно — поиск фильтрует ТОЛЬКО отображение, чекбоксы остальных не трогает.
+    var searchQuery by remember { mutableStateOf("") }
+    val visibleCandidates = remember(candidates.size, searchQuery) {
+        if (searchQuery.isBlank()) candidates.toList()
+        else candidates.filter { c ->
+            val q = searchQuery.trim()
+            "${c.firstName} ${c.lastName}".contains(q, ignoreCase = true) ||
+                c.phones.any { it.number.contains(q) } ||
+                c.emails.any { it.email.contains(q, ignoreCase = true) } ||
+                (c.companyName?.contains(q, ignoreCase = true) == true)
+        }
+    }
 
     LaunchedEffect(Unit) {
         // Simple duplicate check on load
@@ -436,7 +451,44 @@ fun ImportPreviewScreen(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(candidates, key = { it.id }) { candidate ->
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        placeholder = { Text(stringResource(R.string.imp_search_hint)) },
+                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, null)
+                            }
+                        },
+                        singleLine = true
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Выбрать/снять — только среди ВИДИМЫХ (отфильтрованных
+                        // поиском) кандидатов, не всего списка целиком — так можно
+                        // сузить поиск до одного нового контакта и отметить только его.
+                        TextButton(onClick = {
+                            visibleCandidates.forEach { vc ->
+                                val idx = candidates.indexOfFirst { it.id == vc.id }
+                                if (idx >= 0) candidates[idx] = candidates[idx].copy(selectedForImport = true)
+                            }
+                        }) { Text(stringResource(R.string.imp_select_all)) }
+                        TextButton(onClick = {
+                            visibleCandidates.forEach { vc ->
+                                val idx = candidates.indexOfFirst { it.id == vc.id }
+                                if (idx >= 0) candidates[idx] = candidates[idx].copy(selectedForImport = false)
+                            }
+                        }) { Text(stringResource(R.string.imp_select_none)) }
+                    }
+                }
+            }
+            items(visibleCandidates, key = { it.id }) { candidate ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
@@ -538,14 +590,17 @@ private fun applyImportedRelations(candidate: ImportContactCandidate, contactId:
             val current = AppStateStore.contacts.find { it.id == contactId } ?: return@forEach
             if (current.notes.none { it.text == text }) {
                 val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                AppStateStore.updateContact(current.copy(notes = current.notes + Note(
+                // addNote(), не updateContact(copy(notes=...)) — иначе заметка не
+                // попадает в глобальный AppStateStore.notes и невидима в UI
+                // (тот же баг, что и в performImport/mergeCandidate, см. там).
+                AppStateStore.addNote(Note(
                     id = java.util.UUID.randomUUID().toString(),
                     contactId = contactId,
                     type = NoteType.GENERAL,
                     text = text,
                     isImportant = false,
                     createdAt = now, updatedAt = now
-                )))
+                ))
             }
         }
     }
@@ -577,7 +632,7 @@ internal fun applyImportedCompany(
             AppStateStore.getCompany(relation.companyId)?.name.equals(cleanCompanyName, ignoreCase = true)
         }
         if (hasRelation) return false
-        var company = AppStateStore.companies.find { it.name.equals(cleanCompanyName, ignoreCase = true) }
+        var company = AppStateStore.findCompanyByName(cleanCompanyName)
         if (company == null) {
             val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
             company = Company(
@@ -602,11 +657,11 @@ internal fun applyImportedCompany(
         val current = AppStateStore.contacts.find { it.id == contactId } ?: return false
         if (current.notes.any { it.text == text }) return false
         val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-        AppStateStore.updateContact(current.copy(notes = current.notes + Note(
+        AppStateStore.addNote(Note(
             id = java.util.UUID.randomUUID().toString(), contactId = contactId,
             type = NoteType.GENERAL, text = text, isImportant = false,
             createdAt = now, updatedAt = now
-        )))
+        ))
         return true
     }
     return false
@@ -630,6 +685,7 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
             namePrefix = candidate.namePrefix.ifBlank { null },
             nameSuffix = candidate.nameSuffix.ifBlank { null },
             phoneticFirstName = candidate.phoneticFirstName.ifBlank { null },
+            phoneticMiddleName = candidate.phoneticMiddleName.ifBlank { null },
             phoneticLastName = candidate.phoneticLastName.ifBlank { null },
             photoUri = null,
             relationshipType = RelationshipType.OTHER,
@@ -699,19 +755,25 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
         }
         
         if (!candidate.notes.isNullOrBlank()) {
-             val newNote = Note(
-                     id = java.util.UUID.randomUUID().toString(),
-                     contactId = contactId,
-                     type = NoteType.GENERAL,
-                     text = context.getString(R.string.imp_note_from_import, candidate.notes),
-                     isImportant = false,
-                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                     updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                 )
-             val contactToUpdate = AppStateStore.contacts.find { it.id == contactId }
-             if (contactToUpdate != null) {
-                 AppStateStore.updateContact(contactToUpdate.copy(notes = contactToUpdate.notes + newNote))
-             }
+            // ФИКС (данные-потеря, «должен не терять ни фразы»): раньше заметка
+            // добавлялась через updateContact(contact.copy(notes = ...)) — это
+            // кладёт её ТОЛЬКО во встроенный список контакта, но НЕ в глобальный
+            // AppStateStore.notes, откуда реально читает вкладка «Заметки»
+            // (NotesTab.kt: allNotes = AppStateStore.notes.filter{contactId==...}).
+            // Заметка технически создавалась, но была невидима в UI без перезапуска
+            // приложения. addNote() — канонический путь, синхронизирует оба списка
+            // (тот же паттерн, что уже применён для addresses/companyRelations).
+            AppStateStore.addNote(
+                Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    type = NoteType.GENERAL,
+                    text = context.getString(R.string.imp_note_from_import, candidate.notes),
+                    isImportant = false,
+                    createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                )
+            )
         }
 
         applyImportedRelations(candidate, contactId, context)
@@ -845,6 +907,7 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
     val newNamePrefix = existingContact.namePrefix ?: candidate.namePrefix.ifBlank { null }
     val newNameSuffix = existingContact.nameSuffix ?: candidate.nameSuffix.ifBlank { null }
     val newPhoneticFirst = existingContact.phoneticFirstName ?: candidate.phoneticFirstName.ifBlank { null }
+    val newPhoneticMiddle = existingContact.phoneticMiddleName ?: candidate.phoneticMiddleName.ifBlank { null }
     val newPhoneticLast = existingContact.phoneticLastName ?: candidate.phoneticLastName.ifBlank { null }
 
     // Merge Addresses
@@ -896,9 +959,10 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
         }
         if (!hasImportedNote) {
             val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-            val freshForNote = AppStateStore.contacts.find { it.id == existingId } ?: existingContact
-            AppStateStore.updateContact(freshForNote.copy(
-                notes = freshForNote.notes + Note(
+            // См. фикс выше (новый контакт) — addNote() вместо updateContact(copy),
+            // иначе заметка невидима во вкладке «Заметки» без перезапуска.
+            AppStateStore.addNote(
+                Note(
                     id = java.util.UUID.randomUUID().toString(),
                     contactId = existingId,
                     type = NoteType.GENERAL,
@@ -906,7 +970,7 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
                     isImportant = false,
                     createdAt = now, updatedAt = now
                 )
-            ))
+            )
         }
     }
     if (candidate.groupNames.isNotEmpty()) {
@@ -921,6 +985,7 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
         newNamePrefix != existingContact.namePrefix ||
         newNameSuffix != existingContact.nameSuffix ||
         newPhoneticFirst != existingContact.phoneticFirstName ||
+        newPhoneticMiddle != existingContact.phoneticMiddleName ||
         newPhoneticLast != existingContact.phoneticLastName
     if (newPhones.isNotEmpty() || newEmails.isNotEmpty() || deviceLink != null || nameFieldsChanged) {
         val freshExisting = AppStateStore.contacts.find { it.id == existingId } ?: existingContact
@@ -931,6 +996,7 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
             namePrefix = newNamePrefix,
             nameSuffix = newNameSuffix,
             phoneticFirstName = newPhoneticFirst,
+            phoneticMiddleName = newPhoneticMiddle,
             phoneticLastName = newPhoneticLast,
             // Связь с телефоном проставляем, только если её ещё не было —
             // не затираем существующую (контакт мог быть связан вручную с

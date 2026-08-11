@@ -14,8 +14,6 @@ object NotificationHelper {
     // Раздельные каналы — чтобы пользователь управлял звуком/важностью каждого
     // типа из системных настроек по отдельности.
     const val CHANNEL_ID = "socialsphere_reminders"        // события календаря
-    const val CHANNEL_NAME = "Напоминания о событиях"
-    const val CHANNEL_DESCRIPTION = "Напоминания о событиях календаря"
     const val CHANNEL_REACH_OUT = "socialsphere_reach_out" // «пора связаться»
     const val CHANNEL_BIRTHDAY  = "socialsphere_birthday"  // дни рождения
 
@@ -24,16 +22,18 @@ object NotificationHelper {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val high = NotificationManager.IMPORTANCE_HIGH
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, CHANNEL_NAME, high).apply { description = CHANNEL_DESCRIPTION }
-            )
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_REACH_OUT, "Пора связаться", high).apply {
-                    description = "Напоминания связаться по ритму общения"
+                NotificationChannel(CHANNEL_ID, context.getString(R.string.notif_channel_events_name), high).apply {
+                    description = context.getString(R.string.notif_channel_events_desc)
                 }
             )
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_BIRTHDAY, "Дни рождения", high).apply {
-                    description = "Напоминания о днях рождения"
+                NotificationChannel(CHANNEL_REACH_OUT, context.getString(R.string.notif_reach_out_title), high).apply {
+                    description = context.getString(R.string.notif_channel_reach_out_desc)
+                }
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_BIRTHDAY, context.getString(R.string.notif_channel_birthday_name), high).apply {
+                    description = context.getString(R.string.notif_channel_birthday_desc)
                 }
             )
         }
@@ -79,7 +79,7 @@ object NotificationHelper {
                 context, notificationId * 31 + 1, callIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(android.R.drawable.ic_menu_call, "Позвонить", callPi)
+            builder.addAction(android.R.drawable.ic_menu_call, context.getString(R.string.notif_action_call), callPi)
 
             val smsIntent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:$phone"))
                 .apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
@@ -87,7 +87,7 @@ object NotificationHelper {
                 context, notificationId * 31 + 2, smsIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(android.R.drawable.ic_dialog_email, "Написать", smsPi)
+            builder.addAction(android.R.drawable.ic_dialog_email, context.getString(R.string.notif_action_message), smsPi)
         }
 
         // «Отложить» (через сутки) и «Готово» (закрыть) — обрабатывает NotificationReceiver.
@@ -97,18 +97,19 @@ object NotificationHelper {
             putExtra("calendarItemId", targetCalendarItemId)
             putExtra("title", title)
             putExtra("content", content)
+            putExtra("channel", channelId)
             if (!phone.isNullOrBlank()) putExtra("phone", phone)
         }
         val snoozePi = PendingIntent.getBroadcast(
             context, notificationId * 31 + 3, actionIntent("snooze"),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        builder.addAction(android.R.drawable.ic_menu_recent_history, "Отложить", snoozePi)
+        builder.addAction(android.R.drawable.ic_menu_recent_history, context.getString(R.string.notif_action_snooze), snoozePi)
         val donePi = PendingIntent.getBroadcast(
             context, notificationId * 31 + 4, actionIntent("done"),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        builder.addAction(android.R.drawable.checkbox_on_background, "Готово", donePi)
+        builder.addAction(android.R.drawable.checkbox_on_background, context.getString(R.string.notif_action_done), donePi)
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, builder.build())

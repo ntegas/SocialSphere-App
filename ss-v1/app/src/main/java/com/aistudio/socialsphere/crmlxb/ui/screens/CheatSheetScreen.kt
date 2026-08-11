@@ -67,11 +67,14 @@ fun CheatSheetScreen(
         .find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
         ?.city ?: ""
 
+    // ФИКС (2026-07-11, найдено при живой проверке #81 на реальном устройстве):
+    // Шпаргалка читала AppStateStore.notes напрямую, игнорируя isLocked — защищённые
+    // записи показывались в открытую на экране быстрого обзора, минуя PIN/биометрию.
     val impNotes     = AppStateStore.notes.filter {
-        it.contactId == contact.id && it.type == NoteType.IMPORTANT_TO_REMEMBER
+        it.contactId == contact.id && it.type == NoteType.IMPORTANT_TO_REMEMBER && !it.isLocked
     }
     val lastNote     = AppStateStore.notes
-        .filter { it.contactId == contact.id }
+        .filter { it.contactId == contact.id && !it.isLocked }
         .maxByOrNull { it.createdAt }
     val upcomingEvents = AppStateStore.calendarItems.filter {
         it.links.any { l -> l.targetId == contact.id } &&
@@ -97,7 +100,7 @@ fun CheatSheetScreen(
         it.category in setOf(PersonalDetailCategory.ALLERGIES, PersonalDetailCategory.RESTRICTIONS)
     }
     val dreamNotes   = AppStateStore.notes.filter {
-        it.contactId == contact.id && it.type == NoteType.PERSONAL_DETAIL
+        it.contactId == contact.id && it.type == NoteType.PERSONAL_DETAIL && !it.isLocked
     }
     val primaryPhone = contact.phones.find { it.isPrimary }?.number
         ?: contact.phones.firstOrNull()?.number ?: ""
@@ -230,7 +233,7 @@ fun CheatSheetScreen(
                         val otherName = AppStateStore.getContact(otherId)
                             ?.let { "${it.firstName} ${it.lastName}".trim() } ?: "—"
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), Arrangement.SpaceBetween) {
-                            Text(role ?: "", fontSize = 13.sp, color = CsMuted, modifier = Modifier.weight(0.4f))
+                            Text(role?.let { relationRoleLabel(ctxLabel, it) } ?: "", fontSize = 13.sp, color = CsMuted, modifier = Modifier.weight(0.4f))
                             Text(otherName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = CsTx,
                                 modifier = Modifier.weight(0.6f), textAlign = TextAlign.End)
                         }

@@ -4,8 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
+import com.squareup.moshi.JsonClass
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -23,8 +25,9 @@ import java.util.zip.ZipOutputStream
  * персональные детали/связи с компаниями). Плюс компании, события
  * календаря и контакт-контакт связи (семья).
  */
+@JsonClass(generateAdapter = true)
 data class BackupData(
-    val version: Int = 4,
+    val version: Int = 5,
     val exportedAt: String = "",
     val contacts: List<Contact> = emptyList(),
     val companies: List<Company> = emptyList(),
@@ -33,7 +36,18 @@ data class BackupData(
     // Группы контактов (v12) — добавлены со значением по умолчанию: старые
     // бэкапы без этого поля по-прежнему парсятся (Moshi берёт emptyList()).
     val groups: List<ContactGroup> = emptyList(),
-    val groupMembers: List<ContactGroupMember> = emptyList()
+    val groupMembers: List<ContactGroupMember> = emptyList(),
+    // Теги контакта — по образцу groups/groupMembers: default-значения,
+    // чтобы старые бэкапы без этих полей по-прежнему парсились.
+    val tags: List<Tag> = emptyList(),
+    val tagMembers: List<ContactTagMember> = emptyList(),
+    // ФИКС (аудит 2026-08-11, §44 KNOWLEDGE.md): заметки НИКОГДА не попадали
+    // в бэкап отдельным полем — читались только как вложенное Contact.notes,
+    // из-за чего заметки компаний (Note.companyId, без contactId) не сохранялись
+    // вообще. Плоский список — единственный источник истины (как в AppStateStore),
+    // покрывает и контактные, и компанийные заметки разом. Default emptyList()
+    // — старые бэкапы (version<5) по-прежнему парсятся, просто без заметок.
+    val notes: List<Note> = emptyList()
 )
 
 object ExportManager {
@@ -47,7 +61,7 @@ object ExportManager {
     // не трогаем, он ещё нужен для шаринга).
     // "contact_" добавлен 2026-07-02: vCard одного контакта (шаринг/в телефон)
     // раньше не попадал под уборку и лежал в cache бессрочно.
-    private val exportPrefixes = listOf("contacts_", "companies_", "backup_", "socialsphere_backup_", "contact_")
+    private val exportPrefixes = listOf("contacts_", "companies_", "backup_", "socialsphere_backup_", "contact_", "notes_", "calendar_")
 
     /** Подпапка cache/exports — FileProvider открывает ТОЛЬКО её (аудит 2026-07-02:
      *  раньше file_paths.xml отдавал весь cacheDir). Старые файлы чистятся по TTL. */
@@ -77,8 +91,8 @@ object ExportManager {
         }
         // Через безопасный запуск: локализованный контекст — не Activity,
         // прямой startActivity молча ронял share-sheet экспорта
-        if (!ExternalActionHandler.startIntentSafely(context, Intent.createChooser(intent, "Поделиться файлом"))) {
-            android.widget.Toast.makeText(context, "Не удалось открыть меню «Поделиться»", android.widget.Toast.LENGTH_SHORT).show()
+        if (!ExternalActionHandler.startIntentSafely(context, Intent.createChooser(intent, context.getString(R.string.export_share_chooser_title)))) {
+            android.widget.Toast.makeText(context, context.getString(R.string.export_share_open_failed), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -87,7 +101,7 @@ object ExportManager {
         cleanOldExports(context)
         val file = File(exportsDir(context), "contacts_$ts.csv")
         PrintWriter(FileWriter(file)).use { pw ->
-            pw.println("Имя,Фамилия,Телефон,Email,Компания,Должность,Город,Тип,Важность")
+            pw.println(context.getString(R.string.export_csv_contacts_header))
             AppStateStore.contacts.forEach { c ->
                 val phone   = c.phones.find { it.isPrimary }?.number
                     ?: c.phones.firstOrNull()?.number ?: ""
@@ -116,7 +130,7 @@ object ExportManager {
         cleanOldExports(context)
         val file = File(exportsDir(context), "companies_$ts.csv")
         PrintWriter(FileWriter(file)).use { pw ->
-            pw.println("Название,Индустрия,Город,Сайт,Описание,Количество контактов")
+            pw.println(context.getString(R.string.export_csv_companies_header))
             AppStateStore.companies.forEach { c ->
                 val city = AppStateStore.addresses.find {
                     it.ownerId == c.id && it.ownerType == AddressOwnerType.COMPANY
@@ -156,9 +170,10 @@ object ExportManager {
      * мессенджеры — X-поля; app-поля (следующий шаг, темы, теги…), которых нет
      * в стандарте, складываем в NOTE читаемым текстом — иначе они бы терялись.
      */
-    private fun writeVCard(pw: PrintWriter, c: Contact) {
-        pw.println("BEGIN:VCARD")
-        pw.println("VERSION:3.0")
+    // N:/FN: — общие для полной и урезанной (share) vCard, вынесено, чтобы
+    // правка формата ФИО попадала в обе версии разом (аудит 2026-07-22:
+    // до рефакторинга были буквально продублированы между writeVCard/writeShareVCard).
+    private fun writeNameFields(pw: PrintWriter, c: Contact) {
         // N: Family;Given;Additional;Prefixes;Suffixes (RFC 2426) — раньше
         // приставка/суффикс не писались вообще (пустые компоненты), хотя модель
         // их уже хранит отдельно (v13, как в Android-контактах).
@@ -171,12 +186,10 @@ object ExportManager {
             c.nameSuffix?.takeIf { it.isNotBlank() }
         ).joinToString(" ")
         pw.println("FN:${vEsc(fullName)}")
-        if (!c.nickname.isNullOrBlank()) pw.println("NICKNAME:${vEsc(c.nickname)}")
-        // Фонетические имя/фамилия — нестандартное X-поле (нет фиксированного
-        // тега в vCard 3.0), но Android умеет читать X-PHONETIC-*.
-        if (!c.phoneticFirstName.isNullOrBlank()) pw.println("X-PHONETIC-FIRST-NAME:${vEsc(c.phoneticFirstName)}")
-        if (!c.phoneticLastName.isNullOrBlank()) pw.println("X-PHONETIC-LAST-NAME:${vEsc(c.phoneticLastName)}")
+    }
 
+    // ORG/TITLE — общие для полной и урезанной vCard.
+    private fun writeOrgFields(pw: PrintWriter, c: Contact) {
         val compRel = c.companyRelations.firstOrNull { it.isPrimary }
             ?: c.companyRelations.firstOrNull()
         val company = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
@@ -185,7 +198,10 @@ object ExportManager {
             if (!compRel?.position.isNullOrBlank())
                 pw.println("TITLE:${vEsc(compRel?.position)}")
         }
+    }
 
+    // TEL — общие для полной и урезанной vCard.
+    private fun writePhoneFields(pw: PrintWriter, c: Contact) {
         c.phones.forEach { p ->
             val type = when (p.type) {
                 PhoneType.WORK -> "WORK"
@@ -195,7 +211,10 @@ object ExportManager {
             val pref = if (p.isPrimary) ",PREF" else ""
             pw.println("TEL;TYPE=$type$pref:${p.number}")
         }
+    }
 
+    // EMAIL — общие для полной и урезанной vCard.
+    private fun writeEmailFields(pw: PrintWriter, c: Contact) {
         c.emails.forEach { e ->
             val type = when (e.type) {
                 EmailType.WORK -> "WORK"
@@ -204,6 +223,22 @@ object ExportManager {
             val pref = if (e.isPrimary) ",PREF" else ""
             pw.println("EMAIL;TYPE=$type$pref:${e.email}")
         }
+    }
+
+    private fun writeVCard(pw: PrintWriter, c: Contact, context: Context) {
+        pw.println("BEGIN:VCARD")
+        pw.println("VERSION:3.0")
+        writeNameFields(pw, c)
+        if (!c.nickname.isNullOrBlank()) pw.println("NICKNAME:${vEsc(c.nickname)}")
+        // Фонетические имя/фамилия — нестандартное X-поле (нет фиксированного
+        // тега в vCard 3.0), но Android умеет читать X-PHONETIC-*.
+        if (!c.phoneticFirstName.isNullOrBlank()) pw.println("X-PHONETIC-FIRST-NAME:${vEsc(c.phoneticFirstName)}")
+        if (!c.phoneticMiddleName.isNullOrBlank()) pw.println("X-PHONETIC-MIDDLE-NAME:${vEsc(c.phoneticMiddleName)}")
+        if (!c.phoneticLastName.isNullOrBlank()) pw.println("X-PHONETIC-LAST-NAME:${vEsc(c.phoneticLastName)}")
+
+        writeOrgFields(pw, c)
+        writePhoneFields(pw, c)
+        writeEmailFields(pw, c)
 
         c.messengers.forEach { m -> pw.println("X-${m.type.name}:${vEsc(m.value)}") }
 
@@ -211,8 +246,9 @@ object ExportManager {
         AppStateStore.addresses
             .filter { it.ownerId == c.id && it.ownerType == AddressOwnerType.CONTACT }
             .forEach { a ->
+                // Компонент 5 (region) vCard ADR — район (раньше всегда пустой).
                 pw.println("ADR;TYPE=${adrType(a.addressType)}:;;${vEsc(a.addressLine)};" +
-                    "${vEsc(a.city)};;${vEsc(a.postalCode)};${vEsc(a.country)}")
+                    "${vEsc(a.city)};${vEsc(a.district)};${vEsc(a.postalCode)};${vEsc(a.country)}")
             }
 
         val birthday = AppStateStore.calendarItems.find {
@@ -231,12 +267,12 @@ object ExportManager {
         // NOTE: все заметки + app-поля (нет в стандарте vCard — кладём текстом)
         val noteParts = mutableListOf<String>()
         c.notes.forEach { noteParts.add(it.text) }
-        if (!c.nextStep.isNullOrBlank())      noteParts.add("Следующий шаг: ${c.nextStep}")
-        if (!c.talkingPoints.isNullOrBlank()) noteParts.add("Темы для разговора: ${c.talkingPoints}")
-        if (!c.canHelpWith.isNullOrBlank())   noteParts.add("Может помочь: ${c.canHelpWith}")
-        if (!c.iCanHelpWith.isNullOrBlank())  noteParts.add("Я могу помочь: ${c.iCanHelpWith}")
-        if (!c.meetContext.isNullOrBlank())   noteParts.add("Где познакомились: ${c.meetContext}")
-        if (c.tags.isNotEmpty())              noteParts.add("Теги: ${c.tags.joinToString(", ")}")
+        if (!c.nextStep.isNullOrBlank())      noteParts.add(context.getString(R.string.export_vcard_next_step_prefix) + c.nextStep)
+        if (!c.talkingPoints.isNullOrBlank()) noteParts.add(context.getString(R.string.export_vcard_talking_points_prefix) + c.talkingPoints)
+        if (!c.canHelpWith.isNullOrBlank())   noteParts.add(context.getString(R.string.export_vcard_can_help_prefix) + c.canHelpWith)
+        if (!c.iCanHelpWith.isNullOrBlank())  noteParts.add(context.getString(R.string.export_vcard_i_can_help_prefix) + c.iCanHelpWith)
+        if (!c.meetContext.isNullOrBlank())   noteParts.add(context.getString(R.string.export_vcard_meet_context_prefix) + c.meetContext)
+        if (c.tags.isNotEmpty())              noteParts.add(context.getString(R.string.export_vcard_tags_prefix) + c.tags.joinToString(", "))
         if (noteParts.isNotEmpty())
             pw.println("NOTE:${vEsc(noteParts.joinToString("\n"))}")
 
@@ -244,11 +280,42 @@ object ExportManager {
         pw.println()
     }
 
+    /**
+     * Урезанная vCard для «Поделиться контактом» (в отличие от writeVCard,
+     * которая шлёт ВСЁ, включая приватные CRM-поля владельца). Сюда идёт
+     * только то, что уместно передать другому человеку как визитку: имя,
+     * телефоны, email, компания/должность. Явно НЕ включены: мессенджеры,
+     * адрес, день рождения, заметки/nextStep/talkingPoints/canHelpWith/
+     * iCanHelpWith/meetContext/tags — они приватны для владельца (владелец
+     * подтвердил этот состав явно, 2026-07-22).
+     */
+    private fun writeShareVCard(pw: PrintWriter, c: Contact) {
+        pw.println("BEGIN:VCARD")
+        pw.println("VERSION:3.0")
+        writeNameFields(pw, c)
+        writeOrgFields(pw, c)
+        writePhoneFields(pw, c)
+        writeEmailFields(pw, c)
+        pw.println("END:VCARD")
+        pw.println()
+    }
+
+    /** Один контакт → облегчённая .vcf специально для «Поделиться» (см. writeShareVCard). */
+    suspend fun exportContactShareVCard(context: Context, contact: Contact): File =
+        withContext(Dispatchers.IO) {
+            cleanOldExports(context)
+            val safe = "${contact.firstName}_${contact.lastName}"
+                .replace(Regex("[^A-Za-z0-9_]"), "")
+            val file = File(exportsDir(context), "contact_${safe.ifBlank { "card" }}_$ts.vcf")
+            PrintWriter(FileWriter(file)).use { pw -> writeShareVCard(pw, contact) }
+            file
+        }
+
     suspend fun exportVCard(context: Context): File = withContext(Dispatchers.IO) {
         cleanOldExports(context)
         val file = File(exportsDir(context), "contacts_$ts.vcf")
         PrintWriter(FileWriter(file)).use { pw ->
-            AppStateStore.contacts.forEach { writeVCard(pw, it) }
+            AppStateStore.contacts.forEach { writeVCard(pw, it, context) }
         }
         file
     }
@@ -260,7 +327,7 @@ object ExportManager {
             val safe = "${contact.firstName}_${contact.lastName}"
                 .replace(Regex("[^A-Za-z0-9_]"), "")
             val file = File(exportsDir(context), "contact_${safe.ifBlank { "card" }}_$ts.vcf")
-            PrintWriter(FileWriter(file)).use { pw -> writeVCard(pw, contact) }
+            PrintWriter(FileWriter(file)).use { pw -> writeVCard(pw, contact, context) }
             file
         }
 
@@ -294,14 +361,17 @@ object ExportManager {
     }
 
     private fun buildBackup(): BackupData = BackupData(
-        version = 4,
+        version = 5,
         exportedAt = LocalDateTime.now().toString(),
         contacts = AppStateStore.contacts.toList(),
         companies = AppStateStore.companies.toList(),
         calendarItems = AppStateStore.calendarItems.toList(),
         contactRelations = AppStateStore.contactRelations.toList(),
         groups = AppStateStore.groups.toList(),
-        groupMembers = AppStateStore.groupMembers.toList()
+        groupMembers = AppStateStore.groupMembers.toList(),
+        tags = AppStateStore.tags.toList(),
+        tagMembers = AppStateStore.tagMembers.toList(),
+        notes = AppStateStore.notes.toList()
     )
 
     // Бэкап как строка JSON — для прямого сохранения в файл через SAF.
@@ -339,16 +409,77 @@ object ExportManager {
         data.contacts.forEach { c ->
             AppStateStore.restoreContact(c)
         }
-        data.calendarItems.forEach { ci ->
-            if (AppStateStore.calendarItems.any { it.id == ci.id }) AppStateStore.updateCalendarItem(ci)
-            else AppStateStore.addCalendarItem(ci)
-        }
+        // restoreCalendarItem (не updateCalendarItem/addCalendarItem) — те
+        // штампуют новый updatedAt/createdAt, затирая исходные даты бэкапа
+        // (тот же класс правки, что restoreContact уже применяет для контактов).
+        data.calendarItems.forEach { ci -> AppStateStore.restoreCalendarItem(ci) }
         data.contactRelations.forEach { r ->
             if (AppStateStore.contactRelations.none { it.id == r.id }) AppStateStore.addContactRelation(r)
         }
         data.groups.forEach { g -> AppStateStore.restoreGroup(g) }
         data.groupMembers.forEach { m -> AppStateStore.restoreGroupMember(m) }
+        data.tags.forEach { t -> AppStateStore.restoreTag(t) }
+        data.tagMembers.forEach { m -> AppStateStore.restoreTagMember(m) }
+        // ФИКС (§44): раньше заметки восстанавливались ТОЛЬКО как побочный эффект
+        // вложенного Contact.notes внутри restoreContact — но restoreContact's
+        // DB-запись (addContactDb) не трогает таблицу notes вообще, так что
+        // заметки не переживали следующий холодный старт; заметки компаний
+        // вообще не попадали в бэкап (Company.notes не существует). Теперь —
+        // явно, из плоского top-level списка, с реальной записью в БД.
+        data.notes.forEach { n -> AppStateStore.restoreNote(n) }
         return data.contacts.size
+    }
+
+    // ─── Частичное резервное копирование (заметки/календарь по отдельности) ──
+    // Владелец: «постоянно страдают заметки и календарь» — вместо того, чтобы
+    // каждый раз восстанавливать ВСЮ базу, можно сохранить/восстановить только
+    // одну категорию. Тот же JSON-формат (BackupData), но с одним заполненным
+    // полем — импорт трогает СТРОГО одну категорию, даже если в файле случайно
+    // окажутся другие (защита от случайной порчи остального при неверном файле).
+
+    suspend fun backupJsonStringNotes(): String = withContext(Dispatchers.IO) {
+        backupAdapter.toJson(BackupData(
+            version = 5, exportedAt = LocalDateTime.now().toString(),
+            notes = AppStateStore.notes.toList()
+        ))
+    }
+
+    suspend fun exportNotesJson(context: Context): File = withContext(Dispatchers.IO) {
+        cleanOldExports(context)
+        val file = File(exportsDir(context), "notes_$ts.json")
+        file.writeText(backupJsonStringNotes())
+        file
+    }
+
+    /** Восстанавливает ТОЛЬКО заметки из файла (остальные категории в файле,
+     *  если есть, игнорируются). Возвращает число заметок, -1 если файл не бэкап. */
+    fun importNotesJson(json: String): Int {
+        val data = parseJsonBackup(json) ?: return -1
+        if (data.version < 1 || data.version > 5) return -1
+        data.notes.forEach { n -> AppStateStore.restoreNote(n) }
+        return data.notes.size
+    }
+
+    suspend fun backupJsonStringCalendar(): String = withContext(Dispatchers.IO) {
+        backupAdapter.toJson(BackupData(
+            version = 5, exportedAt = LocalDateTime.now().toString(),
+            calendarItems = AppStateStore.calendarItems.toList()
+        ))
+    }
+
+    suspend fun exportCalendarJson(context: Context): File = withContext(Dispatchers.IO) {
+        cleanOldExports(context)
+        val file = File(exportsDir(context), "calendar_$ts.json")
+        file.writeText(backupJsonStringCalendar())
+        file
+    }
+
+    /** Восстанавливает ТОЛЬКО события календаря (остальные категории игнорируются). */
+    fun importCalendarJson(json: String): Int {
+        val data = parseJsonBackup(json) ?: return -1
+        if (data.version < 1 || data.version > 5) return -1
+        data.calendarItems.forEach { ci -> AppStateStore.restoreCalendarItem(ci) }
+        return data.calendarItems.size
     }
 
     // ─── Full ZIP backup ───────────────────────────────────────

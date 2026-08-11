@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -33,6 +32,7 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
+import com.aistudio.socialsphere.crmlxb.ui.components.CopyableText
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
@@ -52,10 +52,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
         // Без CardBlock-заголовка: ProfessionRow сам подписывает поле —
         // повторять «Профессия» дважды (заголовок карточки + внутренний
         // лейбл) не нужно.
-        if (!contact.profession.isNullOrBlank() || editing) {
-            CardBlock {
-                ProfessionRow(contact = contact, editing = editing)
-            }
+        // ФИКС (2026-07-12, фидбэк владельца): блок виден ВСЕГДА.
+        CardBlock {
+            ProfessionRow(contact = contact, editing = editing)
         }
     }
 
@@ -71,18 +70,17 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
             WorkplaceEditDialog(contact = contact, rel = rel, onDismiss = { editingRel = null })
         }
         removingRel?.let { rel ->
-            AlertDialog(
-                onDismissRequest = { removingRel = null },
-                title = { Text(stringResource(R.string.cd_remove_company_title), fontWeight = FontWeight.Bold) },
-                confirmButton = {
-                    Button(onClick = {
-                        AppStateStore.updateContact(contact.copy(
-                            companyRelations = contact.companyRelations.filter { it.id != rel.id }
-                        ))
-                        removingRel = null
-                    }) { Text(stringResource(R.string.cd_remove)) }
-                },
-                dismissButton = { TextButton(onClick = { removingRel = null }) { Text(stringResource(R.string.common_cancel)) } }
+            com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+                onDismiss = { removingRel = null },
+                title = stringResource(R.string.cd_remove_company_title),
+                confirmText = stringResource(R.string.cd_remove),
+                destructive = true,
+                onConfirm = {
+                    AppStateStore.updateContact(contact.copy(
+                        companyRelations = contact.companyRelations.filter { it.id != rel.id }
+                    ))
+                    removingRel = null
+                }
             )
         }
         if (editing) {
@@ -126,7 +124,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                             Text(company.name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                         }
                         Column(Modifier.weight(1f)) {
-                            Text(company.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            CopyableText(company.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 listOf(company.industry.label(ctxLabel), company.addresses.firstOrNull()?.city.orEmpty())
                                     .filter { it.isNotBlank() }.joinToString(" · "),
@@ -135,7 +133,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                         }
                         val isFormer = rel.employmentStatus == EmploymentStatus.FORMER
                         Box(
-                            Modifier.clip(RoundedCornerShape(percent = 50))
+                            Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Full)
                                 .background(if (isFormer) AppleTheme.colors.fill else AppleTheme.colors.brand.copy(alpha = 0.12f))
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
@@ -170,7 +168,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         rel.managedAccounts.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { acc ->
                             Box(
-                                Modifier.clip(RoundedCornerShape(percent = 50)).background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                                Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Full).background(AppleTheme.colors.brand.copy(alpha = 0.10f))
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) { Text(acc, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand, fontWeight = FontWeight.Medium) }
                         }
@@ -220,7 +218,16 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                 modifier = Modifier.fillMaxWidth().height(42.dp)
             ) { Text(stringResource(R.string.common_save), fontWeight = FontWeight.Bold) }
         }
-        else if (hasMB) CardBlock(title = stringResource(R.string.cd_mutual_value)) {
+        // ФИКС (2026-07-12, фидбэк владельца): блок виден ВСЕГДА, не только когда
+        // заполнен — иначе пустое поле в просмотре негде было найти.
+        else CardBlock(title = stringResource(R.string.cd_mutual_value)) {
+            if (!hasMB) {
+                Text(
+                    stringResource(R.string.cd_ford_empty_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppleTheme.colors.secondaryLabel
+                )
+            }
             if (!contact.canHelpWith.isNullOrBlank()) {
                 Text(
                     stringResource(R.string.cd_can_help),
@@ -277,7 +284,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
         val ctx = androidx.compose.ui.platform.LocalContext.current
         val allAddrs = AppStateStore.addresses.filter { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
         val workAddrs = allAddrs.filter { it.addressType in workTypes }
-        if (workAddrs.isNotEmpty() || editing) {
+        // ФИКС (2026-07-12, фидбэк владельца): блок и «+Добавить» видны ВСЕГДА.
+        run {
             CardBlock(title = stringResource(R.string.cd_work_address)) {
                 var editAddr by remember { mutableStateOf<Address?>(null) }
                 var showAddrDialog by remember { mutableStateOf(false) }
@@ -293,7 +301,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                listOf(addr.addressLine, addr.city, addr.postalCode.orEmpty(), addr.country).filter { it.isNotBlank() }.joinToString(", "),
+                                listOf(addr.addressLine, addr.district.orEmpty(), addr.city, addr.postalCode.orEmpty(), addr.country).filter { it.isNotBlank() }.joinToString(", "),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Text(addr.addressType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
@@ -313,11 +321,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
-                if (editing) {
-                    TextButton(onClick = { editAddr = null; showAddrDialog = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_address))
-                    }
+                TextButton(onClick = { editAddr = null; showAddrDialog = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_address))
                 }
 
                 if (showAddrDialog) {
@@ -351,17 +357,16 @@ fun androidx.compose.foundation.lazy.LazyListScope.workTab(contact: Contact, onN
                     )
                 }
                 pendingRemoveAddr?.let { ra ->
-                    AlertDialog(
-                        onDismissRequest = { pendingRemoveAddr = null },
-                        title = { Text(stringResource(R.string.ce_remove_address_q), fontWeight = FontWeight.Bold) },
-                        text = { Text(listOf(ra.addressLine, ra.city).filter { it.isNotBlank() }.joinToString(", ")) },
-                        confirmButton = {
-                            Button(onClick = {
-                                AppStateStore.updateContact(contact.copy(addresses = allAddrs.filter { it.id != ra.id }))
-                                pendingRemoveAddr = null
-                            }) { Text(stringResource(R.string.common_delete)) }
-                        },
-                        dismissButton = { TextButton(onClick = { pendingRemoveAddr = null }) { Text(stringResource(R.string.common_cancel)) } }
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+                        onDismiss = { pendingRemoveAddr = null },
+                        title = stringResource(R.string.ce_remove_address_q),
+                        text = listOf(ra.addressLine, ra.city).filter { it.isNotBlank() }.joinToString(", "),
+                        confirmText = stringResource(R.string.common_delete),
+                        destructive = true,
+                        onConfirm = {
+                            AppStateStore.updateContact(contact.copy(addresses = allAddrs.filter { it.id != ra.id }))
+                            pendingRemoveAddr = null
+                        }
                     )
                 }
             }
@@ -375,6 +380,6 @@ private fun MiniField(label: String, value: String, modifier: Modifier = Modifie
     Column(modifier) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = AppleTheme.colors.secondaryLabel)
         Spacer(Modifier.height(2.dp))
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+        CopyableText(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
     }
 }

@@ -229,6 +229,33 @@ class DaoTest {
         assertTrue(calendarDao.getCalendarItemLinks().isEmpty())
     }
 
+    // Регрессия (баг: «некоторые события больше не привязаны к людям» после
+    // обновления): CalendarItemEditScreen раньше штамповал КАЖДУЮ ссылку
+    // literal-ом calendarItemId = "" вместо реального id события. Пока приложение
+    // живо, это было незаметно (список ссылок держится в памяти как есть), но
+    // AppStateStore.loadInitialData() на холодном старте пересобирает links
+    // события строго через `links.filter { it.calendarItemId == c.id }`
+    // (AppStateStore.kt) — и "" никогда не совпадает с реальным id, связь тихо
+    // исчезала. Тест воспроизводит ИМЕННО этот matching-контракт через реальный
+    // DAO: ссылка, проштампованная настоящим id события, обязана найтись; ссылка
+    // с "" (старое поведение бага) — нет.
+    @Test
+    fun calendarItemLink_reattachesOnlyWhenStampedWithRealEventId() = runTest {
+        calendarDao.insertCalendarItem(calItem("e1"))
+        calendarDao.insertCalendarItemLinks(listOf(
+            link("l-good", "e1"),
+            CalendarItemLinkEntity(id = "l-bad", calendarItemId = "", targetType = "CONTACT", targetId = "c1")
+        ))
+
+        val allLinks = calendarDao.getCalendarItemLinks()
+        // Та же строка, что и в AppStateStore.loadInitialData() при пересборке
+        // calendarItems.links из плоской таблицы calendar_item_links.
+        val reattachedToEvent = allLinks.filter { it.calendarItemId == "e1" }
+
+        assertEquals(1, reattachedToEvent.size)
+        assertEquals("l-good", reattachedToEvent.single().id)
+    }
+
     // ── ContactDao: мессенджеры/компании/группы (v12) ─────────────────────
     @Test
     fun messengers_insertGetDeleteForContact() = runTest {

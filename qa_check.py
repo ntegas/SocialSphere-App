@@ -197,7 +197,7 @@ if os.path.exists(bg) and 'isMinifyEnabled = true' in open(bg, encoding='utf-8')
 
 # У50: дубликаты <string name="..."> внутри одного strings.xml — AAPT error
 for path in ['ss-v1/app/src/main/res/values/strings.xml',
-              'ss-v1/app/src/main/res/values-en/strings.xml',
+              'ss-v1/app/src/main/res/values-ru/strings.xml',
               'ss-v1/app/src/main/res/values-el/strings.xml']:
     if not os.path.exists(path):
         continue
@@ -220,18 +220,49 @@ for path in ['ss-v1/app/src/main/res/values/strings.xml',
         if re.search(r'&(?!amp;|lt;|gt;|quot;|apos;|#)', val):
             errors.append(f'{path}: string/{nm} — незаэкранированный &, нужен &amp;')
 
-# У49: ЛОКАЛИЗОВАННЫЕ экраны — ноль кириллицы в строковых литералах
-# (пополняется по мере прохождения серии локализации)
-LOCALIZED_FILES = ['HomeScreen.kt', 'ContactsScreen.kt', 'ContactDetailScreen.kt', 'CalendarScreen.kt', 'MapScreen.kt',
-                   'SettingsScreen.kt', 'AppearanceSettingsScreen.kt', 'LanguageSettingsScreen.kt',
-                   'NotificationSettingsScreen.kt', 'PrivacySettingsScreen.kt',
-                   'CalendarSettingsScreen.kt', 'ImportExportSettingsScreen.kt',
-                   'CompaniesScreen.kt', 'CompanyDetailScreen.kt', 'ContactEditScreen.kt', 'CompanyEditScreen.kt', 'CalendarItemDetailScreen.kt',
-                   'CalendarItemEditScreen.kt', 'CheatSheetScreen.kt', 'ImportScreens.kt']
-ROLE_DATA_OK = {'Муж','Жена','Партнёр','Отец','Мать','Брат','Сестра','Сын','Дочь','Родственник','Друг','Коллега'}
+# У58 (аудит локализации 2026-07-11): паритет КЛЮЧЕЙ между тремя strings.xml.
+# У50 ловит дубли ВНУТРИ одного файла, но не ловит ключ, добавленный в values/
+# и забытый в values-ru/values-el (или наоборот) — а именно так тихо появляются
+# непереведённые строки. Каждый новый <string name="..."> обязан сразу попасть
+# во все три файла (см. правило в SOCIALSPHERE_KNOWLEDGE.md).
+# ИСПРАВЛЕНО 2026-07-23: список ссылался на несуществующий values-en/ (реальная
+# англ. база лежит без квалификатора — values/) и вообще не включал values-ru/ —
+# из-за этого all(os.path.exists(...)) был всегда False и проверка молча не
+# выполнялась ни для одного языка.
+_STRINGS_PATHS = ['ss-v1/app/src/main/res/values/strings.xml',
+                   'ss-v1/app/src/main/res/values-ru/strings.xml',
+                   'ss-v1/app/src/main/res/values-el/strings.xml']
+if all(os.path.exists(p) for p in _STRINGS_PATHS):
+    key_sets = {
+        p: set(re.findall(r'<string name="(\w+)"', open(p, encoding='utf-8').read()))
+        for p in _STRINGS_PATHS
+    }
+    all_keys = set.union(*key_sets.values())
+    for p, keys in key_sets.items():
+        missing = sorted(all_keys - keys)
+        if missing:
+            others = ', '.join(os.path.basename(os.path.dirname(o)) for o in _STRINGS_PATHS if o != p)
+            errors.append(f'{p}: не хватает {len(missing)} ключей, которые есть в ({others}): {missing[:10]}')
+
+# У49: ЛОКАЛИЗОВАННЫЕ экраны — ноль кириллицы в строковых литералах.
+# ФИКС (аудит локализации 2026-07-11): раньше это был allowlist, который нужно
+# было руками пополнять для каждого нового файла — именно так новые экраны
+# (ContactDisplaySettingsScreen.kt, AppLockComponents.kt и др.) молча оставались
+# без проверки. Теперь denylist: проверяются ВСЕ файлы ui/screens + ui/components,
+# кроме явно перечисленных как заведомо не-UI/не-переводимых.
+UI_DIRS = ['ui/screens', 'ui/components']
+NOT_LOCALIZED = {
+    'SettingsState.kt',        # хранит енамы/настройки, не рисует Text()
+    'ImportSession.kt',        # модель данных сессии импорта, не Composable-экран
+}
+ROLE_DATA_OK = {'Муж','Жена','Партнёр','Отец','Мать','Брат','Сестра','Сын','Дочь','Родственник','Друг','Коллега',
+                'Подруга','Знакомый','Сосед','Одноклассник','Однокурсник','Партнёр по бизнесу','Наставник','Клиент'}
 for path in kt_files():
     fn = os.path.basename(path)
-    if fn not in LOCALIZED_FILES:
+    rel_dir = path.replace('\\', '/').split('java/')[-1].rsplit('/', 1)[0]
+    if not any(rel_dir.endswith(d) for d in UI_DIRS):
+        continue
+    if fn in NOT_LOCALIZED:
         continue
     for i, line in enumerate(open(path, encoding='utf-8').read().splitlines(), 1):
         code = line.split('//')[0]  # комментарии не считаем

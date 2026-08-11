@@ -13,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,15 +34,21 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.aistudio.socialsphere.crmlxb.ui.screens.*
-import com.aistudio.socialsphere.crmlxb.ui.theme.MyApplicationTheme
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.data.local.SocialsphereDatabase
 import com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings
 import com.aistudio.socialsphere.crmlxb.utils.findActivity
 
-// FragmentActivity (наследник ComponentActivity) — требование androidx.biometric
-// BiometricPrompt для разблокировки «Защищено»; остальное поведение не меняется.
-class MainActivity : androidx.fragment.app.FragmentActivity() {
+// AppCompatActivity (наследник FragmentActivity — требование androidx.biometric
+// BiometricPrompt для разблокировки «Защищено» по-прежнему выполнено) — нужна
+// для per-app языка через AppCompatDelegate.setApplicationLocales (2026-07-22):
+// раньше локаль подменялась вручную через createConfigurationContext и
+// оборачивала Compose-дерево (LocalizedApp) — именно эта самодельная схема
+// была источником старого бага «язык путается при переключении» (LocalContext
+// внутри нёе не был настоящим ContextWrapper над Activity). AppCompatDelegate
+// пересоздаёт Activity целиком при смене языка — LocalContext.current везде
+// снова корректный, ручное оборачивание не нужно.
+class MainActivity : androidx.appcompat.app.AppCompatActivity() {
     // Запрос разрешения на показ уведомлений (Android 13+). Результат не критичен:
     // если откажут — уведомления просто не покажутся, логика планирования цела.
     private val notifPermLauncher = registerForActivityResult(
@@ -51,11 +56,14 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // ДО super.onCreate(): AppCompatDelegate должен знать локаль до того,
+        // как Activity начнёт применять Configuration/ресурсы.
+        AppSettings.init(applicationContext)
+        AppSettings.applyLocale(AppSettings.currentLanguage.value)
         super.onCreate(savedInstanceState)
 
-        AppSettings.init(applicationContext)
         val db = SocialsphereDatabase.getDatabase(applicationContext)
-        AppStateStore.initialize(db)
+        AppStateStore.initialize(applicationContext, db)
         // Ежедневное «пора связаться» (по ритму общения)
         com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
             .scheduleStaleCheck(applicationContext)
@@ -73,19 +81,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            // FIX: use 'by' delegate so recomposition triggers on change
-            val currentLanguage by AppSettings.currentLanguage
-            val isDarkTheme     by AppSettings.isDarkTheme
+            val isDarkTheme by AppSettings.isDarkTheme
 
-            MyApplicationTheme(darkTheme = isDarkTheme) {
-                com.aistudio.socialsphere.crmlxb.ui.theme.AppleAppTheme(darkTheme = isDarkTheme) {
-                    // key() forces full subtree recreation when language changes
-                    key(currentLanguage) {
-                        LocalizedApp(language = currentLanguage) {
-                            SocialsphereApp()
-                        }
-                    }
-                }
+            com.aistudio.socialsphere.crmlxb.ui.theme.AppleAppTheme(darkTheme = isDarkTheme) {
+                SocialsphereApp()
             }
         }
     }
@@ -107,11 +106,12 @@ private const val APP_LOCK_GRACE_MS = 30_000L
 
 @Composable
 fun SocialsphereApp() {
-    // Первый запуск — экран приветствия (макет Aurelia). После «Начать» ставим
-    // персистентный флаг, и это условие больше не срабатывает.
+    // Первый запуск — тур из нескольких шагов (обложка → персона → демо →
+    // импорт → финал). Флаг ставится внутри тура (финал или «Пропустить»
+    // на шаге импорта) — этот блок сам ничего не решает, только гейтит.
     val onboardingDone by AppSettings.onboardingCompleted
     if (!onboardingDone) {
-        OnboardingScreen(onStart = { AppSettings.onboardingCompleted.value = true })
+        OnboardingTourScreen(onFinish = {})
         return
     }
 
@@ -290,17 +290,25 @@ fun SocialsphereApp() {
                 )
             }
             composable(
-                "calendar_item_create?contactId={contactId}",
-                arguments = listOf(navArgument("contactId") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                })
+                "calendar_item_create?contactId={contactId}&companyId={companyId}",
+                arguments = listOf(
+                    navArgument("contactId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("companyId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
             ) { backStackEntry ->
                 CalendarItemEditScreen(
                     calendarItemId = null,
                     onNavigateBack = { navController.popBackStack() },
-                    prefillContactId = backStackEntry.arguments?.getString("contactId")
+                    prefillContactId = backStackEntry.arguments?.getString("contactId"),
+                    prefillCompanyId = backStackEntry.arguments?.getString("companyId")
                 )
             }
             composable("calendar_item_edit/{calendarItemId}") { backStackEntry ->
@@ -326,13 +334,56 @@ fun SocialsphereApp() {
                     onNavigateToImportExport = { navController.navigate("settings_import_export") },
                     onNavigateToAppearance = { navController.navigate("settings_appearance") },
                     onNavigateToPrivacy = { navController.navigate("settings_privacy") },
-                    onNavigateToDuplicates = { navController.navigate("settings_duplicates") }
+                    onNavigateToDuplicates = { navController.navigate("settings_duplicates") },
+                    onNavigateToCompanyDuplicates = { navController.navigate("company_duplicates") },
+                    onNavigateToContactDisplay = { navController.navigate("settings_contact_display") }
                 )
             }
             composable("settings_duplicates") {
                 DuplicatesScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToEditContact = { id -> navController.navigate("contact_edit/$id") }
+                    onNavigateToResolve = { ids -> navController.navigate("merge_resolve/${ids.joinToString(",")}") }
+                )
+            }
+            composable("merge_resolve/{ids}") { backStackEntry ->
+                val ids = backStackEntry.arguments?.getString("ids")?.split(",").orEmpty()
+                MergeResolveScreen(
+                    contactIds = ids,
+                    // Слияние выполнено — сразу открыть карточку итогового контакта
+                    // (владелец правит объединённые поля тут же), иначе (отмена
+                    // слияния через Snackbar / не выполнено) — назад к выбору.
+                    onDone = { mergedId ->
+                        if (mergedId != null) {
+                            navController.navigate("contact_detail/$mergedId") {
+                                popUpTo("settings_duplicates") { inclusive = true }
+                            }
+                        } else {
+                            navController.popBackStack("settings_duplicates", inclusive = false)
+                        }
+                    }
+                )
+            }
+            composable("company_duplicates") {
+                CompanyDuplicatesScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToResolve = { ids -> navController.navigate("company_merge_resolve/${ids.joinToString(",")}") }
+                )
+            }
+            composable("company_merge_resolve/{ids}") { backStackEntry ->
+                val ids = backStackEntry.arguments?.getString("ids")?.split(",").orEmpty()
+                CompanyMergeResolveScreen(
+                    companyIds = ids,
+                    // Тот же паттерн, что и у слияния контактов: успех — сразу
+                    // карточка итоговой компании, отмена/неудача — назад к выбору.
+                    onDone = { mergedId ->
+                        if (mergedId != null) {
+                            navController.navigate("company_detail/$mergedId") {
+                                popUpTo("company_duplicates") { inclusive = true }
+                            }
+                        } else {
+                            navController.popBackStack("company_duplicates", inclusive = false)
+                        }
+                    }
                 )
             }
             composable("settings_language") {
@@ -343,6 +394,9 @@ fun SocialsphereApp() {
             }
             composable("settings_calendar") {
                 CalendarSettingsScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable("settings_contact_display") {
+                ContactDisplaySettingsScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable("settings_import_export") {
                 ImportExportSettingsScreen(
@@ -410,14 +464,18 @@ fun SocialsphereApp() {
                     onCreated = { id ->
                         navController.popBackStack()
                         navController.navigate("contact_detail/$id")
-                    }
+                    },
+                    // Тап по живой подсказке «похоже, уже есть» — форма остаётся
+                    // на стеке (черновик не теряется), просто уходим вперёд на найденный контакт.
+                    onNavigateToContact = { otherId -> navController.navigate("contact_detail/$otherId") }
                 )
             }
             composable("contact_edit/{contactId}") { backStackEntry ->
                 val contactId = backStackEntry.arguments?.getString("contactId")
                 ContactEditScreen(
                     contactId = contactId,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToContact = { otherId -> navController.navigate("contact_detail/$otherId") }
                 )
             }
             composable("company_detail/{companyId}") { backStackEntry ->
@@ -427,7 +485,7 @@ fun SocialsphereApp() {
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToContact = { contactId -> navController.navigate("contact_detail/$contactId") },
                     onNavigateToEdit = { navController.navigate("company_edit/$companyId") },
-                    onNavigateToCreateCalendarItem = { navController.navigate("calendar_item_create") }
+                    onNavigateToCreateCalendarItem = { navController.navigate("calendar_item_create?companyId=$companyId") }
                 )
             }
             composable("company_create") {
@@ -445,16 +503,49 @@ fun SocialsphereApp() {
             }
         }
         
-        // ФИКС: тот же баг, что и в BiometricGate (2026-07-05) — LocalContext.current
-        // здесь тоже приходит через обёртку LocalizedApp/createConfigurationContext,
-        // прямой `as? Activity` всегда давал null, и диплинк «открыть из
-        // уведомления» на самом деле никогда не срабатывал.
-        val activity = androidx.compose.ui.platform.LocalContext.current.findActivity()
+        // ФИКС: тот же баг, что и в BiometricGate (2026-07-05, доработано 2026-07-11) —
+        // LocalContext.current здесь — createConfigurationContext из LocalizedApp,
+        // НЕ ContextWrapper над Activity — findActivity() из него до Activity в
+        // принципе не доходит (подтверждено живым тестом). LocalView.current.context
+        // LocalizedApp не подменяет — оттуда findActivity() работает.
+        val activity = androidx.compose.ui.platform.LocalView.current.context.findActivity()
         androidx.compose.runtime.LaunchedEffect(activity?.intent) {
             val calendarItemId = activity?.intent?.getStringExtra("calendarItemId")
             if (calendarItemId != null) {
                 navController.navigate("calendar_item_detail/$calendarItemId")
                 activity.intent?.removeExtra("calendarItemId")
+            }
+
+            // Входящий приём контакта: кто-то поделился vCard из системного
+            // share-sheet (ACTION_SEND) или открыл .vcf «через» это приложение
+            // (ACTION_VIEW). Переиспользуем существующий парсер/флоу предпросмотра
+            // импорта — тот же путь, что и у ручного «Импорт из файла» (2026-07-22).
+            val incoming = activity?.intent
+            val incomingAction = incoming?.action
+            val vcardMime = incoming?.type == "text/vcard" || incoming?.type == "text/x-vcard"
+            val isIncomingShare = vcardMime &&
+                (incomingAction == android.content.Intent.ACTION_SEND || incomingAction == android.content.Intent.ACTION_VIEW)
+            if (activity != null && incoming != null && isIncomingShare) {
+                val uri = if (incomingAction == android.content.Intent.ACTION_SEND)
+                    androidx.core.content.IntentCompat.getParcelableExtra(incoming, android.content.Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                else incoming.data
+                if (uri != null) {
+                    val candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            val content = activity.contentResolver.openInputStream(uri)
+                                ?.bufferedReader()?.readText() ?: ""
+                            com.aistudio.socialsphere.crmlxb.utils.parseVCard(content)
+                        } catch (e: Exception) { emptyList() }
+                    }
+                    if (candidates.isNotEmpty()) {
+                        ImportSession.clear()
+                        ImportSession.candidates.addAll(candidates)
+                        navController.navigate("import_preview")
+                    }
+                }
+                // Сбрасываем action — иначе повторная рекомпозиция/поворот экрана
+                // переиграл бы тот же импорт снова.
+                activity.intent?.action = android.content.Intent.ACTION_MAIN
             }
         }
     }

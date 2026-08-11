@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -33,6 +32,9 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
 import com.aistudio.socialsphere.crmlxb.utils.label
+import com.aistudio.socialsphere.crmlxb.utils.relationRoleLabel
+import com.aistudio.socialsphere.crmlxb.utils.inverseRelationRole
+import com.aistudio.socialsphere.crmlxb.utils.roleOfLabel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -47,7 +49,10 @@ fun ContactEditScreen(
     contactId: String?,
     onNavigateBack: () -> Unit,
     // После СОЗДАНИЯ контакта открываем его карточку (фидбэк владельца), а не список.
-    onCreated: ((String) -> Unit)? = null
+    onCreated: ((String) -> Unit)? = null,
+    // Тап по живой подсказке «похоже, уже есть» (2026-07-22) — открыть найденный
+    // контакт, не теряя черновик текущей формы (она остаётся на стеке навигации).
+    onNavigateToContact: ((String) -> Unit)? = null
 ) {
     val isEditMode = contactId != null
     val ctxLabel = LocalContext.current
@@ -75,6 +80,7 @@ fun ContactEditScreen(
     var namePrefix        by remember { mutableStateOf(originalContact?.namePrefix ?: "") }
     var nameSuffix         by remember { mutableStateOf(originalContact?.nameSuffix ?: "") }
     var phoneticFirstName by remember { mutableStateOf(originalContact?.phoneticFirstName ?: "") }
+    var phoneticMiddleName by remember { mutableStateOf(originalContact?.phoneticMiddleName ?: "") }
     var phoneticLastName  by remember { mutableStateOf(originalContact?.phoneticLastName ?: "") }
 
     // Mutable lists for editing
@@ -83,21 +89,77 @@ fun ContactEditScreen(
     var messengers by remember { mutableStateOf(originalContact?.messengers ?: emptyList<Messenger>()) }
     var draftAddresses by remember { mutableStateOf(originalContact?.addresses ?: emptyList<Address>()) }
 
+    // ── Живая подсказка о дублях, ПОКА контакт ещё черновик (не сохранён) ──
+    // Дополняет (не заменяет) постфактум-экран «Объединить контакты»: та ищет
+    // среди уже сохранённых, эта — сравнивает черновик формы с базой в реальном
+    // времени. Ненавязчиво, не блокирует «Готово» (владелец явно просил
+    // «продумай очень глубоко», 2026-07-22 — см. решение и пороги в
+    // AppStateStore.findLiveDuplicateHints).
+    var liveDuplicateHints by remember { mutableStateOf<List<AppStateStore.LiveDuplicateHint>>(emptyList()) }
+    var dupHintsDismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(firstName, lastName, phones, emails) {
+        dupHintsDismissed = false
+        kotlinx.coroutines.delay(300)
+        liveDuplicateHints = AppStateStore.findLiveDuplicateHints(
+            draftFirstName = firstName,
+            draftLastName = lastName,
+            draftPhones = phones.map { it.number },
+            draftEmails = emails.map { it.email },
+            excludeId = originalContact?.id
+        )
+    }
+
     // Company / work
     var selectedCompanyId by remember { mutableStateOf(originalContact?.companyRelations?.firstOrNull { it.isPrimary }?.companyId ?: originalContact?.companyRelations?.firstOrNull()?.companyId ?: "") }
     var companyPosition   by remember { mutableStateOf(originalContact?.companyRelations?.firstOrNull()?.position ?: "") }
     var companyDept       by remember { mutableStateOf(originalContact?.companyRelations?.firstOrNull()?.department ?: "") }
     var workNote          by remember { mutableStateOf(originalContact?.companyRelations?.firstOrNull()?.workNote ?: "") }
+    // «Это адрес компании» (2026-07-23, решение владельца): id адреса из
+    // draftAddresses (тип WORK), помеченного как совпадающий с адресом компании
+    // выбранного места работы — officeAddressId был в схеме год, но нигде не
+    // использовался. При смене компании сбрасывается (см. picker onPick ниже) —
+    // старая привязка принадлежала другой компании.
+    // ФИКС (баг §35, найден повторным аудитом): officeAddressId на relation — id
+    // адреса КОМПАНИИ (после linkContactAddressToCompany), а чекбокс ниже сравнивается
+    // с id адресов КОНТАКТА (draftAddresses) — разные id-пространства. Раньше это
+    // приводило к тому, что чекбокс при повторном открытии формы всегда выглядел
+    // невыбранным, а повторное сохранение без его касания стирало уже установленную
+    // связь (draftAddresses.find по id компании ничего не находил). Здесь сразу при
+    // инициализации разворачиваем officeAddressId обратно в id СВОЕГО адреса контакта
+    // по тому же совпадению улица+город, что использует linkContactAddressToCompany.
+    var linkedOfficeAddressId by remember {
+        mutableStateOf(
+            originalContact?.companyRelations?.firstOrNull { it.companyId == selectedCompanyId }?.officeAddressId?.let { officeAddrId ->
+                val officeAddr = AppStateStore.addresses.find { it.id == officeAddrId }
+                officeAddr?.let { oa ->
+                    originalContact.addresses.firstOrNull {
+                        it.addressLine.trim().equals(oa.addressLine.trim(), ignoreCase = true) &&
+                            it.city.trim().equals(oa.city.trim(), ignoreCase = true)
+                    }?.id
+                }
+            }
+        )
+    }
 
     // Classification
     var relationshipType   by remember { mutableStateOf(originalContact?.relationshipType   ?: RelationshipType.ACQUAINTANCE) }
     // Свой тип отношений («Кум», «Тренер»…) — если непустой, показывается вместо стандартного
     var customRelationType by remember { mutableStateOf(originalContact?.customRelationshipType ?: "") }
     var showCustomRelDialog by remember { mutableStateOf(false) }
+    // Второстепенные типы отношений (v17, решение владельца 2026-07-23): мультивыбор,
+    // не взаимоисключающий главный relationshipType — «и друг, и коллега».
+    var secondaryRelationshipTypes by remember { mutableStateOf(originalContact?.secondaryRelationshipTypes ?: emptyList<RelationshipType>()) }
     var connectionLevel    by remember { mutableStateOf(originalContact?.connectionLevel    ?: ConnectionLevel.NORMAL) }
-    var importanceLevel    by remember { mutableStateOf(originalContact?.importanceLevel    ?: ImportanceLevel.NORMAL) }
+    // ImportanceLevel убран из UI ПОЛНОСТЬЮ (решение владельца 2026-07-23) — колонка
+    // в БД остаётся (тот же прецедент, что и ConnectionLevel), просто эта форма
+    // больше не даёт его смотреть/менять. Значение проносится из оригинала при
+    // сохранении (см. buildAndSave): NORMAL для нового контакта, иначе как было.
     var socialRole         by remember { mutableStateOf(originalContact?.socialRole         ?: SocialRole.REGULAR) }
     var communicationRhythm by remember { mutableStateOf(originalContact?.communicationRhythm ?: CommunicationRhythm.NOT_TRACKED) }
+    // Число дней для CommunicationRhythm.CUSTOM («раз в N дней») — v17. Хранится как
+    // текст в UI-состоянии, парсится в Int только при сохранении (см. buildAndSave);
+    // невалидный ввод откатывается к прежнему значению, не крашит.
+    var customRhythmDaysText by remember { mutableStateOf(originalContact?.customRhythmDays?.toString() ?: "") }
     var contactStatus      by remember { mutableStateOf(originalContact?.contactStatus      ?: ContactStatus.ACTIVE) }
 
     // Фото: абсолютный путь копии в filesDir/photos (см. PhotoStorage)
@@ -144,11 +206,21 @@ fun ContactEditScreen(
         // каждом сохранении формы и всё делало «Текущее»).
         val existingPrimaryRel = originalContact?.companyRelations
             ?.firstOrNull { it.companyId == selectedCompanyId }
+        // «Это адрес компании»: рабочий адрес контакта, отмеченный флажком,
+        // находит (или заводит) совпадающий адрес компании по улице+городу —
+        // см. AppStateStore.linkContactAddressToCompany. Если отмеченный адрес
+        // успели удалить из формы, ссылка просто не создаётся (без краша).
+        val resolvedOfficeAddressId = linkedOfficeAddressId?.let { addrId ->
+            draftAddresses.find { it.id == addrId }?.let { addr ->
+                AppStateStore.linkContactAddressToCompany(selectedCompanyId, addr)
+            }
+        }
         val compRelList = if (selectedCompanyId.isNotBlank()) listOf(
             existingPrimaryRel?.copy(
                 position   = companyPosition.ifBlank { null },
                 department = companyDept.ifBlank { null },
                 workNote   = workNote.ifBlank { null },
+                officeAddressId = resolvedOfficeAddressId,
                 isPrimary  = true
             ) ?: ContactCompanyRelation(
                 id = UUID.randomUUID().toString(),
@@ -161,7 +233,7 @@ fun ContactEditScreen(
                 startDate  = null, endDate = null,
                 responsibilities = null, managedAccounts = null,
                 workNote   = workNote.ifBlank { null },
-                officeAddressId = null,
+                officeAddressId = resolvedOfficeAddressId,
                 isPrimary  = true
             )
         ) + otherCompRels else originalContact?.companyRelations ?: emptyList()
@@ -175,6 +247,7 @@ fun ContactEditScreen(
             namePrefix       = namePrefix.trim().ifBlank { null },
             nameSuffix       = nameSuffix.trim().ifBlank { null },
             phoneticFirstName = phoneticFirstName.trim().ifBlank { null },
+            phoneticMiddleName = phoneticMiddleName.trim().ifBlank { null },
             phoneticLastName  = phoneticLastName.trim().ifBlank { null },
             phones           = phones,
             emails           = emails,
@@ -187,10 +260,15 @@ fun ContactEditScreen(
             personalDetails  = originalContact?.personalDetails ?: emptyList(),
             relationshipType  = relationshipType,
             customRelationshipType = customRelationType.trim().ifBlank { null },
+            secondaryRelationshipTypes = secondaryRelationshipTypes,
             connectionLevel   = connectionLevel,
-            importanceLevel   = importanceLevel,
+            // Форма НЕ даёт менять важность — проносим оригинал (NORMAL для нового
+            // контакта), см. комментарий у объявления var communicationRhythm выше.
+            importanceLevel   = originalContact?.importanceLevel ?: ImportanceLevel.NORMAL,
             socialRole        = socialRole,
             communicationRhythm = communicationRhythm,
+            // Невалидный/пустой ввод не переопределяет прежнее значение (без краша).
+            customRhythmDays  = customRhythmDaysText.trim().toIntOrNull() ?: originalContact?.customRhythmDays,
             contactStatus    = contactStatus,
             nextStep         = nextStep.trim().ifBlank { null },
             canHelpWith      = canHelpWith.trim().ifBlank { null },
@@ -228,14 +306,9 @@ fun ContactEditScreen(
     if (showAddRelation) {
         val relationRoles = listOf("Жена", "Муж", "Партнёр", "Мать", "Отец",
             "Сын", "Дочь", "Брат", "Сестра", "Родственник", "Друг", "Коллега")
-        // Обратная роль по умолчанию (пользователь может изменить)
-        val inverseRole: (String) -> String = {
-            when (it) {
-                "Жена" -> "Муж"; "Муж" -> "Жена"
-                "Партнёр" -> "Партнёр"; "Друг" -> "Друг"; "Коллега" -> "Коллега"
-                else -> "Родственник"
-            }
-        }
+        // ФИКС (2026-07-12): инверсия роли и подписи теперь общие с OverviewTab.kt
+        // (utils/RelationLabels.kt) — раньше эта копия не локализовалась вовсе
+        // (сырые русские строки в DropdownField на en/el).
         var newRelSelected  by remember { mutableStateOf<Contact?>(null) }
         var newRelOtherRole by remember { mutableStateOf("Родственник") }
         var newRelMyRole    by remember { mutableStateOf("Родственник") }
@@ -286,24 +359,29 @@ fun ContactEditScreen(
                 secondaryText = stringResource(R.string.common_back),
                 onSecondary = { newRelSelected = null }
             ) {
-                DropdownField(stringResource(R.string.ce_who_relation), newRelOtherRole, relationRoles) { v ->
-                    newRelOtherRole = v
-                    if (!myRoleTouched) newRelMyRole = inverseRole(v)
+                val relSelName = "${sel.firstName} ${sel.lastName}".trim()
+                val relOwnName = "${firstName} ${lastName}".trim()
+                DropdownField(roleOfLabel(ctxLabel, relSelName, relOwnName), relationRoleLabel(ctxLabel, newRelOtherRole), relationRoles.map { relationRoleLabel(ctxLabel, it) }) { v ->
+                    newRelOtherRole = relationRoles.firstOrNull { relationRoleLabel(ctxLabel, it) == v } ?: newRelOtherRole
+                    if (!myRoleTouched) newRelMyRole = inverseRelationRole(newRelOtherRole)
                 }
-                DropdownField(stringResource(R.string.ce_who_am_i), newRelMyRole, relationRoles) { v ->
-                    newRelMyRole = v; myRoleTouched = true
+                DropdownField(roleOfLabel(ctxLabel, relOwnName, relSelName), relationRoleLabel(ctxLabel, newRelMyRole), relationRoles.map { relationRoleLabel(ctxLabel, it) }) { v ->
+                    newRelMyRole = relationRoles.firstOrNull { relationRoleLabel(ctxLabel, it) == v } ?: newRelMyRole; myRoleTouched = true
                 }
             }
         }
     }
     if (showAddPhone) {
+        var newPhonePrimary by remember { mutableStateOf(phones.isEmpty()) }
         com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
             title = stringResource(R.string.ce_add_phone),
             onDismiss = { showAddPhone = false; newPhone = "" },
             confirmText = stringResource(R.string.common_add),
             onConfirm = {
                 if (newPhone.isNotBlank()) {
-                    phones = phones + ContactPhone(UUID.randomUUID().toString(), editedContactId, newPhone.trim(), newPhoneType, phones.isEmpty())
+                    val added = ContactPhone(UUID.randomUUID().toString(), editedContactId, newPhone.trim(), newPhoneType, newPhonePrimary)
+                    phones = if (newPhonePrimary) (phones.map { it.copy(isPrimary = false) } + added) else phones + added
+                    phones = phones.sortedByDescending { it.isPrimary }
                     newPhone = ""; showAddPhone = false
                 }
             },
@@ -312,36 +390,50 @@ fun ContactEditScreen(
         ) {
             OutlinedTextField(value = newPhone, onValueChange = { newPhone = it }, keyboardOptions = PhoneKeyboard, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth())
             DropdownField(stringResource(R.string.ce_type), newPhoneType.label(ctxLabel), PhoneType.values().map { it.label(ctxLabel) }) { v -> newPhoneType = PhoneType.values().firstOrNull { it.label(ctxLabel) == v } ?: PhoneType.MOBILE }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(checked = newPhonePrimary, onCheckedChange = { newPhonePrimary = it })
+                Text(stringResource(R.string.ce_make_primary), style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 
     if (showAddEmail) {
+        var newEmailPrimary by remember { mutableStateOf(emails.isEmpty()) }
         com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
             title = stringResource(R.string.ce_add_email),
             onDismiss = { showAddEmail = false; newEmail = "" },
             confirmText = stringResource(R.string.common_add),
             onConfirm = {
                 if (newEmail.isNotBlank()) {
-                    emails = emails + ContactEmail(UUID.randomUUID().toString(), editedContactId, newEmail.trim(), newEmailType, emails.isEmpty())
+                    val added = ContactEmail(UUID.randomUUID().toString(), editedContactId, newEmail.trim(), newEmailType, newEmailPrimary)
+                    emails = if (newEmailPrimary) (emails.map { it.copy(isPrimary = false) } + added) else emails + added
+                    emails = emails.sortedByDescending { it.isPrimary }
                     newEmail = ""; showAddEmail = false
                 }
             },
             secondaryText = stringResource(R.string.common_cancel),
             onSecondary = { showAddEmail = false; newEmail = "" }
         ) {
-            OutlinedTextField(value = newEmail, onValueChange = { newEmail = it }, keyboardOptions = EmailKeyboard, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = newEmail, onValueChange = { newEmail = it }, keyboardOptions = EmailKeyboard, label = { Text(stringResource(R.string.ce_email)) }, modifier = Modifier.fillMaxWidth())
             DropdownField(stringResource(R.string.ce_type), newEmailType.label(ctxLabel), EmailType.values().map { it.label(ctxLabel) }) { v -> newEmailType = EmailType.values().firstOrNull { it.label(ctxLabel) == v } ?: EmailType.PERSONAL }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(checked = newEmailPrimary, onCheckedChange = { newEmailPrimary = it })
+                Text(stringResource(R.string.ce_make_primary), style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 
     if (showAddMessenger) {
+        var newMessengerPrimary by remember { mutableStateOf(messengers.isEmpty()) }
         com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
             title = stringResource(R.string.ce_add_messenger),
             onDismiss = { showAddMessenger = false; newMessenger = "" },
             confirmText = stringResource(R.string.common_add),
             onConfirm = {
                 if (newMessenger.isNotBlank()) {
-                    messengers = messengers + Messenger(UUID.randomUUID().toString(), editedContactId, newMessengerType, newMessenger.trim(), null, messengers.isEmpty())
+                    val added = Messenger(UUID.randomUUID().toString(), editedContactId, newMessengerType, newMessenger.trim(), null, newMessengerPrimary)
+                    messengers = if (newMessengerPrimary) (messengers.map { it.copy(isPrimary = false) } + added) else messengers + added
+                    messengers = messengers.sortedByDescending { it.isPrimary }
                     newMessenger = ""; showAddMessenger = false
                 }
             },
@@ -359,6 +451,10 @@ fun ContactEditScreen(
                 }
             }
             OutlinedTextField(value = newMessenger, onValueChange = { newMessenger = it }, label = { Text(stringResource(R.string.ce_username_number)) }, modifier = Modifier.fillMaxWidth())
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(checked = newMessengerPrimary, onCheckedChange = { newMessengerPrimary = it })
+                Text(stringResource(R.string.ce_make_primary), style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 
@@ -393,7 +489,7 @@ fun ContactEditScreen(
                     onClick = ::buildAndSave,
                     enabled = firstName.isNotBlank(),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
-                    shape = RoundedCornerShape(percent = 50),
+                    shape = SocialShape.Full,
                     colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
                     modifier = Modifier.height(34.dp)
                 ) { Text(stringResource(R.string.common_done), fontWeight = FontWeight.Bold) }
@@ -480,22 +576,11 @@ fun ContactEditScreen(
 
             // ── Полная структура имени как в Android-контактах (v13): приставка/
             // имя/фамилия/отчество/суффикс/фонетика — владелец попросил «хочу как
-            // в андроид, идентично» (5 полей структуры + 2 фонетических). ──
+            // в андроид, идентично» (5 полей структуры + 2 фонетических).
+            // Фидбэк UX-аудита: редкие поля (приставка/суффикс/фонетика) не должны
+            // опережать часто заполняемые — они свёрнуты под «Дополнительно». ──
+            var advancedNameFieldsExpanded by remember { mutableStateOf(false) }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                // Приставка (Dr./г-н) — отдельная карточка, как в андроид-редакторе
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
-                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    BareFieldColumn(
-                        label = stringResource(R.string.ce_name_prefix), value = namePrefix,
-                        onValueChange = { namePrefix = it }, keyboardOptions = CapWords,
-                        placeholder = stringResource(R.string.ce_name_prefix_hint),
-                        modifier = Modifier.fillMaxWidth().padding(12.dp)
-                    )
-                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
@@ -516,6 +601,62 @@ fun ContactEditScreen(
                         )
                     }
                 }
+                if (liveDuplicateHints.isNotEmpty() && !dupHintsDismissed) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
+                        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.brand.copy(alpha = 0.08f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    stringResource(R.string.ce_dup_hint_title),
+                                    style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                                    color = AppleTheme.colors.brand
+                                )
+                                Icon(
+                                    Icons.Default.Close, stringResource(R.string.common_close),
+                                    tint = AppleTheme.colors.secondaryLabel,
+                                    modifier = Modifier.size(18.dp).clickable { dupHintsDismissed = true }
+                                )
+                            }
+                            liveDuplicateHints.take(3).forEach { hint ->
+                                val reasons = listOfNotNull(
+                                    hint.byPhone?.let { stringResource(R.string.ce_dup_hint_reason_phone) },
+                                    hint.byEmail?.let { stringResource(R.string.ce_dup_hint_reason_email) },
+                                    if (hint.byNameSimilarity) stringResource(R.string.ce_dup_hint_reason_name) else null
+                                ).joinToString(" · ")
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .clickable { onNavigateToContact?.invoke(hint.contact.id) }
+                                        .padding(vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatar(
+                                        hint.contact.id, "${hint.contact.firstName} ${hint.contact.lastName}".trim(),
+                                        size = 32.dp, fontSize = 13.sp
+                                    )
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            "${hint.contact.firstName} ${hint.contact.lastName}".trim(),
+                                            style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium
+                                        )
+                                        if (reasons.isNotEmpty())
+                                            Text(reasons, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+                                    }
+                                    Icon(Icons.Default.KeyboardArrowRight, null,
+                                        Modifier.size(18.dp), tint = AppleTheme.colors.secondaryLabel)
+                                }
+                            }
+                        }
+                    }
+                }
                 // Отчество — как в телефонной книге (импортируется из vCard/устройства)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -526,20 +667,6 @@ fun ContactEditScreen(
                     BareFieldColumn(
                         label = stringResource(R.string.ce_middle_name), value = middleName,
                         onValueChange = { middleName = it }, keyboardOptions = CapWords,
-                        modifier = Modifier.fillMaxWidth().padding(12.dp)
-                    )
-                }
-                // Суффикс (мл./ст.) — как в андроид-редакторе, идёт после отчества/фамилии
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
-                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    BareFieldColumn(
-                        label = stringResource(R.string.ce_name_suffix), value = nameSuffix,
-                        onValueChange = { nameSuffix = it }, keyboardOptions = CapWords,
-                        placeholder = stringResource(R.string.ce_name_suffix_hint),
                         modifier = Modifier.fillMaxWidth().padding(12.dp)
                     )
                 }
@@ -556,28 +683,87 @@ fun ContactEditScreen(
                         modifier = Modifier.fillMaxWidth().padding(12.dp)
                     )
                 }
-                // Фонетические имя/фамилия — для языков вроде японского, где
-                // произношение не следует из письменной формы (как в андроид)
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
-                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+
+                // Переключатель редких полей структуры имени (приставка/суффикс/фонетика)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
+                        .clickable { advancedNameFieldsExpanded = !advancedNameFieldsExpanded }
+                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.ce_advanced_fields),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = AppleTheme.colors.brand
+                    )
+                    Icon(
+                        if (advancedNameFieldsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        null, Modifier.size(18.dp), tint = AppleTheme.colors.brand
+                    )
+                }
+
+                if (advancedNameFieldsExpanded) {
+                    // Приставка (Dr./г-н) — отдельная карточка, как в андроид-редакторе
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
+                        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
                         BareFieldColumn(
-                            label = stringResource(R.string.ce_phonetic_first_name), value = phoneticFirstName,
-                            onValueChange = { phoneticFirstName = it }, keyboardOptions = CapWords,
-                            placeholder = stringResource(R.string.ce_phonetic_hint),
-                            modifier = Modifier.weight(1f).padding(12.dp)
+                            label = stringResource(R.string.ce_name_prefix), value = namePrefix,
+                            onValueChange = { namePrefix = it }, keyboardOptions = CapWords,
+                            placeholder = stringResource(R.string.ce_name_prefix_hint),
+                            modifier = Modifier.fillMaxWidth().padding(12.dp)
                         )
-                        Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(AppleTheme.colors.separator))
+                    }
+                    // Суффикс (мл./ст.) — как в андроид-редакторе, идёт после отчества/фамилии
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
+                        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
                         BareFieldColumn(
-                            label = stringResource(R.string.ce_phonetic_last_name), value = phoneticLastName,
-                            onValueChange = { phoneticLastName = it }, keyboardOptions = CapWords,
-                            placeholder = stringResource(R.string.ce_phonetic_hint),
-                            modifier = Modifier.weight(1f).padding(12.dp)
+                            label = stringResource(R.string.ce_name_suffix), value = nameSuffix,
+                            onValueChange = { nameSuffix = it }, keyboardOptions = CapWords,
+                            placeholder = stringResource(R.string.ce_name_suffix_hint),
+                            modifier = Modifier.fillMaxWidth().padding(12.dp)
                         )
+                    }
+                    // Фонетические имя/отчество/фамилия — для языков вроде японского, где
+                    // произношение не следует из письменной формы (как в андроид)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
+                        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Row(Modifier.fillMaxWidth()) {
+                            BareFieldColumn(
+                                label = stringResource(R.string.ce_phonetic_first_name), value = phoneticFirstName,
+                                onValueChange = { phoneticFirstName = it }, keyboardOptions = CapWords,
+                                placeholder = stringResource(R.string.ce_phonetic_hint),
+                                modifier = Modifier.weight(1f).padding(12.dp)
+                            )
+                            Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(AppleTheme.colors.separator))
+                            BareFieldColumn(
+                                label = stringResource(R.string.ce_phonetic_middle_name), value = phoneticMiddleName,
+                                onValueChange = { phoneticMiddleName = it }, keyboardOptions = CapWords,
+                                placeholder = stringResource(R.string.ce_phonetic_hint),
+                                modifier = Modifier.weight(1f).padding(12.dp)
+                            )
+                            Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(AppleTheme.colors.separator))
+                            BareFieldColumn(
+                                label = stringResource(R.string.ce_phonetic_last_name), value = phoneticLastName,
+                                onValueChange = { phoneticLastName = it }, keyboardOptions = CapWords,
+                                placeholder = stringResource(R.string.ce_phonetic_hint),
+                                modifier = Modifier.weight(1f).padding(12.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -600,10 +786,31 @@ fun ContactEditScreen(
                             else -> RelationshipType.values().firstOrNull { it.label(ctxLabel) == v }?.let {
                                 relationshipType = it
                                 customRelationType = "" // стандартный выбор очищает свой
+                                // Главный тип не может одновременно быть второстепенным
+                                secondaryRelationshipTypes = secondaryRelationshipTypes - it
                             }
                         }
                     }
                 )
+            }
+
+            // ── Также (второстепенные типы отношений, v17) — скромный мультивыбор,
+            // не равноправный с главным типом выше: мелкие чипы, не большие пилюли. ──
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AureliaCaption(stringResource(R.string.ce_secondary_relation_types))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    RelationshipType.values().filter { it != relationshipType }.forEach { rt ->
+                        val isSel = rt in secondaryRelationshipTypes
+                        FilterChip(
+                            selected = isSel,
+                            onClick = {
+                                secondaryRelationshipTypes =
+                                    if (isSel) secondaryRelationshipTypes - rt else secondaryRelationshipTypes + rt
+                            },
+                            label = { Text(rt.label(ctxLabel), fontSize = 12.sp) }
+                        )
+                    }
+                }
             }
             if (showCustomRelDialog) {
                 var draft by remember { mutableStateOf(customRelationType) }
@@ -615,6 +822,8 @@ fun ContactEditScreen(
                     onConfirm = {
                         customRelationType = draft.trim()
                         relationshipType = RelationshipType.OTHER
+                        // Главный тип не может одновременно быть второстепенным
+                        secondaryRelationshipTypes = secondaryRelationshipTypes - RelationshipType.OTHER
                         showCustomRelDialog = false
                     },
                     secondaryText = stringResource(R.string.common_cancel),
@@ -626,17 +835,6 @@ fun ContactEditScreen(
                         modifier = Modifier.fillMaxWidth(), singleLine = true
                     )
                 }
-            }
-
-            // ── Важность (пилюли, ключевой — золотом) ─────────────────
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                AureliaCaption(stringResource(R.string.ce_importance))
-                PillChoiceRow(
-                    options = ImportanceLevel.values().map { it.label(ctxLabel) },
-                    selected = importanceLevel.label(ctxLabel),
-                    onSelect = { v -> importanceLevel = ImportanceLevel.values().firstOrNull { it.label(ctxLabel) == v } ?: importanceLevel },
-                    goldFor = setOf(ImportanceLevel.KEY.label(ctxLabel))
-                )
             }
 
             // ── Телефон ───────────────────────────────────────────────
@@ -657,7 +855,7 @@ fun ContactEditScreen(
                             icon = Icons.Default.Call, iconTint = AppleTheme.colors.brand, iconBg = AppleTheme.colors.brand.copy(alpha = 0.10f),
                             value = phone.number, onValueChange = { num -> phones = phones.toMutableList().also { it[idx] = phone.copy(number = num) } },
                             keyboardOptions = PhoneKeyboard, label = phone.type.label(ctxLabel),
-                            isPrimary = phone.isPrimary, onTogglePrimary = { phones = phones.mapIndexed { i, p -> p.copy(isPrimary = i == idx) } },
+                            isPrimary = phone.isPrimary, onTogglePrimary = { phones = phones.mapIndexed { i, p -> p.copy(isPrimary = i == idx) }.sortedByDescending { it.isPrimary } },
                             onDelete = { phones = phones.toMutableList().also { it.removeAt(idx) } }
                         )
                     }
@@ -682,7 +880,7 @@ fun ContactEditScreen(
                             icon = Icons.Default.Email, iconTint = AureliaTheme.colors.gold, iconBg = AureliaTheme.colors.gold.copy(alpha = 0.14f),
                             value = email.email, onValueChange = { v -> emails = emails.toMutableList().also { it[idx] = email.copy(email = v) } },
                             keyboardOptions = EmailKeyboard, label = email.type.label(ctxLabel),
-                            isPrimary = email.isPrimary, onTogglePrimary = { emails = emails.mapIndexed { i, e -> e.copy(isPrimary = i == idx) } },
+                            isPrimary = email.isPrimary, onTogglePrimary = { emails = emails.mapIndexed { i, e -> e.copy(isPrimary = i == idx) }.sortedByDescending { it.isPrimary } },
                             onDelete = { emails = emails.toMutableList().also { it.removeAt(idx) } }
                         )
                     }
@@ -707,6 +905,7 @@ fun ContactEditScreen(
                             icon = Icons.AutoMirrored.Filled.Send, iconTint = AppleTheme.colors.red, iconBg = AppleTheme.colors.red.copy(alpha = 0.10f),
                             value = m.value, onValueChange = { v -> messengers = messengers.toMutableList().also { it[idx] = m.copy(value = v) } },
                             label = m.type.label(ctxLabel),
+                            isPrimary = m.isPrimary, onTogglePrimary = { messengers = messengers.mapIndexed { i, mm -> mm.copy(isPrimary = i == idx) }.sortedByDescending { it.isPrimary } },
                             onDelete = { messengers = messengers.toMutableList().also { it.removeAt(idx) } }
                         )
                     }
@@ -748,6 +947,31 @@ fun ContactEditScreen(
                             Icon(Icons.Default.Close, stringResource(R.string.ce_remove_address),
                                 Modifier.size(16.dp),
                                 tint = AppleTheme.colors.secondaryLabel)
+                        }
+                    }
+                    // «Это адрес компании» (2026-07-23, решение владельца) — только
+                    // у рабочего адреса и только если компания выбрана; дедуп по
+                    // улице+городу и создание/связывание — на сохранении формы
+                    // (см. buildAndSave → AppStateStore.linkContactAddressToCompany).
+                    if (addr.addressType == AddressType.WORK && selectedCompanyId.isNotBlank()) {
+                        val companyName = AppStateStore.companies.find { it.id == selectedCompanyId }?.name.orEmpty()
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { linkedOfficeAddressId = if (linkedOfficeAddressId == addr.id) null else addr.id }
+                                .padding(start = 4.dp, bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = linkedOfficeAddressId == addr.id,
+                                // Тап обрабатывает Row целиком (см. clickable выше) —
+                                // здесь null, чтобы не сработать дважды на одном тапе.
+                                onCheckedChange = null
+                            )
+                            Text(
+                                stringResource(R.string.ce_this_is_company_address, companyName),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppleTheme.colors.secondaryLabel
+                            )
                         }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
@@ -825,6 +1049,9 @@ fun ContactEditScreen(
                             }
                         },
                         onPick = { picked ->
+                            // Смена компании — старая привязка «это адрес компании»
+                            // принадлежала другой компании, сбрасываем.
+                            if (picked.id != selectedCompanyId) linkedOfficeAddressId = null
                             selectedCompanyId = picked.id
                             showCompanyDropdown = false
                         },
@@ -845,8 +1072,7 @@ fun ContactEditScreen(
                         onConfirm = {
                             val clean = newCompanyName.trim()
                             // Дедуп: компания с таким именем уже есть — выбираем её
-                            val existing = AppStateStore.companies
-                                .find { it.name.equals(clean, ignoreCase = true) }
+                            val existing = AppStateStore.findCompanyByName(clean)
                             if (existing != null) {
                                 selectedCompanyId = existing.id
                             } else {
@@ -905,7 +1131,7 @@ fun ContactEditScreen(
                         Column(Modifier.weight(1f)) {
                             Text(otherName, style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold)
-                            Text(otherRole, style = MaterialTheme.typography.bodySmall,
+                            Text(relationRoleLabel(ctxLabel, otherRole), style = MaterialTheme.typography.bodySmall,
                                 color = AppleTheme.colors.secondaryLabel)
                         }
                         IconButton(onClick = {
@@ -959,15 +1185,48 @@ fun ContactEditScreen(
                     )
                     IconButton(
                         onClick = {
-                            val tag = newTagText.trim()
-                            if (tag.isNotBlank() && tag !in tags) {
-                                tags = tags + tag
+                            // ФИКС (2026-07-11, фидбэк владельца): сравнение было
+                            // только с тегами ЭТОГО контакта и регистрозависимым —
+                            // «Друг»/«друг» заводились как разные теги базы. Теперь
+                            // ищем совпадение по ВСЕЙ базе (AppStateStore.allTags())
+                            // без учёта регистра и добавляем существующее написание,
+                            // а не новый вариант с другим регистром.
+                            val typed = newTagText.trim()
+                            if (typed.isNotBlank()) {
+                                val existing = AppStateStore.allTags().firstOrNull { it.equals(typed, ignoreCase = true) }
+                                val tag = existing ?: typed
+                                if (tag !in tags) tags = tags + tag
                                 newTagText = ""
                             }
                         },
                         enabled = newTagText.isNotBlank()
                     ) {
                         Icon(Icons.Default.Add, null, tint = AppleTheme.colors.brand)
+                    }
+                }
+                // Подсказки существующих тегов по мере ввода (паттерн Gmail/Notion) —
+                // раньше автокомплита не было вообще, дубли-опечатки было не видно.
+                val tagSuggestions = remember(newTagText) {
+                    val q = newTagText.trim()
+                    if (q.isBlank()) emptyList()
+                    else AppStateStore.allTags()
+                        .filter { it.contains(q, ignoreCase = true) && it !in tags }
+                        .take(6)
+                }
+                if (tagSuggestions.isNotEmpty()) {
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement   = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        tagSuggestions.forEach { suggestion ->
+                            AssistChip(
+                                onClick = { tags = tags + suggestion; newTagText = "" },
+                                label   = { Text(suggestion, style = MaterialTheme.typography.labelSmall) },
+                                shape   = SocialShape.Full
+                            )
+                        }
                     }
                 }
                 Text(
@@ -1043,12 +1302,26 @@ fun ContactEditScreen(
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     AureliaCaption(stringResource(R.string.ce_rhythm))
-                    // CUSTOM исключён: у контакта нет поля своих дней — выбор молча отключал бы отслеживание
+                    // CUSTOM разрешён (v17, решение владельца 2026-07-23): при выборе
+                    // ниже появляется поле «раз в N дней» → Contact.customRhythmDays,
+                    // используется в StaleContacts.overdueDays вместо жёсткого интервала.
                     PillChoiceRow(
-                        options = CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) },
+                        options = CommunicationRhythm.values().map { it.label(ctxLabel) },
                         selected = communicationRhythm.label(ctxLabel),
                         onSelect = { v -> communicationRhythm = CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == v } ?: communicationRhythm }
                     )
+                    if (communicationRhythm == CommunicationRhythm.CUSTOM) {
+                        OutlinedTextField(
+                            value = customRhythmDaysText,
+                            onValueChange = { new -> if (new.all { it.isDigit() }) customRhythmDaysText = new },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            ),
+                            label = { Text(stringResource(R.string.ce_custom_rhythm_days)) },
+                            placeholder = { Text(stringResource(R.string.ce_custom_rhythm_days_hint)) },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true, shape = SocialShape.Small
+                        )
+                    }
                 }
             }
 
@@ -1132,9 +1405,9 @@ fun PillChoiceRow(
             val textColor = when { isGold -> goldTone; isSel -> Color.White; else -> AppleTheme.colors.label }
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(percent = 50))
+                    .clip(SocialShape.Full)
                     .background(bg)
-                    .border(1.dp, borderColor, RoundedCornerShape(percent = 50))
+                    .border(1.dp, borderColor, SocialShape.Full)
                     .clickable { onSelect(opt) }
                     .padding(horizontal = 14.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1232,6 +1505,18 @@ fun DropdownField(label: String, selectedValue: String, options: List<String>, o
 internal val CapWords = androidx.compose.foundation.text.KeyboardOptions(
     capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words
 )
+// ФИКС (2026-07-13, фидбэк владельца: при быстром вводе адреса — «Афины»
+// прочиталось как «Афимы» при переходе фокуса в соседнее поле «Индекс»).
+// В коде НЕТ логики, которая читает индекс как приоритет над городом —
+// наиболее вероятная причина: автокоррекция IME на малознакомых именах
+// собственных при смене фокуса между соседними полями (Compose Foundation
+// KeyboardOptions.autoCorrect по умолчанию true, нигде явно не отключён).
+// Для полей адреса (Улица/Город/Район/Страна — не для индекса, там не
+// словарный ввод) отключаем автокоррекцию явно.
+internal val CapWordsNoCorrect = androidx.compose.foundation.text.KeyboardOptions(
+    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words,
+    autoCorrect = false
+)
 internal val CapSentences = androidx.compose.foundation.text.KeyboardOptions(
     capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences
 )
@@ -1242,4 +1527,7 @@ internal val PhoneKeyboard = androidx.compose.foundation.text.KeyboardOptions(
 )
 internal val EmailKeyboard = androidx.compose.foundation.text.KeyboardOptions(
     keyboardType = androidx.compose.ui.text.input.KeyboardType.Email
+)
+internal val UrlKeyboard = androidx.compose.foundation.text.KeyboardOptions(
+    keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri
 )

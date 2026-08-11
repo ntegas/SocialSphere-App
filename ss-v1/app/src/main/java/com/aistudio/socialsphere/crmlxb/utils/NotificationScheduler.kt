@@ -1,5 +1,6 @@
 package com.aistudio.socialsphere.crmlxb.utils
 
+import com.aistudio.socialsphere.crmlxb.R
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
@@ -52,20 +53,31 @@ object NotificationScheduler {
             return // Date is in the past or invalid
         }
 
-        // Телефон связанного контакта — для кнопок «Позвонить»/«Написать» в самом
-        // уведомлении. Берём здесь (приложение живо), т.к. на «холодном» будильнике
-        // память AppStateStore может быть пустой.
-        val linkedContact = calendarItem.links
+        // Связанные контакты — для кнопок «Позвонить»/«Написать» и для текста
+        // уведомления (имя+повод+время, не просто заголовок дважды). Берём здесь
+        // (приложение живо), т.к. на «холодном» будильнике память AppStateStore
+        // может быть пустой.
+        val linkedContacts = calendarItem.links
             .mapNotNull { com.aistudio.socialsphere.crmlxb.data.AppStateStore.getContact(it.targetId) }
-            .firstOrNull()
+        val linkedContact = linkedContacts.firstOrNull()
         val phone = linkedContact?.let { c ->
             (c.phones.firstOrNull { it.isPrimary } ?: c.phones.firstOrNull())?.number
         }
 
+        val displayTitle = calendarItem.displayTitle(context)
+        val contactNames = linkedContacts.joinToString(", ") { "${it.firstName} ${it.lastName}".trim() }
+        val contentDetail = listOfNotNull(
+            contactNames.takeIf { it.isNotBlank() },
+            calendarItem.startTime?.takeIf { !calendarItem.isAllDay && it.isNotBlank() }
+        ).joinToString(" · ")
+        val content = contentDetail.ifBlank {
+            context.getString(R.string.notif_reminder_content, displayTitle)
+        }
+
         val intent = Intent(context, NotificationReceiver::class.java).apply {
             putExtra("calendarItemId", calendarItem.id)
-            putExtra("title", calendarItem.title)
-            putExtra("content", "Напоминание: ${calendarItem.title}")
+            putExtra("title", displayTitle)
+            putExtra("content", content)
             putExtra("notificationId", getNotificationId(calendarItem.id, reminderRule.id))
             if (!phone.isNullOrBlank()) putExtra("phone", phone)
             // ДР — на свой канал, остальное — канал событий
@@ -122,6 +134,9 @@ object NotificationScheduler {
             putExtra("title", src.getStringExtra("title"))
             putExtra("content", src.getStringExtra("content"))
             putExtra("notificationId", nid)
+            // Без этого «Пора связаться»/«День рождения» после «Отложить» переоткрывались
+            // бы в дефолтном канале событий вместо своего (баг найден вместе с §36).
+            src.getStringExtra("channel")?.let { putExtra("channel", it) }
             src.getStringExtra("phone")?.let { putExtra("phone", it) }
         }
         val pendingIntent = PendingIntent.getBroadcast(
@@ -165,6 +180,9 @@ object NotificationScheduler {
             val links = calendarLinks.filter { it.calendarItemId == entity.id }.map { it.toDomain() }
             val reminders = reminderRules.filter { it.calendarItemId == entity.id }.map { it.toDomain() }
             val item = entity.toDomain().copy(links = links, reminders = reminders)
+            // Только ACTIVE: иначе завершённые/отменённые/отложенные события
+            // ре-армятся при каждой перезагрузке телефона (баг §34).
+            if (item.status != com.aistudio.socialsphere.crmlxb.model.CalendarItemStatus.ACTIVE) return@forEach
 
             item.reminders.forEach { rule ->
                 scheduleReminder(context, item, rule)

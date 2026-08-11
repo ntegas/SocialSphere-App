@@ -17,14 +17,17 @@ fun Contact.toEntity(): ContactEntity = ContactEntity(
     namePrefix        = namePrefix,
     nameSuffix        = nameSuffix,
     phoneticFirstName = phoneticFirstName,
+    phoneticMiddleName = phoneticMiddleName,
     phoneticLastName  = phoneticLastName,
     photoUri          = photoUri,
     relationshipType  = relationshipType.name,
     customRelationshipType = customRelationshipType,
+    secondaryRelationshipTypes = if (secondaryRelationshipTypes.isEmpty()) "" else secondaryRelationshipTypes.joinToString(",") { it.name },
     connectionLevel   = connectionLevel.name,
     importanceLevel   = importanceLevel.name,
     socialRole        = socialRole.name,
     communicationRhythm = communicationRhythm.name,
+    customRhythmDays  = customRhythmDays,
     contactStatus     = contactStatus.name,
     lastContactDate   = lastContactDate,
     nextStep          = nextStep,
@@ -137,6 +140,14 @@ fun ContactGroupMember.toEntity(): ContactGroupMemberEntity = ContactGroupMember
     id = id, groupId = groupId, contactId = contactId
 )
 
+fun Tag.toEntity(): TagEntity = TagEntity(
+    id = id, name = name, category = category, createdAt = createdAt, updatedAt = updatedAt
+)
+
+fun ContactTagMember.toEntity(): ContactTagMemberEntity = ContactTagMemberEntity(
+    id = id, tagId = tagId, contactId = contactId
+)
+
 fun Address.toEntity(): AddressEntity = AddressEntity(
     id = id,
     ownerType = ownerType.name,
@@ -148,7 +159,8 @@ fun Address.toEntity(): AddressEntity = AddressEntity(
     comment = comment,
     latitude = latitude,
     longitude = longitude,
-    postalCode = postalCode
+    postalCode = postalCode,
+    district = district
 )
 
 fun CalendarItem.toEntity(): CalendarItemEntity = CalendarItemEntity(
@@ -237,14 +249,21 @@ fun ContactEntity.toDomain(): Contact = Contact(
     namePrefix          = namePrefix,
     nameSuffix          = nameSuffix,
     phoneticFirstName   = phoneticFirstName,
+    phoneticMiddleName  = phoneticMiddleName,
     phoneticLastName    = phoneticLastName,
     photoUri            = photoUri,
     relationshipType    = safeEnum(relationshipType, RelationshipType.OTHER),
     customRelationshipType = customRelationshipType,
+    secondaryRelationshipTypes = secondaryRelationshipTypes
+        ?.split(",")
+        ?.filter { it.isNotBlank() }
+        ?.map { safeEnum(it, RelationshipType.OTHER) }
+        ?: emptyList(),
     connectionLevel     = safeEnum(connectionLevel, ConnectionLevel.NORMAL),
     importanceLevel     = safeEnum(importanceLevel, ImportanceLevel.NORMAL),
     socialRole          = safeEnum(socialRole, SocialRole.REGULAR),
     communicationRhythm = safeEnum(communicationRhythm, CommunicationRhythm.NOT_TRACKED),
+    customRhythmDays    = customRhythmDays,
     contactStatus       = safeEnum(contactStatus, ContactStatus.ACTIVE),
     lastContactDate     = lastContactDate,
     nextStep            = nextStep,
@@ -334,6 +353,14 @@ fun ContactGroupMemberEntity.toDomain(): ContactGroupMember = ContactGroupMember
     id = id, groupId = groupId, contactId = contactId
 )
 
+fun TagEntity.toDomain(): Tag = Tag(
+    id = id, name = name, category = category, createdAt = createdAt, updatedAt = updatedAt
+)
+
+fun ContactTagMemberEntity.toDomain(): ContactTagMember = ContactTagMember(
+    id = id, tagId = tagId, contactId = contactId
+)
+
 fun AddressEntity.toDomain(): Address = Address(
     id = id,
     ownerType = safeEnum(ownerType, AddressOwnerType.CONTACT),
@@ -345,7 +372,8 @@ fun AddressEntity.toDomain(): Address = Address(
     comment = comment,
     latitude = latitude,
     longitude = longitude,
-    postalCode = postalCode
+    postalCode = postalCode,
+    district = district
 )
 
 fun CalendarItemEntity.toDomain(): CalendarItem = CalendarItem(

@@ -46,7 +46,8 @@ import com.aistudio.socialsphere.crmlxb.model.RecurrenceMode
 fun CalendarItemEditScreen(
     calendarItemId: String?,
     onNavigateBack: () -> Unit,
-    prefillContactId: String? = null
+    prefillContactId: String? = null,
+    prefillCompanyId: String? = null
 ) {
     val isEditMode = calendarItemId != null
     val originalItem = remember { calendarItemId?.let { AppStateStore.calendarItems.find { item -> item.id == it } } }
@@ -88,6 +89,7 @@ fun CalendarItemEditScreen(
         mutableStateOf<Company?>(
             originalItem?.links?.firstOrNull { it.targetType == CalendarTargetType.COMPANY }
                 ?.let { AppStateStore.getCompany(it.targetId) }
+                ?: if (originalItem == null) prefillCompanyId?.let { AppStateStore.getCompany(it) } else null
         )
     }
 
@@ -105,17 +107,37 @@ fun CalendarItemEditScreen(
 
     var selectedReminders by remember(reminders) {
         val initialSelection = mutableSetOf<ReminderTime>()
-        if (reminders.isEmpty()) {
-            initialSelection.add(ReminderTime.NONE)
-        } else {
+        if (reminders.isNotEmpty()) {
             reminders.forEach { r ->
                 when {
                     r.reminderType == ReminderType.AT_TIME -> initialSelection.add(ReminderTime.AT_EVENT)
                     r.reminderType == ReminderType.BEFORE && r.offsetValue == 10 && r.offsetUnit == ReminderOffsetUnit.MINUTES -> initialSelection.add(ReminderTime.MIN_10)
+                    r.reminderType == ReminderType.BEFORE && r.offsetValue == 30 && r.offsetUnit == ReminderOffsetUnit.MINUTES -> initialSelection.add(ReminderTime.MIN_30)
                     r.reminderType == ReminderType.BEFORE && r.offsetValue == 1 && r.offsetUnit == ReminderOffsetUnit.HOURS -> initialSelection.add(ReminderTime.HOUR_1)
                     r.reminderType == ReminderType.BEFORE && r.offsetValue == 1 && r.offsetUnit == ReminderOffsetUnit.DAYS -> initialSelection.add(ReminderTime.DAY_1)
+                    r.reminderType == ReminderType.BEFORE && r.offsetValue == 3 && r.offsetUnit == ReminderOffsetUnit.DAYS -> initialSelection.add(ReminderTime.DAY_3)
                     r.reminderType == ReminderType.BEFORE && r.offsetValue == 1 && r.offsetUnit == ReminderOffsetUnit.WEEKS -> initialSelection.add(ReminderTime.WEEK_1)
                 }
+            }
+        } else if (!isEditMode) {
+            // Новое событие: подставляем НАСТОЯЩИЙ дефолт из Настроек по типу события —
+            // раньше эти 4 настройки (Подарки/Встречи/Звонки/Общее) нигде не читались,
+            // и форма всегда стартовала с «без напоминания» независимо от выбора
+            // владельца в Настройках (баг §35/§36). ON_DAY → AT_EVENT: для all-day
+            // событий (дни рождения) AT_TIME и так резолвится в 09:00 того же дня
+            // (см. NotificationScheduler.calculateNotificationTime), т.е. семантически
+            // это одно и то же значение.
+            fun ReminderTime.orAtEvent() = if (this == ReminderTime.ON_DAY) ReminderTime.AT_EVENT else this
+            when (type) {
+                CalendarItemType.BIRTHDAY, CalendarItemType.ANNIVERSARY,
+                CalendarItemType.NAMEDAY, CalendarItemType.IMPORTANT_DATE ->
+                    initialSelection.addAll(AppSettings.birthdayReminderTimes.value.map { it.orAtEvent() })
+                CalendarItemType.GIFT -> initialSelection.add(AppSettings.giftReminderTime.value)
+                CalendarItemType.MEETING, CalendarItemType.COMPANY_EVENT ->
+                    initialSelection.add(AppSettings.meetingReminderTime.value)
+                CalendarItemType.CALL, CalendarItemType.MESSAGE ->
+                    initialSelection.add(AppSettings.callReminderTime.value)
+                else -> initialSelection.add(AppSettings.defaultReminderTime.value)
             }
         }
         if (initialSelection.isEmpty() && isEditMode) initialSelection.add(ReminderTime.AT_EVENT)
@@ -166,20 +188,22 @@ fun CalendarItemEditScreen(
                 )
                 Button(
                         onClick = {
-                            val links = mutableListOf<CalendarItemLink>()
-                            linkedContacts.forEach { c -> links.add(CalendarItemLink(id = java.util.UUID.randomUUID().toString(), calendarItemId = "", targetType = CalendarTargetType.CONTACT, targetId = c.id)) }
-                            linkedCompany?.let { links.add(CalendarItemLink(id = java.util.UUID.randomUUID().toString(), calendarItemId = "", targetType = CalendarTargetType.COMPANY, targetId = it.id)) }
-                            
                             val itemId = originalItem?.id ?: java.util.UUID.randomUUID().toString()
-                            
+
+                            val links = mutableListOf<CalendarItemLink>()
+                            linkedContacts.forEach { c -> links.add(CalendarItemLink(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, targetType = CalendarTargetType.CONTACT, targetId = c.id)) }
+                            linkedCompany?.let { links.add(CalendarItemLink(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, targetType = CalendarTargetType.COMPANY, targetId = it.id)) }
+
                             val newReminderRules = mutableListOf<ReminderRule>()
                             if (!selectedReminders.contains(ReminderTime.NONE)) {
                                 selectedReminders.forEach { opt ->
                                     val rule = when (opt) {
                                         ReminderTime.AT_EVENT -> ReminderRule(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, reminderType = ReminderType.AT_TIME)
                                         ReminderTime.MIN_10 -> ReminderRule(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, reminderType = ReminderType.BEFORE, offsetValue = 10, offsetUnit = ReminderOffsetUnit.MINUTES)
+                                        ReminderTime.MIN_30 -> ReminderRule(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, reminderType = ReminderType.BEFORE, offsetValue = 30, offsetUnit = ReminderOffsetUnit.MINUTES)
                                         ReminderTime.HOUR_1 -> ReminderRule(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, reminderType = ReminderType.BEFORE, offsetValue = 1, offsetUnit = ReminderOffsetUnit.HOURS)
                                         ReminderTime.DAY_1 -> ReminderRule(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, reminderType = ReminderType.BEFORE, offsetValue = 1, offsetUnit = ReminderOffsetUnit.DAYS)
+                                        ReminderTime.DAY_3 -> ReminderRule(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, reminderType = ReminderType.BEFORE, offsetValue = 3, offsetUnit = ReminderOffsetUnit.DAYS)
                                         ReminderTime.WEEK_1 -> ReminderRule(id = java.util.UUID.randomUUID().toString(), calendarItemId = itemId, reminderType = ReminderType.BEFORE, offsetValue = 1, offsetUnit = ReminderOffsetUnit.WEEKS)
                                         else -> null
                                     }
@@ -225,7 +249,7 @@ fun CalendarItemEditScreen(
                     // без даты событие «невидимо», поэтому Готово неактивна.
                     enabled = startDate.isNotBlank(),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(percent = 50),
+                    shape = SocialShape.Full,
                     colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = androidx.compose.ui.graphics.Color.White),
                     modifier = Modifier.height(34.dp)
                 ) {
@@ -572,9 +596,12 @@ private fun ReminderPickerSheet(
     onDismiss: () -> Unit
 ) {
     val ctx = LocalContext.current
+    // MIN_30/DAY_3 добавлены (§36), чтобы значения из Настроек «Встречи»/«Подарки»
+    // были представимы в этом же пикере — иначе подставленный дефолт не совпадал
+    // бы ни с одним чипом.
     val options = listOf(
-        ReminderTime.NONE, ReminderTime.AT_EVENT, ReminderTime.MIN_10,
-        ReminderTime.HOUR_1, ReminderTime.DAY_1, ReminderTime.WEEK_1
+        ReminderTime.NONE, ReminderTime.AT_EVENT, ReminderTime.MIN_10, ReminderTime.MIN_30,
+        ReminderTime.HOUR_1, ReminderTime.DAY_1, ReminderTime.DAY_3, ReminderTime.WEEK_1
     )
     ModalBottomSheet(onDismissRequest = onDismiss, shape = SocialShape.Sheet) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {

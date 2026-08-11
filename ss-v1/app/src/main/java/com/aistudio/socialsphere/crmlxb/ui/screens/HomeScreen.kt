@@ -43,15 +43,52 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+// SearchEngine.matchField приходит как стабильный ASCII-ключ (см. SearchEngine.kt,
+// аудит хардкода 2026-07-22) — здесь резолвится в локализованную подпись чипа.
+// Ветка else покрывает значения из MessengerType/PersonalDetailCategory.labelKey()
+// (уже в основном language-neutral имена собственные вроде "Telegram"/"VK").
+@Composable
+private fun searchMatchFieldLabel(key: String): String = when (key) {
+    "name" -> stringResource(R.string.srch_field_name)
+    "surname" -> stringResource(R.string.srch_field_surname)
+    "patronymic" -> stringResource(R.string.srch_field_patronymic)
+    "nickname" -> stringResource(R.string.srch_field_nickname)
+    "phone" -> stringResource(R.string.srch_field_phone)
+    "email" -> stringResource(R.string.srch_field_email)
+    "company" -> stringResource(R.string.srch_field_company)
+    "position" -> stringResource(R.string.srch_field_position)
+    "profession" -> stringResource(R.string.srch_field_profession)
+    "department" -> stringResource(R.string.srch_field_department)
+    "city" -> stringResource(R.string.srch_field_city)
+    "country" -> stringResource(R.string.srch_field_country)
+    "district" -> stringResource(R.string.srch_field_district)
+    "note" -> stringResource(R.string.srch_field_note)
+    "gift" -> stringResource(R.string.srch_field_gift)
+    "tag" -> stringResource(R.string.srch_field_tag)
+    "group" -> stringResource(R.string.srch_field_group)
+    "type" -> stringResource(R.string.srch_field_type)
+    "next_step" -> stringResource(R.string.srch_field_next_step)
+    "company_name" -> stringResource(R.string.srch_field_company_name)
+    "industry" -> stringResource(R.string.srch_field_industry)
+    "description" -> stringResource(R.string.srch_field_description)
+    "website" -> stringResource(R.string.srch_field_website)
+    "employee" -> stringResource(R.string.srch_field_employee)
+    else -> key
+}
+
 // ─── Local data wrappers ──────────────────────────────────────
 private data class HomeContact(
     val id: String,
     val name: String,
     val company: String,
     val position: String,
-    val importance: ImportanceLevel,
     val daysSince: Long? = null,
-    val overdueLabel: String? = null
+    val overdueLabel: String? = null,
+    // «Недавно добавленные» раньше показывали ТОЛЬКО компанию/должность — если
+    // ни того ни другого нет (частый случай для только что созданного контакта),
+    // карточка не показывала вообще ничего под именем, хотя тип отношений уже
+    // задан (владелец: «после создания не отображается в ленте тип отношений»).
+    val relationshipLabel: String = ""
 )
 
 private data class HomeEvent(
@@ -87,15 +124,27 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState  = rememberScrollState()
+    val ctxLabel = LocalContext.current
     var expandBirthdayList  by remember { mutableStateOf(false) }
     // Y-позиция блока «Нужно связаться» внутри скролл-колонки (для счётчика ⚠️)
     var needAttentionSectionY by remember { mutableStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
     // FIX: explicit Locale.getDefault() to avoid crash on locale change
     val today        = LocalDate.now()
+    // ФИКС (2026-07-12, фидбэк владельца: день недели с маленькой буквы —
+    // «суббота» вместо «Суббота»). EEEE у DateTimeFormatter в ru/el-локалях
+    // возвращает stand-alone (словарную) форму дня недели из CLDR, которая
+    // грамматически пишется со строчной буквы вне начала предложения — это
+    // особенность локали, не баг форматтера (в en не проявляется, там дни
+    // недели капитализируются всегда). Капитализируем именно день недели
+    // (последний сегмент после ", "), не всю строку — она начинается с числа.
     val dateLabel    = remember(today) {
         try {
-            today.format(DateTimeFormatter.ofPattern("d MMMM, EEEE", Locale.getDefault()))
+            val raw = today.format(DateTimeFormatter.ofPattern("d MMMM, EEEE", Locale.getDefault()))
+            val idx = raw.lastIndexOf(", ")
+            if (idx >= 0 && idx + 2 < raw.length)
+                raw.substring(0, idx + 2) + raw.substring(idx + 2).replaceFirstChar { it.titlecase(Locale.getDefault()) }
+            else raw
         } catch (e: Exception) {
             today.toString()
         }
@@ -117,20 +166,14 @@ fun HomeScreen(
     // stringResource нельзя вызывать внутри derivedStateOf —
     // захватываем локализованные строки здесь; они же — ключи remember,
     // чтобы смена языка пересчитала блоки
-    val strNever        = stringResource(R.string.home_never_contacted)
-    val strOverYear     = stringResource(R.string.home_over_year_ago)
-    val strDaysAgo      = stringResource(R.string.home_days_ago)
     val strInDays       = stringResource(R.string.home_in_days)
     val strToday        = stringResource(R.string.common_today)
     val strTomorrow     = stringResource(R.string.common_tomorrow)
-    val strNoNextStep   = stringResource(R.string.home_no_next_step_label)
     val strAddedOn      = stringResource(R.string.home_added_on)
     val strSlBirthdays    = stringResource(R.string.home_sl_birthdays)
     val strSlBirthdaysSub = stringResource(R.string.home_sl_birthdays_sub)
     val strSlFollowup     = stringResource(R.string.home_sl_followup)
     val strSlFollowupSub  = stringResource(R.string.home_sl_followup_sub)
-    val strSlNoStep       = stringResource(R.string.home_sl_nonextstep)
-    val strSlNoStepSub    = stringResource(R.string.home_sl_nonextstep_sub)
     val strSlNew          = stringResource(R.string.home_sl_new)
     val strSlNewSub       = stringResource(R.string.home_sl_new_sub)
 
@@ -169,7 +212,7 @@ fun HomeScreen(
                         when (link.targetType) {
                             CalendarTargetType.CONTACT ->
                                 AppStateStore.getContact(link.targetId)
-                                    ?.let { "${it.firstName} ${it.lastName}".trim() }
+                                    ?.let { formatContactName(it, AppSettings.contactNameFormat.value) }
                             CalendarTargetType.COMPANY ->
                                 AppStateStore.getCompany(link.targetId)?.name
                             else -> null
@@ -181,27 +224,22 @@ fun HomeScreen(
     }
 
     // ── Нужно связаться — по ритму + дней без общения ────────
-    val needAttention by remember(strNever, strOverYear, strDaysAgo) {
+    val needAttention by remember {
         derivedStateOf {
             val today = java.time.LocalDate.now()
 
-            // Rhythm → max days allowed without contact
-            fun rhythmDays(r: CommunicationRhythm): Long? = when (r) {
-                CommunicationRhythm.WEEKLY         -> 7L
-                CommunicationRhythm.MONTHLY        -> 30L
-                CommunicationRhythm.EVERY_3_MONTHS -> 90L
-                CommunicationRhythm.EVERY_6_MONTHS -> 180L
-                CommunicationRhythm.YEARLY         -> 365L
-                else                               -> null  // NOT_TRACKED / CUSTOM — skip
-            }
+            // Rhythm → max days allowed without contact (CUSTOM использует
+            // c.customRhythmDays, см. StaleContacts.rhythmDays)
+            fun rhythmDays(c: Contact): Long? =
+                StaleContacts.rhythmDays(c.communicationRhythm, c.customRhythmDays)?.toLong()
 
             AppStateStore.contacts
                 .filter { c ->
                     // Only contacts with a tracked rhythm
-                    rhythmDays(c.communicationRhythm) != null
+                    rhythmDays(c) != null
                 }
                 .mapNotNull { c ->
-                    val maxDays = rhythmDays(c.communicationRhythm) ?: return@mapNotNull null
+                    val maxDays = rhythmDays(c) ?: return@mapNotNull null
 
                     // Last contact date — from model field or most recent note
                     val lastDate: java.time.LocalDate? = run {
@@ -227,11 +265,6 @@ fun HomeScreen(
                     if (daysSince < maxDays) return@mapNotNull null
 
                     val overdueDays = daysSince - maxDays   // how many days past deadline
-                    val label = when {
-                        lastDate == null -> strNever
-                        daysSince > 365  -> strOverYear
-                        else             -> String.format(strDaysAgo, daysSince)
-                    }
 
                     val compRel = c.companyRelations.firstOrNull { it.isPrimary }
                         ?: c.companyRelations.firstOrNull()
@@ -239,25 +272,15 @@ fun HomeScreen(
                         ?.let { AppStateStore.getCompany(it)?.name } ?: ""
 
                     HomeContact(
-                        id           = c.id,
-                        name         = "${c.firstName} ${c.lastName}".trim(),
-                        company      = company,
-                        position     = compRel?.position ?: "",
-                        importance   = c.importanceLevel,
-                        daysSince    = daysSince,
-                        overdueLabel = label
+                        id         = c.id,
+                        name       = formatContactName(c, AppSettings.contactNameFormat.value),
+                        company    = company,
+                        position   = compRel?.position ?: "",
+                        daysSince  = daysSince
                     ) to overdueDays
                 }
-                // Sort: most overdue first, then by importance
-                .sortedWith(compareByDescending<Pair<HomeContact, Long>> { it.second }
-                    .thenByDescending {
-                        when (it.first.importance) {
-                            ImportanceLevel.KEY       -> 3
-                            ImportanceLevel.IMPORTANT -> 2
-                            else -> 1
-                        }
-                    }
-                )
+                // Sort: most overdue first
+                .sortedByDescending { it.second }
                 .take(7)
                 .map { it.first }
         }
@@ -275,8 +298,10 @@ fun HomeScreen(
                         ?: c.companyRelations.firstOrNull()
                     val company = compRel?.companyId
                         ?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                    HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
-                        company, compRel?.position ?: "", c.importanceLevel)
+                    val relLabel = c.customRelationshipType?.takeIf { it.isNotBlank() }
+                        ?: c.relationshipType.label(ctxLabel)
+                    HomeContact(c.id, formatContactName(c, AppSettings.contactNameFormat.value),
+                        company, compRel?.position ?: "", relationshipLabel = relLabel)
                 }
         }
     }
@@ -325,9 +350,9 @@ fun HomeScreen(
 
     // ── Умные списки ──────────────────────────────────────────
 
-    val smartLists by remember(strToday, strTomorrow, strInDays, strNoNextStep, strAddedOn,
+    val smartLists by remember(strToday, strTomorrow, strInDays, strAddedOn,
         strSlBirthdays, strSlBirthdaysSub, strSlFollowup, strSlFollowupSub,
-        strSlNoStep, strSlNoStepSub, strSlNew, strSlNewSub) {
+        strSlNew, strSlNewSub) {
         derivedStateOf {
             val today = java.time.LocalDate.now()
             val lists = mutableListOf<SmartList>()
@@ -354,9 +379,8 @@ fun HomeScreen(
                     val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
                     HomeContact(
                         contact.id,
-                        "${contact.firstName} ${contact.lastName}".trim(),
+                        formatContactName(contact, AppSettings.contactNameFormat.value),
                         comp, compRel?.position ?: "",
-                        contact.importanceLevel,
                         daysSince    = daysUntil,
                         overdueLabel = when (daysUntil) {
                             0L   -> strToday
@@ -383,8 +407,8 @@ fun HomeScreen(
                     val compRel = c.companyRelations.firstOrNull { it.isPrimary }
                         ?: c.companyRelations.firstOrNull()
                     val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                    HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
-                        comp, compRel?.position ?: "", c.importanceLevel,
+                    HomeContact(c.id, formatContactName(c, AppSettings.contactNameFormat.value),
+                        comp, compRel?.position ?: "",
                         overdueLabel = c.nextStep)
                 }
                 .take(5)
@@ -395,31 +419,6 @@ fun HomeScreen(
                     Icons.Default.CheckCircle,
                     androidx.compose.ui.graphics.Color(0xFF2E8B6B), // Aurelia: малахит
                     followUpContacts.size, followUpContacts
-                ))
-            }
-
-            // 3. Важные контакты без следующего шага
-            val noNextStep = AppStateStore.contacts
-                .filter {
-                    it.importanceLevel != ImportanceLevel.NORMAL &&
-                    it.nextStep.isNullOrBlank()
-                }
-                .map { c ->
-                    val compRel = c.companyRelations.firstOrNull { it.isPrimary }
-                        ?: c.companyRelations.firstOrNull()
-                    val comp = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                    HomeContact(c.id, "${c.firstName} ${c.lastName}".trim(),
-                        comp, compRel?.position ?: "", c.importanceLevel,
-                        overdueLabel = strNoNextStep)
-                }
-                .take(5)
-            if (noNextStep.isNotEmpty()) {
-                lists.add(SmartList(
-                    "nonextstep", strSlNoStep,
-                    strSlNoStepSub,
-                    Icons.Default.WarningAmber,
-                    androidx.compose.ui.graphics.Color(0xFFB68A36), // Aurelia: золото
-                    noNextStep.size, noNextStep
                 ))
             }
 
@@ -567,29 +566,33 @@ fun HomeScreen(
                             label    = stringResource(R.string.home_counter_meetings),
                             onClick  = { onNavigateToCalendar() }
                         )
-                        // ⚠️ Просроченных контактов (терракот и число, и плитка)
-                        AureliaStatCard(
-                            modifier   = Modifier.weight(1f),
-                            icon       = Icons.Outlined.WarningAmber,
-                            tile       = AppleTheme.colors.red,
-                            value      = overdueCount.toString(),
-                            label      = stringResource(R.string.home_counter_overdue),
-                            valueColor = AppleTheme.colors.red,
-                            onClick    = {
-                                if (overdueCount > 0) {
-                                    // ТЗ: прокрутка к блоку «Нужно связаться»
-                                    coroutineScope.launch {
-                                        scrollState.animateScrollTo(needAttentionSectionY)
+                        // ⚠️ Просроченных контактов (терракот и число, и плитка) — раньше
+                        // showOverdue нигде не читался, счётчик был виден всегда независимо
+                        // от настройки (баг §36).
+                        if (AppSettings.showOverdue.value) {
+                            AureliaStatCard(
+                                modifier   = Modifier.weight(1f),
+                                icon       = Icons.Outlined.WarningAmber,
+                                tile       = AppleTheme.colors.red,
+                                value      = overdueCount.toString(),
+                                label      = stringResource(R.string.home_counter_overdue),
+                                valueColor = AppleTheme.colors.red,
+                                onClick    = {
+                                    if (overdueCount > 0) {
+                                        // ТЗ: прокрутка к блоку «Нужно связаться»
+                                        coroutineScope.launch {
+                                            scrollState.animateScrollTo(needAttentionSectionY)
+                                        }
+                                    } else {
+                                        onNavigateToContacts()
                                     }
-                                } else {
-                                    onNavigateToContacts()
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
 
                     // Нужно связаться (по макету: заголовок + Все + сгруппированная карточка)
-                    if (needAttention.isNotEmpty()) {
+                    if (AppSettings.showOverdue.value && needAttention.isNotEmpty()) {
                         AureliaSectionHeader(
                             title      = stringResource(R.string.home_need_attention),
                             actionText = stringResource(R.string.common_see_all),
@@ -744,10 +747,11 @@ private fun HomeSearchResults(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        AureliaAvatar(c.id, "${c.firstName} ${c.lastName}".trim(),
+                        val searchRowName = formatContactName(c, AppSettings.contactNameFormat.value)
+                        AureliaAvatar(c.id, searchRowName,
                             size = 40.dp, fontSize = 13.sp)
                         Column(Modifier.weight(1f)) {
-                            Text("${c.firstName} ${c.lastName}".trim(),
+                            Text(searchRowName,
                                 fontWeight = FontWeight.SemiBold,
                                 style = MaterialTheme.typography.bodyMedium)
                             val sub = listOf(company, compRel?.position)
@@ -758,7 +762,7 @@ private fun HomeSearchResults(
                         }
                         Surface(shape = SocialShape.Full,
                             color = AppleTheme.colors.brand.copy(alpha = 0.10f).copy(0.6f)) {
-                            Text(r.matchField,
+                            Text(searchMatchFieldLabel(r.matchField),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = AppleTheme.colors.brand,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
@@ -808,7 +812,7 @@ private fun HomeSearchResults(
                         }
                         Surface(shape = SocialShape.Full,
                             color = AppleTheme.colors.fill.copy(0.6f)) {
-                            Text(r.matchField,
+                            Text(searchMatchFieldLabel(r.matchField),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = AppleTheme.colors.secondaryLabel,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
@@ -884,18 +888,14 @@ private fun HomeContactRow(
     onNavigateToContact: (String) -> Unit = {},
     onClick: () -> Unit
 ) {
-    val importanceColor = when (contact.importance) {
-        ImportanceLevel.KEY       -> AppleTheme.colors.red
-        ImportanceLevel.IMPORTANT -> AppleTheme.colors.orange
-        else                      -> AppleTheme.colors.brand
-    }
-    val overdueColor = when {
+    // Срочность по палитре Aurelia (общая палитра, без локальных копий). Точка
+    // с пульсом раньше несла важность контакта (importanceLevel, убран из UI
+    // 2026-07-23) — теперь та же срочность, что и градиент аватара ниже.
+    val urgencyColor = when {
         contact.daysSince != null && contact.daysSince > 60 -> AppleTheme.colors.red
         contact.daysSince != null && contact.daysSince > 14 -> AppleTheme.colors.orange
-        else                                                 -> AppleTheme.colors.secondaryLabel
+        else                                                -> AppleTheme.colors.brand
     }
-
-    // Срочность по палитре Aurelia (общая палитра, без локальных копий).
     val avaGrad = AureliaAvatars.urgencyBrush(contact.daysSince)
     Row(
         Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 14.dp, vertical = 11.dp),
@@ -923,19 +923,40 @@ private fun HomeContactRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp)
                 )
-            if (!contact.overdueLabel.isNullOrBlank()) {
+            // «Повторять уведомление о просроченных» (§36, решение владельца): помимо
+            // повторного push (см. фикс NotificationReceiver) — усиленная подсветка
+            // самого списка. Раньше настройка ни на что не влияла.
+            if (AppSettings.repeatOverdueVisually.value && contact.daysSince != null) {
                 Text(
-                    contact.overdueLabel,
+                    stringResource(R.string.home_overdue_days_badge, contact.daysSince),
                     fontSize   = 12.sp,
-                    color      = overdueColor,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier   = Modifier.padding(top = 5.dp)
+                    fontWeight = FontWeight.Bold,
+                    color      = AppleTheme.colors.red,
+                    modifier   = Modifier.padding(top = 2.dp)
                 )
             }
         }
-        // Точка с пульсом (au-pulse из макета); цвет несёт важность контакта —
-        // функция сохранена, анимация по прототипу.
-        AureliaPulseDot(color = importanceColor)
+        // Быстрая отметка «связались сегодня» — убирает контакт из списка
+        // без похода в заметки/календарь (ответ на вопрос владельца: список
+        // не должен висеть вечно, если общение было вне приложения).
+        Box(
+            Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                .clickable { AppStateStore.markContactedNow(contact.id) },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = stringResource(R.string.home_mark_contacted),
+                tint = AppleTheme.colors.brand,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        // Точка с пульсом (au-pulse из макета); цвет несёт срочность (дни без
+        // общения) — функция сохранена, анимация по прототипу.
+        AureliaPulseDot(color = urgencyColor)
     }
 }
 
@@ -955,7 +976,7 @@ private fun HomeRecentCard(contact: HomeContact, onClick: () -> Unit) {
             AureliaAvatar(contact.id, contact.name, size = 54.dp, fontSize = 20.sp)
             Text(contact.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
-            val role = contact.position.ifEmpty { contact.company }
+            val role = contact.position.ifEmpty { contact.company }.ifEmpty { contact.relationshipLabel }
             if (role.isNotEmpty())
                 Text(role, fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))

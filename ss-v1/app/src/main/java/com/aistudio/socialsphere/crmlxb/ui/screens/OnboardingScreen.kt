@@ -22,18 +22,23 @@ import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif
 
 // Тёмная палитра онбординга (макет Aurelia, тёмный экран приветствия).
-private val ObBg    = Color(0xFF0E0D0A) // тёплый уголь-фон
-private val ObTx    = Color(0xFFF3EFE8) // основной текст
-private val ObMuted = Color(0x99F3EFE8) // .60 подписи
-private val ObBrand = Color(0xFF5FB894) // осветлённый малахит
-private val ObGold  = Color(0xFFD7B468)
-private val ObCard  = Color(0x0DF3EFE8) // .05 подложка иконок
+// internal (не private): переиспользуется остальными экранами тура —
+// OnboardingPersonaScreen/OnboardingDemoScreen/OnboardingTourScreen — чтобы
+// не заводить вторую тёмную палитру (AureliaDarkColors — близкая, но не
+// идентичная — дала бы заметный разнобой на стыке экранов тура).
+internal val ObBg    = Color(0xFF0E0D0A) // тёплый уголь-фон
+internal val ObTx    = Color(0xFFF3EFE8) // основной текст
+internal val ObMuted = Color(0x99F3EFE8) // .60 подписи
+internal val ObBrand = Color(0xFF5FB894) // осветлённый малахит
+internal val ObGold  = Color(0xFFD7B468)
+internal val ObCard  = Color(0x0DF3EFE8) // .05 подложка иконок
 
 /**
- * Экран приветствия (первый запуск). Тёмный, редакционный: монограмма-бренд,
- * крупный Playfair-заголовок «Помните каждого, кто важен», три ценностных
- * пункта и кнопка «Начать». По нажатию — колбэк, который ставит флаг
- * onboardingCompleted и уводит в приложение.
+ * Экран приветствия — шаг 1 тура первого запуска (см. OnboardingTourScreen).
+ * Тёмный, редакционный: монограмма-бренд, крупный Playfair-заголовок,
+ * три ценностных пункта и кнопка «Далее» — переход к следующему шагу тура
+ * (сам флаг onboardingCompleted здесь больше не ставится, это делает финал
+ * тура или «Пропустить» — см. OnboardingTourScreen.kt).
  */
 @Composable
 fun OnboardingScreen(onStart: () -> Unit) {
@@ -93,7 +98,7 @@ fun OnboardingScreen(onStart: () -> Unit) {
                 shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
                 colors = ButtonDefaults.buttonColors(containerColor = ObBrand, contentColor = ObBg)
             ) {
-                Text(stringResource(R.string.onboarding_start), fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.onboarding_next), fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(8.dp))
                 Icon(Icons.Default.ArrowForward, null, Modifier.size(20.dp))
             }

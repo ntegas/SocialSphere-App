@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -37,6 +36,7 @@ fun CompanyEditScreen(
 ) {
     val isEditMode = companyId != null
     val ctxLabel = LocalContext.current
+    val scope = rememberCoroutineScope()
     val originalCompany = remember { companyId?.let { AppStateStore.getCompany(it) } }
 
     var name by remember { mutableStateOf(originalCompany?.name ?: "") }
@@ -44,11 +44,26 @@ fun CompanyEditScreen(
     var description by remember { mutableStateOf(originalCompany?.description ?: "") }
     var website by remember { mutableStateOf(originalCompany?.website ?: "") }
 
+    // ФИКС (аудит 2026-08-03, владелец): в отличие от WorkplaceAddFlow/
+    // ContactEditScreen/ImportScreens, этот экран не проверял имя новой
+    // компании против уже существующих (trim + ignoreCase) — «Электрик» и
+    // «электрик» превращались в две разные компании вместо одной группы.
+    val duplicateCompany = if (!isEditMode) AppStateStore.findCompanyByName(name) else null
+
     var phones by remember { mutableStateOf(originalCompany?.phones ?: emptyList<ContactPhone>()) }
     var emails by remember { mutableStateOf(originalCompany?.emails ?: emptyList<ContactEmail>()) }
     var addresses by remember { mutableStateOf(originalCompany?.addresses ?: emptyList<Address>()) }
 
-    var companyNote by remember { mutableStateOf("") }
+    // Единственная общая заметка компании — самая свежая GENERAL-заметка с этим
+    // companyId. Раньше поле всегда стартовало пустым и введённый текст никуда
+    // не сохранялся при «Готово» — тихая потеря данных при каждом редактировании.
+    val existingCompanyNote = remember {
+        originalCompany?.let { c ->
+            AppStateStore.notes.filter { it.companyId == c.id && it.type == NoteType.GENERAL }
+                .maxByOrNull { it.updatedAt }
+        }
+    }
+    var companyNote by remember { mutableStateOf(existingCompanyNote?.text ?: "") }
 
     // Dialog states for phone/email
     var showAddPhone     by remember { mutableStateOf(false) }
@@ -233,38 +248,81 @@ fun CompanyEditScreen(
                 )
                 Button(
                         onClick = {
-                            val newCompany = Company(
-                                // editedCompanyId известен до сохранения — связи
-                                // «добавить сотрудника» указывают на верный id
-                                id = editedCompanyId,
-                                name = name,
-                                // logoUri в форме сейчас не редактируется — сохраняем как
-                                // было, а не хардкодим null (иначе будущая фича лого молча
-                                // стиралась бы каждым сохранением, см. У60)
-                                logoUri = originalCompany?.logoUri,
-                                industry = industry,
-                                description = description,
-                                website = website,
-                                phones = phones,
-                                emails = emails,
-                                addresses = addresses,
-                                createdAt = originalCompany?.createdAt ?: java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                                updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            )
-                            if (isEditMode) {
-                                AppStateStore.updateCompany(newCompany)
+                            val trimmedName = name.trim()
+                            val finalCompanyId = duplicateCompany?.id ?: editedCompanyId
+                            // Адреса уже создавались с ownerId = editedCompanyId (см.
+                            // AddressEditDialog ниже) — если оказалось, что это дубль
+                            // существующей компании, переносим их на её реальный id.
+                            val finalAddresses = addresses.map {
+                                if (it.ownerId == editedCompanyId) it.copy(ownerId = finalCompanyId) else it
+                            }
+                            val saveNowIso = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                            if (duplicateCompany != null) {
+                                // Объединяем в существующую компанию, а не затираем её
+                                // индустрию/описание/сайт черновиком пустой формы —
+                                // добавляем только то, что реально ново (телефоны/почты/адреса).
+                                AppStateStore.updateCompany(
+                                    duplicateCompany.copy(
+                                        phones = duplicateCompany.phones + phones,
+                                        emails = duplicateCompany.emails + emails,
+                                        addresses = duplicateCompany.addresses + finalAddresses,
+                                        updatedAt = saveNowIso
+                                    )
+                                )
                             } else {
-                                AppStateStore.addCompany(newCompany)
+                                val newCompany = Company(
+                                    // editedCompanyId известен до сохранения — связи
+                                    // «добавить сотрудника» указывают на верный id
+                                    id = finalCompanyId,
+                                    name = trimmedName,
+                                    // logoUri в форме сейчас не редактируется — сохраняем как
+                                    // было, а не хардкодим null (иначе будущая фича лого молча
+                                    // стиралась бы каждым сохранением, см. У60)
+                                    logoUri = originalCompany?.logoUri,
+                                    industry = industry,
+                                    description = description,
+                                    website = website,
+                                    phones = phones,
+                                    emails = emails,
+                                    addresses = finalAddresses,
+                                    createdAt = originalCompany?.createdAt ?: saveNowIso,
+                                    updatedAt = saveNowIso
+                                )
+                                if (isEditMode) {
+                                    AppStateStore.updateCompany(newCompany)
+                                } else {
+                                    AppStateStore.addCompany(newCompany)
+                                }
+                            }
+                            // Заметка компании — сохраняем/обновляем/удаляем отдельно,
+                            // т.к. Company не хранит notes инлайн (см. AppStateStore.notes).
+                            val trimmedNote = companyNote.trim()
+                            val noteNow = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                            when {
+                                trimmedNote.isNotEmpty() && existingCompanyNote != null ->
+                                    AppStateStore.updateNote(existingCompanyNote.copy(text = trimmedNote, updatedAt = noteNow))
+                                trimmedNote.isNotEmpty() ->
+                                    AppStateStore.addNote(Note(
+                                        id = java.util.UUID.randomUUID().toString(),
+                                        companyId = finalCompanyId,
+                                        type = NoteType.GENERAL,
+                                        text = trimmedNote,
+                                        isImportant = false,
+                                        createdAt = noteNow,
+                                        updatedAt = noteNow
+                                    ))
+                                existingCompanyNote != null ->
+                                    AppStateStore.deleteNote(existingCompanyNote.id)
                             }
                             // Отложенные сотрудники → реальные связи контакт↔компания
                             pendingPeople.forEach { (person, pos) ->
                                 val fresh = AppStateStore.getContact(person.id) ?: return@forEach
-                                if (fresh.companyRelations.none { it.companyId == editedCompanyId }) {
+                                if (fresh.companyRelations.none { it.companyId == finalCompanyId }) {
                                     AppStateStore.updateContact(fresh.copy(
                                         companyRelations = fresh.companyRelations + ContactCompanyRelation(
                                             id = java.util.UUID.randomUUID().toString(),
                                             contactId = fresh.id,
-                                            companyId = editedCompanyId,
+                                            companyId = finalCompanyId,
                                             position = pos,
                                             employmentStatus = EmploymentStatus.CURRENT,
                                             isPrimary = fresh.companyRelations.isEmpty()
@@ -275,7 +333,7 @@ fun CompanyEditScreen(
                             onNavigateBack()
                         },
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
-                    shape = RoundedCornerShape(percent = 50),
+                    shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Full,
                     colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand, contentColor = Color.White),
                     modifier = Modifier.height(34.dp)
                 ) {
@@ -304,13 +362,23 @@ fun CompanyEditScreen(
                             Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                         }
                     }
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it }, keyboardOptions = CapWords,
-                        label = { Text(stringResource(R.string.cce_name)) },
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        singleLine = true
-                    )
+                    Column(Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it }, keyboardOptions = CapWords,
+                            label = { Text(stringResource(R.string.cce_name)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        if (duplicateCompany != null) {
+                            Text(
+                                stringResource(R.string.cce_name_duplicate_hint),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleTheme.colors.secondaryLabel,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            )
+                        }
+                    }
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -375,7 +443,7 @@ fun CompanyEditScreen(
 
                 HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
 
-                AureliaCaption("Email")
+                AureliaCaption(stringResource(R.string.cce_email))
 
                 if (emails.isEmpty()) {
                     Text(stringResource(R.string.cce_no_email),
@@ -406,36 +474,75 @@ fun CompanyEditScreen(
                 }
             }
 
-            // Addresses (редактируемые)
+            // Addresses (редактируемые) — ФИКС (2026-07-23, владелец): раньше это
+            // были 4 фиксированных именованных слота (офис/филиал/юрадрес/другое),
+            // по одному на AddressType — upsertAddress искал `find { type == X }`,
+            // т.е. второй адрес того же типа был физически невозможно завести
+            // ИЛИ увидеть в форме (он молча становился «невидимым», хотя жил в БД —
+            // так проявилось при слиянии двух компаний с адресами типа OFFICE).
+            // Теперь — тот же динамический список + ЕДИНЫЙ AddressEditDialog, что
+            // уже работает у контактов (AddressComponents.kt): произвольное число
+            // адресов любых типов, плюс геокодинг, которого тут раньше не было.
             SectionCard(stringResource(R.string.cce_addresses)) {
-                fun upsertAddress(type: AddressType, line: String, city: String, country: String, postal: String) {
-                    addresses = addresses.toMutableList().also { list ->
-                        val idx = list.indexOfFirst { it.addressType == type }
-                        if (line.isBlank() && city.isBlank() && country.isBlank() && postal.isBlank()) {
-                            if (idx >= 0) list.removeAt(idx)
-                        } else {
-                            val base = if (idx >= 0) list[idx] else Address(
-                                id = java.util.UUID.randomUUID().toString(),
-                                ownerType = AddressOwnerType.COMPANY,
-                                ownerId = originalCompany?.id ?: "new",
-                                addressType = type, addressLine = "", city = "", country = ""
+                var showAddrDialog by remember { mutableStateOf(false) }
+                var editingAddr by remember { mutableStateOf<Address?>(null) }
+                if (addresses.isEmpty()) {
+                    Text(
+                        stringResource(R.string.ce_address_after_save),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppleTheme.colors.secondaryLabel
+                    )
+                }
+                addresses.forEach { addr ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clickable { editingAddr = addr; showAddrDialog = true }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                addr.addressLine,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
                             )
-                            val updated = base.copy(addressLine = line, city = city, country = country, postalCode = postal.ifBlank { null })
-                            if (idx >= 0) list[idx] = updated else list.add(updated)
+                            Text(
+                                listOf(addr.addressType.label(ctxLabel), addr.city, addr.postalCode.orEmpty(), addr.country)
+                                    .filter { it.isNotBlank() }.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppleTheme.colors.secondaryLabel
+                            )
+                        }
+                        IconButton(onClick = { addresses = addresses - addr }) {
+                            Icon(Icons.Default.Close, stringResource(R.string.ce_remove_address),
+                                Modifier.size(16.dp),
+                                tint = AppleTheme.colors.secondaryLabel)
                         }
                     }
+                    HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
-                EditableCompanyAddress(stringResource(R.string.cce_main_office),
-                    addresses.find { it.addressType == AddressType.OFFICE }) { l, c, co, pc -> upsertAddress(AddressType.OFFICE, l, c, co, pc) }
-                Spacer(Modifier.height(12.dp))
-                EditableCompanyAddress(stringResource(R.string.cce_branch),
-                    addresses.find { it.addressType == AddressType.BRANCH }) { l, c, co, pc -> upsertAddress(AddressType.BRANCH, l, c, co, pc) }
-                Spacer(Modifier.height(12.dp))
-                EditableCompanyAddress(stringResource(R.string.cce_legal_addr),
-                    addresses.find { it.addressType == AddressType.LEGAL }) { l, c, co, pc -> upsertAddress(AddressType.LEGAL, l, c, co, pc) }
-                Spacer(Modifier.height(12.dp))
-                EditableCompanyAddress(stringResource(R.string.cce_other_addr),
-                    addresses.find { it.addressType == AddressType.OTHER }) { l, c, co, pc -> upsertAddress(AddressType.OTHER, l, c, co, pc) }
+                TextButton(onClick = { editingAddr = null; showAddrDialog = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.ce_address))
+                }
+                if (showAddrDialog) {
+                    AddressEditDialog(
+                        base = editingAddr,
+                        ownerId = editedCompanyId,
+                        ownerType = AddressOwnerType.COMPANY,
+                        defaultType = AddressType.OFFICE,
+                        scope = scope,
+                        onDismiss = { showAddrDialog = false; editingAddr = null },
+                        onCommit = { a ->
+                            addresses = if (addresses.none { it.id == a.id }) addresses + a
+                                else addresses.map { if (it.id == a.id) a else it }
+                        },
+                        onGeocoded = { a ->
+                            addresses = addresses.map { if (it.id == a.id) a else it }
+                        }
+                    )
+                }
             }
 
             // People
@@ -554,47 +661,3 @@ fun CompanyEditScreen(
     }
 }
 
-
-@Composable
-private fun EditableCompanyAddress(
-    title: String,
-    address: Address?,
-    onChange: (line: String, city: String, country: String, postal: String) -> Unit
-) {
-    val line = address?.addressLine ?: ""
-    val city = address?.city ?: ""
-    val country = address?.country ?: ""
-    val postal = address?.postalCode ?: ""
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = line, onValueChange = { onChange(it, city, country, postal) }, keyboardOptions = CapWords,
-            label = { Text(stringResource(R.string.cce_addr_line)) },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium
-        )
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = city, onValueChange = { onChange(line, it, country, postal) }, keyboardOptions = CapWords,
-                label = { Text(stringResource(R.string.cce_addr_city)) },
-                modifier = Modifier.weight(1f), singleLine = true,
-                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium
-            )
-            OutlinedTextField(
-                value = country, onValueChange = { onChange(line, city, it, postal) }, keyboardOptions = CapWords,
-                label = { Text(stringResource(R.string.cce_addr_country)) },
-                modifier = Modifier.weight(1f), singleLine = true,
-                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = postal, onValueChange = { onChange(line, city, country, it) },
-            label = { Text(stringResource(R.string.ce_postal_code)) },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium
-        )
-    }
-}

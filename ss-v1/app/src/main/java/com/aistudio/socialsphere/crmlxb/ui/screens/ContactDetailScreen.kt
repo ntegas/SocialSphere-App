@@ -111,6 +111,12 @@ fun ContactDetailScreen(
     // Единая шторка «⋯ Действия» из шапки (по макету): Редактировать /
     // Сохранить в телефон / Поделиться / Удалить.
     var showActionsSheet by remember { mutableStateOf(false) }
+    // scope живёт на уровне ЭКРАНА, а не внутри условного `if (showActionsSheet)` —
+    // раньше он объявлялся там же, и закрытие шторки (showActionsSheet = false)
+    // рекомпозицией отменяло Job корутины ДО того, как exportContactVCard()
+    // успевал дойти до withContext(IO), из-за чего «Сохранить в телефон»/
+    // «Поделиться» тихо ничего не делали (2026-07-22).
+    val actionsScope = rememberCoroutineScope()
 
     // Add note state
     var noteText by remember { mutableStateOf("") }
@@ -124,12 +130,15 @@ fun ContactDetailScreen(
     // системный BiometricPrompt (отпечаток или код устройства).
     val bioLockOn = AppSettings.biometricLockSafe()
     var privacyMode by remember { mutableStateOf(bioLockOn) }
-    // ФИКС (критичный баг, 2026-07-05): LocalContext.current здесь — обёртка
-    // createConfigurationContext (см. LocalizedApp), не сама Activity — прямой
-    // `as? FragmentActivity` ВСЕГДА давал null, requestReveal() уходил в else
-    // и открывал «защищённые» заметки без единого запроса аутентификации.
-    // findActivity() разматывает ContextWrapper до настоящей Activity.
-    val bioActivity = LocalContext.current.findActivity()
+    // ФИКС (критичный баг, 2026-07-05, доработано 2026-07-11): LocalContext.current
+    // здесь — createConfigurationContext (см. LocalizedApp) — НЕ ContextWrapper
+    // над Activity, а независимый Context той же LoadedApk. findActivity() не мог
+    // до Activity добраться в принципе, сколько ContextWrapper ни разматывай —
+    // подтверждено живым тестом на реальном устройстве (isAvail всегда null).
+    // LocalView.current.context — контекст реального ComposeView, LocalizedApp
+    // его не подменяет (переопределяет только LocalContext) — от него
+    // findActivity() доходит до настоящей FragmentActivity.
+    val bioActivity = androidx.compose.ui.platform.LocalView.current.context.findActivity()
     val bioTitle = stringResource(R.string.bio_prompt_title)
     var showPinReveal by remember { mutableStateOf(false) }
     fun requestReveal() {
@@ -147,22 +156,18 @@ fun ContactDetailScreen(
     }
 
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { showDeleteDialog = false },
             icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
-            title = { Text(stringResource(R.string.cd_delete_q), fontWeight = FontWeight.Bold) },
-            text  = { Text(stringResource(R.string.cd_delete_warning, "${contact.firstName} ${contact.lastName}")) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showDeleteDialog = false
-                        AppStateStore.deleteContact(contactId)
-                        onNavigateBack()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red)
-                ) { Text(stringResource(R.string.common_delete)) }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+            title = stringResource(R.string.cd_delete_q),
+            text  = stringResource(R.string.cd_delete_warning, "${contact.firstName} ${contact.lastName}"),
+            confirmText = stringResource(R.string.common_delete),
+            destructive = true,
+            onConfirm = {
+                showDeleteDialog = false
+                AppStateStore.deleteContact(contactId)
+                onNavigateBack()
+            }
         )
     }
 
@@ -170,8 +175,6 @@ fun ContactDetailScreen(
     // раскиданных ранее по вкладкам/низу. Функции переиспользуют существующую
     // логику (vCard-экспорт, share-file, диалог удаления). ──
     if (showActionsSheet) {
-        val ctx = LocalContext.current
-        val scope = rememberCoroutineScope()
         com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showActionsSheet = false }) {
             Column(Modifier.fillMaxWidth()) {
                 Text(
@@ -184,16 +187,19 @@ fun ContactDetailScreen(
                 }
                 ActionSheetRow(Icons.Default.PersonAdd, stringResource(R.string.cd_save_to_phone)) {
                     showActionsSheet = false
-                    scope.launch {
-                        val file = com.aistudio.socialsphere.crmlxb.utils.ExportManager.exportContactVCard(ctx, contact)
-                        com.aistudio.socialsphere.crmlxb.utils.ExportManager.openVcfInContacts(ctx, file)
+                    // Полная vCard (все поля) — сценарий владелец→своя телефонная книга, доверенный контур.
+                    actionsScope.launch {
+                        val file = com.aistudio.socialsphere.crmlxb.utils.ExportManager.exportContactVCard(ctxLabel, contact)
+                        com.aistudio.socialsphere.crmlxb.utils.ExportManager.openVcfInContacts(ctxLabel, file)
                     }
                 }
                 ActionSheetRow(Icons.Default.Share, stringResource(R.string.cd_share)) {
                     showActionsSheet = false
-                    scope.launch {
-                        val file = com.aistudio.socialsphere.crmlxb.utils.ExportManager.exportContactVCard(ctx, contact)
-                        com.aistudio.socialsphere.crmlxb.utils.ExportManager.shareFile(ctx, file, "text/x-vcard")
+                    // Урезанная vCard (только имя/телефоны/email/компания-должность) —
+                    // сценарий владелец→чужой человек, приватные заметки не должны утекать.
+                    actionsScope.launch {
+                        val file = com.aistudio.socialsphere.crmlxb.utils.ExportManager.exportContactShareVCard(ctxLabel, contact)
+                        com.aistudio.socialsphere.crmlxb.utils.ExportManager.shareFile(ctxLabel, file, "text/x-vcard")
                     }
                 }
                 ActionSheetRow(Icons.Default.Group, stringResource(R.string.cd_groups)) {
@@ -330,23 +336,20 @@ fun ContactDetailScreen(
     // ── «Сделать компанией»: контакт → компания (телефоны/email/адреса/заметки
     // переезжают, карточка контакта удаляется) ──
     if (showConvertDialog) {
-        AlertDialog(
-            onDismissRequest = { showConvertDialog = false },
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { showConvertDialog = false },
             icon = { Icon(Icons.Default.Business, null, tint = AppleTheme.colors.brand) },
-            title = { Text(stringResource(R.string.cd_convert_company_title), fontWeight = FontWeight.Bold) },
-            text = { Text(stringResource(R.string.cd_convert_company_text,
-                "${contact.firstName} ${contact.lastName}".trim())) },
-            confirmButton = {
-                Button(onClick = {
-                    showConvertDialog = false
-                    val newCompanyId = AppStateStore.convertContactToCompany(contactId)
-                    if (newCompanyId != null) {
-                        onNavigateBack()
-                        onNavigateToCompany(newCompanyId)
-                    }
-                }) { Text(stringResource(R.string.cd_convert)) }
-            },
-            dismissButton = { TextButton(onClick = { showConvertDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+            title = stringResource(R.string.cd_convert_company_title),
+            text = stringResource(R.string.cd_convert_company_text, "${contact.firstName} ${contact.lastName}".trim()),
+            confirmText = stringResource(R.string.cd_convert),
+            onConfirm = {
+                showConvertDialog = false
+                val newCompanyId = AppStateStore.convertContactToCompany(contactId)
+                if (newCompanyId != null) {
+                    onNavigateBack()
+                    onNavigateToCompany(newCompanyId)
+                }
+            }
         )
     }
 
@@ -578,16 +581,13 @@ fun ContactDetailScreen(
 
     // ── Подтверждение удаления идеи ──
     deletingGift?.let { gift ->
-        AlertDialog(
-            onDismissRequest = { deletingGift = null },
-            title = { Text(stringResource(R.string.cd_gift_delete_q), fontWeight = FontWeight.Bold) },
-            text = { Text(gift.title) },
-            confirmButton = {
-                Button(colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red),
-                    onClick = { AppStateStore.deleteGift(gift.id); deletingGift = null }
-                ) { Text(stringResource(R.string.common_delete)) }
-            },
-            dismissButton = { TextButton(onClick = { deletingGift = null }) { Text(stringResource(R.string.common_cancel)) } }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { deletingGift = null },
+            title = stringResource(R.string.cd_gift_delete_q),
+            text = gift.title,
+            confirmText = stringResource(R.string.common_delete),
+            destructive = true,
+            onConfirm = { AppStateStore.deleteGift(gift.id); deletingGift = null }
         )
     }
 
@@ -795,23 +795,15 @@ fun ContactDetailScreen(
 
     // ── Подтверждение удаления заметки ──
     deletingNote?.let { note ->
-        AlertDialog(
-            onDismissRequest = { deletingNote = null },
-            title = { Text(stringResource(R.string.cd_note_delete_q), fontWeight = FontWeight.Bold) },
-            text = { Text(note.text.take(120) + if (note.text.length > 120) "…" else "") },
-            confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AppleTheme.colors.red
-                    ),
-                    onClick = {
-                        AppStateStore.deleteNote(note.id)
-                        deletingNote = null
-                    }
-                ) { Text(stringResource(R.string.common_delete)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { deletingNote = null }) { Text(stringResource(R.string.common_cancel)) }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { deletingNote = null },
+            title = stringResource(R.string.cd_note_delete_q),
+            text = note.text.take(120) + if (note.text.length > 120) "…" else "",
+            confirmText = stringResource(R.string.common_delete),
+            destructive = true,
+            onConfirm = {
+                AppStateStore.deleteNote(note.id)
+                deletingNote = null
             }
         )
     }
@@ -1054,16 +1046,30 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
     val ctxLabel = LocalContext.current
     val compRel  = contact.companyRelations.firstOrNull { it.isPrimary } ?: contact.companyRelations.firstOrNull()
     val company  = compRel?.companyId?.let { AppStateStore.getCompany(it) }?.name ?: ""
-    // Должность в компании, иначе — свободная профессия (v12)
-    val position = compRel?.position?.takeIf { it.isNotBlank() } ?: contact.profession ?: ""
+    // ФИКС (аудит 2026-08-11, жалоба «профессия никуда не переносится» —
+    // данные были целы, но должность в компании молча ПРЯТАЛА профессию,
+    // а не показывала оба, как Android/iOS Contacts и обычные CRM). Показываем
+    // оба, если заполнены и различаются, иначе — то, что есть.
+    val companyPosition = compRel?.position?.takeIf { it.isNotBlank() }
+    val profession = contact.profession?.trim()?.takeIf { it.isNotBlank() }
+    val position = listOfNotNull(companyPosition, profession?.takeIf { it != companyPosition }).joinToString(" · ")
     val address  = AppStateStore.addresses.find { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
     val city     = address?.city ?: ""
-    // Полное имя с отчеством (как в телефонной книге)
-    val name = listOfNotNull(
-        contact.firstName.takeIf { it.isNotBlank() },
-        contact.middleName?.takeIf { it.isNotBlank() },
-        contact.lastName.takeIf { it.isNotBlank() }
-    ).joinToString(" ")
+    // Полное имя с отчеством (как в телефонной книге), порядок слов — по
+    // настройке «Формат отображения» (ContactDisplayPreferences, DISPLAY_ORDER
+    // как в Android-контактах): имя-первое или фамилия-первое.
+    val name = when (AppSettings.contactNameFormat.value) {
+        ContactNameFormat.FIRST_NAME_FIRST -> listOfNotNull(
+            contact.firstName.takeIf { it.isNotBlank() },
+            contact.middleName?.takeIf { it.isNotBlank() },
+            contact.lastName.takeIf { it.isNotBlank() }
+        )
+        ContactNameFormat.LAST_NAME_FIRST -> listOfNotNull(
+            contact.lastName.takeIf { it.isNotBlank() },
+            contact.firstName.takeIf { it.isNotBlank() },
+            contact.middleName?.takeIf { it.isNotBlank() }
+        )
+    }.joinToString(" ")
 
     // Last contact — most recent note/event
     val lastNoteDate = AppStateStore.notes
@@ -1083,11 +1089,10 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
         } catch (e: Exception) { null }
     } else null
 
-    // Nearest upcoming date
-    val nearestDate = AppStateStore.calendarItems
-        .filter { it.links.any { l -> l.targetId == contact.id } && it.status == CalendarItemStatus.ACTIVE }
-        .filter { it.startDate >= java.time.LocalDate.now().toString() }
-        .minByOrNull { it.startDate }
+    // «Ближайшее событие» (nearestDate) и «следующий шаг» больше не считаются
+    // здесь — обе пилюли убраны из шапки (решение владельца 2026-07-23,
+    // дублируются во вкладке «Обзор», см. OverviewTab.kt). daysSince остаётся
+    // единственным чисто-шапочным индикатором.
 
     val initials = contact.firstName.take(1) + contact.lastName.take(1)
     val subtitle = listOf(company, position, city).filter { it.isNotEmpty() }.joinToString(" · ")
@@ -1104,14 +1109,20 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Важность — ЦВЕТНОЙ ОБОДОК аватара (решение владельца 2026-07-02),
-            // не отдельный чип: Ключевой — золото, Важный — терракот, Обычный — без.
-            // Тап по аватару меняет важность (функция быстрой правки сохранена).
-            var showImportanceMenu by remember { mutableStateOf(false) }
-            val importanceRing = when (contact.importanceLevel) {
-                ImportanceLevel.KEY       -> AppleTheme.colors.importanceKey
-                ImportanceLevel.IMPORTANT -> AppleTheme.colors.importanceHigh
-                else                      -> Color.Transparent
+            // Важность (importanceLevel) убрана из UI полностью (решение владельца
+            // 2026-07-23, по прецеденту ConnectionLevel — колонка БД остаётся,
+            // просто нигде не читается/не пишется из UI). Ободок аватара теперь
+            // отражает contactStatus: MAINTAIN — золото (важная пометка «нужно
+            // поддерживать»), NEW — тот же акцент, что у чипа статуса ниже
+            // (AppleTheme.colors.statusAccent, см. ФИКС 2026-07-31), остальные
+            // статусы — без ободка. Тап по аватару меняет contactStatus (функция
+            // быстрой правки одного из ключевых полей сохранена, просто поле
+            // сменилось с importanceLevel на contactStatus).
+            var showStatusMenu by remember { mutableStateOf(false) }
+            val importanceRing = when (contact.contactStatus) {
+                ContactStatus.MAINTAIN -> AureliaTheme.colors.gold
+                ContactStatus.NEW      -> AppleTheme.colors.statusAccent
+                else                   -> Color.Transparent
             }
             Box {
                 val headerPhoto = contact.photoUri?.let { java.io.File(it) }?.takeIf { it.exists() }
@@ -1125,7 +1136,7 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                                 Modifier.border(2.5.dp, importanceRing, CircleShape)
                             else Modifier
                         )
-                        .clickable { showImportanceMenu = true },
+                        .clickable { showStatusMenu = true },
                     contentAlignment = Alignment.Center
                 ) {
                     if (headerPhoto != null) {
@@ -1138,29 +1149,26 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                         fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
                         fontSize = 22.sp, fontWeight = FontWeight.W600)
                 }
-                DropdownMenu(expanded = showImportanceMenu, onDismissRequest = { showImportanceMenu = false }) {
-                    ImportanceLevel.values().forEach { imp ->
+                DropdownMenu(expanded = showStatusMenu, onDismissRequest = { showStatusMenu = false }) {
+                    ContactStatus.values().forEach { st ->
                         DropdownMenuItem(
-                            text = { Text(imp.label(ctxLabel)) },
-                            trailingIcon = if (imp == contact.importanceLevel) {
+                            text = { Text(st.label(ctxLabel)) },
+                            trailingIcon = if (st == contact.contactStatus) {
                                 { Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand) }
                             } else null,
                             onClick = {
-                                showImportanceMenu = false
-                                AppStateStore.updateContact(contact.copy(importanceLevel = imp, updatedAt = nowIso()))
+                                showStatusMenu = false
+                                AppStateStore.updateContact(contact.copy(contactStatus = st, updatedAt = nowIso()))
                             }
                         )
                     }
                 }
             }
             Column(Modifier.weight(1f)) {
-                // SelectionContainer: имя можно выделить долгим тапом и скопировать
-                androidx.compose.foundation.text.selection.SelectionContainer {
-                    Text(name, color = AppleTheme.colors.label,
-                        fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
-                        fontSize = 21.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.01).em,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                com.aistudio.socialsphere.crmlxb.ui.components.CopyableText(name, color = AppleTheme.colors.label,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontSize = 21.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.01).em,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle.isNotEmpty())
                     Text(subtitle, color = AppleTheme.colors.secondaryLabel, fontSize = 12.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -1175,9 +1183,11 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
         // уровень связи слит в статус; добавлена соц.роль; ритм «не отслеживается»
         // не показывается (шум) — правится через ритм-чип, когда задан, или форму.
         Spacer(Modifier.height(11.dp))
+        var showRelTypesSheet by remember { mutableStateOf(false) }
         androidx.compose.foundation.layout.FlowRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             EditableChip(
                 current = contact.customRelationshipType?.takeIf { it.isNotBlank() }
@@ -1188,77 +1198,134 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                 // Выбор стандартного типа очищает свой (кастомный задаётся в форме)
                 AppStateStore.updateContact(contact.copy(relationshipType = it, customRelationshipType = null, updatedAt = nowIso()))
             } }
+            // Второстепенные типы отношений (решение владельца 2026-07-23): главный
+            // тип — обычный чип выше, второстепенные — скромнее (тот же container,
+            // но alpha 0.06f вместо 0.10f, без своей заливки текста), чтобы не
+            // «заспамить» карточку. Тап по любому из них или по «+» открывает общий
+            // мультивыбор.
+            contact.secondaryRelationshipTypes.forEach { rt ->
+                Text(
+                    rt.label(ctxLabel), fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                    color = AppleTheme.colors.brand.copy(alpha = 0.7f),
+                    modifier = Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Full)
+                        .background(AppleTheme.colors.brand.copy(alpha = 0.06f))
+                        .clickable { showRelTypesSheet = true }
+                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                )
+            }
+            Icon(
+                Icons.Default.Add, contentDescription = stringResource(R.string.cd_secondary_rel_types_add),
+                tint = AppleTheme.colors.tertiaryLabel,
+                modifier = Modifier.size(22.dp).clip(CircleShape)
+                    .background(AppleTheme.colors.fill)
+                    .clickable { showRelTypesSheet = true }
+                    .padding(3.dp)
+            )
             // Чип «статус» ВОЗВРАЩЁН (2026-07-03, владелец передумал после удаления
             // 2026-07-02): «Поддерживать» — важная пометка «с кем нужно общаться».
+            // ФИКС (2026-07-18): свой оттенок — раньше совпадал с нейтральным
+            // fill чипа «ритм» и был визуально неотличим от него.
+            // ФИКС (2026-07-31): тот оттенок был Color(0xFF2A5DB0) — побайтово
+            // совпадал с AccentColor.SAPPHIRE, из-за чего на сапфировом акценте
+            // чип сливался с брендовыми элементами. AppleTheme.colors.statusAccent —
+            // отдельный тил-токен вне палитры всех 4 акцентов (см. AppleDesignSystem.kt).
             EditableChip(
                 current = contact.contactStatus.label(ctxLabel),
                 options = ContactStatus.values().map { it.label(ctxLabel) },
-                container = AppleTheme.colors.fill, labelColor = AppleTheme.colors.secondaryLabel
+                container = AppleTheme.colors.statusAccent.copy(alpha = 0.12f), labelColor = AppleTheme.colors.statusAccent
             ) { picked -> ContactStatus.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(contactStatus = it, updatedAt = nowIso())) } }
             EditableChip(
                 current = contact.socialRole.label(ctxLabel),
                 options = SocialRole.values().map { it.label(ctxLabel) },
                 container = AppleTheme.colors.orange.copy(alpha = 0.12f), labelColor = AppleTheme.colors.orange
             ) { picked -> SocialRole.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(socialRole = it, updatedAt = nowIso())) } }
+            // ФИКС (2026-07-23, владелец): раньше CUSTOM был исключён из этого
+            // быстрого чипа — некуда было ввести число дней, и оно терялось.
+            // Теперь выбор «Custom» (в т.ч. повторный тап по уже-Custom, чтобы
+            // поменять число) открывает мини-шторку CustomRhythmDaysDialog;
+            // чип показывает «Custom · N дней», как только число задано.
+            var showCustomRhythmDialog by remember { mutableStateOf(false) }
             if (contact.communicationRhythm != CommunicationRhythm.NOT_TRACKED) {
+                val customDays = contact.customRhythmDays
+                val chipLabel = if (contact.communicationRhythm == CommunicationRhythm.CUSTOM && customDays != null && customDays > 0)
+                    stringResource(R.string.cd_rhythm_custom_days, customDays)
+                else contact.communicationRhythm.label(ctxLabel)
                 EditableChip(
                     current = contact.communicationRhythm.label(ctxLabel),
-                    options = CommunicationRhythm.values().filter { it != CommunicationRhythm.CUSTOM }.map { it.label(ctxLabel) },
+                    displayLabel = chipLabel,
+                    options = CommunicationRhythm.values().map { it.label(ctxLabel) },
                     container = AppleTheme.colors.fill, labelColor = AppleTheme.colors.label
-                ) { picked -> CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == picked }?.let { AppStateStore.updateContact(contact.copy(communicationRhythm = it, updatedAt = nowIso())) } }
-            }
-        }
-
-        // Теги (сохранены)
-        if (contact.tags.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            androidx.compose.foundation.layout.FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                contact.tags.forEach { tag ->
-                    Text(tag, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(AppleTheme.colors.fill).padding(horizontal = 9.dp, vertical = 3.dp))
+                ) { picked ->
+                    CommunicationRhythm.values().firstOrNull { it.label(ctxLabel) == picked }?.let { rhythm ->
+                        if (rhythm == CommunicationRhythm.CUSTOM) showCustomRhythmDialog = true
+                        else AppStateStore.updateContact(contact.copy(communicationRhythm = rhythm, updatedAt = nowIso()))
+                    }
                 }
             }
+            if (showCustomRhythmDialog) {
+                CustomRhythmDaysDialog(
+                    initialDays = contact.customRhythmDays,
+                    onDismiss = { showCustomRhythmDialog = false },
+                    onConfirm = { days ->
+                        AppStateStore.updateContact(contact.copy(communicationRhythm = CommunicationRhythm.CUSTOM, customRhythmDays = days, updatedAt = nowIso()))
+                        showCustomRhythmDialog = false
+                    }
+                )
+            }
+        }
+        if (showRelTypesSheet) {
+            SecondaryRelationshipTypesSheet(
+                contact = contact,
+                ctxLabel = ctxLabel,
+                onDismiss = { showRelTypesSheet = false }
+            )
         }
 
-        // Контекст-пилюли (сохранены)
-        val hasCtx = daysSince != null || !contact.nextStep.isNullOrBlank() || nearestDate != null
-        if (hasCtx) {
+        // Теги, «следующий шаг» и «ближайшее событие» убраны из шапки (решение
+        // владельца 2026-07-23) — все три уже дублируются во вкладке «Обзор»
+        // (OverviewTab.kt: секции тегов, next step, upcomingItems). daysSince —
+        // единственная чисто-шапочная пилюля, нигде на Обзоре не дублируется,
+        // остаётся.
+        if (daysSince != null) {
             Spacer(Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (daysSince != null) {
-                    val lateColor = when { daysSince > 60 -> AppleTheme.colors.red; daysSince > 30 -> AppleTheme.colors.orange; else -> AppleTheme.colors.green }
-                    val lbl = when { daysSince == 0L -> stringResource(R.string.cd_last_today); daysSince == 1L -> stringResource(R.string.cd_last_yesterday); else -> stringResource(R.string.cd_last_days_ago, daysSince) }
-                    ContextPill(lbl, lateColor, lateColor.copy(alpha = 0.12f))
-                }
-                if (!contact.nextStep.isNullOrBlank()) {
-                    ContextPill("→ " + contact.nextStep, AppleTheme.colors.brand, AppleTheme.colors.brand.copy(alpha = 0.10f), modifier = Modifier.weight(1f), ellipsize = true)
-                }
-                if (nearestDate != null) {
-                    ContextPill(com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(nearestDate.title, nearestDate.type, ctxLabel) + " · " + nearestDate.startDate, AppleTheme.colors.orange, AppleTheme.colors.orange.copy(alpha = 0.12f))
-                }
+                val lateColor = when { daysSince > 60 -> AppleTheme.colors.red; daysSince > 30 -> AppleTheme.colors.orange; else -> AppleTheme.colors.green }
+                val lbl = when { daysSince == 0L -> stringResource(R.string.cd_last_today); daysSince == 1L -> stringResource(R.string.cd_last_yesterday); else -> stringResource(R.string.cd_last_days_ago, daysSince) }
+                ContextPill(lbl, lateColor, lateColor.copy(alpha = 0.12f))
             }
         }
 
         // Быстрые действия — круглые кнопки по макету (звонок залит брендом,
         // шпаргалка — золотом, остальные — карточка с тонкой обводкой). Функции сохранены.
         Spacer(Modifier.height(16.dp))
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            QuickCircle(Icons.Outlined.Phone, stringResource(R.string.cd_call), filled = true) {
+        // ФИКС (2026-07-11, повторная живая проверка — фиксированная 54dp/60dp
+        // колонка ВСЕГДА была компромиссом между обрезанием на широких экранах и
+        // переполнением на узких, и обрезание («Шпаргалк…») продолжало
+        // воспроизводиться на реальном устройстве. weight(1f) вместо фикс. ширины —
+        // каждая кнопка получает свою долю ПОЛНОЙ ширины экрана, а не жёстко
+        // заданные dp: на любом реальном телефоне (даже 360dp) это ощутимо больше
+        // 54dp на кнопку, и слово перестаёт упираться в границу колонки.
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+            QuickCircle(Icons.Outlined.Phone, stringResource(R.string.cd_call), filled = contact.phones.isNotEmpty()) {
                 val phone = contact.phones.find { it.isPrimary }?.number ?: contact.phones.firstOrNull()?.number
                 com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(context, phone)
+                // Отмечаем «связались» только если номер реально был — иначе
+                // тап по кнопке без телефона (просто тост «не указан») лживо
+                // сбрасывал бы «Нужно связаться».
+                if (!phone.isNullOrBlank()) AppStateStore.markContactedNow(contact.id)
             }
             QuickCircle(Icons.Outlined.ChatBubbleOutline, stringResource(R.string.cd_write)) {
                 val m = contact.messengers.find { it.isPrimary } ?: contact.messengers.firstOrNull()
+                val smsPhone = contact.phones.firstOrNull()?.number
                 if (m != null) com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(context, m)
-                else com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(context, contact.phones.firstOrNull()?.number)
+                else com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(context, smsPhone)
+                if (m != null || !smsPhone.isNullOrBlank()) AppStateStore.markContactedNow(contact.id)
             }
             QuickCircle(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) {
                 val email = contact.emails.find { it.isPrimary }?.email ?: contact.emails.firstOrNull()?.email
                 com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(context, email)
+                if (!email.isNullOrBlank()) AppStateStore.markContactedNow(contact.id)
             }
             if (address != null) QuickCircle(Icons.Outlined.Map, stringResource(R.string.cd_map)) {
                 if (address.latitude != null && address.longitude != null)
@@ -1273,9 +1340,58 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
 }
 
 
+/**
+ * Мультивыбор второстепенных типов отношений (решение владельца 2026-07-23).
+ * Главный тип (contact.relationshipType) отмечен золотом и не снимается здесь
+ * (его меняют через основной чип в шапке) — тап по нему в шторке игнорируется.
+ * Остальные отмеченные сохраняются как secondaryRelationshipTypes.
+ */
+@Composable
+private fun SecondaryRelationshipTypesSheet(
+    contact: Contact,
+    ctxLabel: android.content.Context,
+    onDismiss: () -> Unit
+) {
+    fun nowIso() = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = onDismiss) {
+        Text(
+            stringResource(R.string.cd_secondary_rel_types_title),
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        Text(
+            stringResource(R.string.cd_secondary_rel_types_hint),
+            fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel,
+            modifier = Modifier.padding(bottom = 14.dp)
+        )
+        androidx.compose.foundation.layout.FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            RelationshipType.values().forEach { rt ->
+                val isMain = rt == contact.relationshipType
+                val isSecondary = rt in contact.secondaryRelationshipTypes
+                MultiSelectChip(
+                    label = rt.label(ctxLabel) + if (isMain) " ★" else "",
+                    selected = isMain || isSecondary,
+                    gold = isMain
+                ) {
+                    if (!isMain) {
+                        val next = if (isSecondary) contact.secondaryRelationshipTypes - rt else contact.secondaryRelationshipTypes + rt
+                        AppStateStore.updateContact(contact.copy(secondaryRelationshipTypes = next, updatedAt = nowIso()))
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
 /** Круглая быстрая кнопка карточки контакта (38dp) с подписью 9sp — по макету. */
 @Composable
-private fun QuickCircle(
+private fun RowScope.QuickCircle(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     filled: Boolean = false,
@@ -1284,7 +1400,9 @@ private fun QuickCircle(
 ) {
     val gold9A = AppleTheme.colors.orange
     Column(
-        modifier = Modifier.width(52.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).clickable { onClick() },
+        // weight(1f) вместо фикс. dp (см. фикс у места вызова) — колонка получает
+        // равную долю полной ширины Row, а не жёстко заданный размер.
+        modifier = Modifier.weight(1f).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
@@ -1311,8 +1429,18 @@ private fun QuickCircle(
             )
         }
         Text(
+            // ФИКС (аудит локализации 2026-07-11): en "Cheat sheet" (11 симв., 2 слова)
+            // не влезал в 1 строку 52.dp колонки и обрезался («Cheat sh…»).
+            // ФИКС (2026-07-11, живой тест владельца): "Шпаргалка"/"Σκονάκι" — ОДНО
+            // слово без пробела, переносить некуда — при обычном fontScale впритык
+            // укладывалось в 2 строки, но lineHeight=10sp при fontSize=9sp даёт
+            // межстрочный интервал теснее самого шрифта (соотношение 1.11, а не
+            // принятые ~1.2+) — при увеличенном accessibility-fontScale не хватало
+            // высоты и текст резался Ellipsis. Расширил колонку 52→60dp и дал
+            // lineHeight подрасти относительно fontSize.
             label, color = if (gold) gold9A else AppleTheme.colors.secondaryLabel,
-            fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 2,
+            lineHeight = 11.sp, textAlign = TextAlign.Center,
             overflow = TextOverflow.Ellipsis
         )
     }
@@ -1444,13 +1572,17 @@ private fun EditableChip(
     options: List<String>,
     container: androidx.compose.ui.graphics.Color? = null,
     labelColor: androidx.compose.ui.graphics.Color? = null,
+    // Текст НА чипе, если должен отличаться от current (ключа выбора в
+    // выпадающем списке) — например, ритм CUSTOM показывает «Custom · N дней»
+    // на чипе, но в списке всё равно должен подсвечиваться как «Custom».
+    displayLabel: String = current,
     onPick: (String) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
         AssistChip(
             onClick = { open = true },
-            label = { Text(current, fontSize = 10.sp) },
+            label = { Text(displayLabel, fontSize = 10.sp) },
             colors = if (container != null)
                 androidx.compose.material3.AssistChipDefaults.assistChipColors(containerColor = container, labelColor = labelColor ?: AppleTheme.colors.label, trailingIconContentColor = labelColor ?: AppleTheme.colors.label)
             else androidx.compose.material3.AssistChipDefaults.assistChipColors()
@@ -1469,6 +1601,38 @@ private fun EditableChip(
                 )
             }
         }
+    }
+}
+
+/**
+ * Мини-шторка «раз в сколько дней» для ритма CUSTOM — открывается прямо из
+ * быстрого чипа в шапке карточки (2026-07-23, фидбэк владельца: раньше CUSTOM
+ * нельзя было ни выбрать, ни настроить, не открывая полную форму редактирования).
+ */
+@Composable
+private fun CustomRhythmDaysDialog(
+    initialDays: Int?,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit,
+) {
+    var daysText by remember { mutableStateOf(initialDays?.takeIf { it > 0 }?.toString() ?: "") }
+    val days = daysText.trim().toIntOrNull()
+    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+        title = stringResource(R.string.ce_custom_rhythm_days),
+        onDismiss = onDismiss,
+        confirmText = stringResource(R.string.common_save),
+        confirmEnabled = days != null && days > 0,
+        onConfirm = { days?.let(onConfirm) },
+        secondaryText = stringResource(R.string.common_cancel),
+        onSecondary = onDismiss
+    ) {
+        OutlinedTextField(
+            value = daysText,
+            onValueChange = { daysText = it.filter { c -> c.isDigit() } },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+            placeholder = { Text(stringResource(R.string.ce_custom_rhythm_days_hint)) },
+            modifier = Modifier.fillMaxWidth(), singleLine = true
+        )
     }
 }
 

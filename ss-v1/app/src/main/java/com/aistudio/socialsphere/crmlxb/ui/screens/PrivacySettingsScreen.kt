@@ -32,7 +32,11 @@ import com.aistudio.socialsphere.crmlxb.utils.findActivity
 fun PrivacySettingsScreen(
     onNavigateBack: () -> Unit
 ) {
-    val context = LocalContext.current
+    // ФИКС (2026-07-11, тот же баг, что в ContactDetailScreen): LocalContext.current
+    // здесь — createConfigurationContext из LocalizedApp, findActivity() из него
+    // до Activity не доходит. LocalView.current.context — настоящий контекст
+    // ComposeView, LocalizedApp его не подменяет.
+    val context = androidx.compose.ui.platform.LocalView.current.context
     val activity = context.findActivity()
     var showWipeConfirm by remember { mutableStateOf(false) }
     var wipeDone        by remember { mutableStateOf(false) }
@@ -302,47 +306,35 @@ fun PrivacySettingsScreen(
     }
 
     if (showRemovePinConfirm) {
-        AlertDialog(
-            onDismissRequest = { showRemovePinConfirm = false },
-            title = { Text(stringResource(R.string.lock_remove_pin_q), fontWeight = FontWeight.Bold) },
-            text = { Text(stringResource(R.string.lock_remove_pin_warning)) },
-            confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red),
-                    onClick = {
-                        showRemovePinConfirm = false
-                        AppSettings.clearPin()
-                        hasPin = false
-                        // Без PIN и без биометрии блокировка приложения заперла
-                        // бы владельца без способа разблокировки — выключаем.
-                        if (!bioAvailable) appLockEnabled = false
-                    }
-                ) { Text(stringResource(R.string.lock_pin_remove)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRemovePinConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { showRemovePinConfirm = false },
+            title = stringResource(R.string.lock_remove_pin_q),
+            text = stringResource(R.string.lock_remove_pin_warning),
+            confirmText = stringResource(R.string.lock_pin_remove),
+            destructive = true,
+            onConfirm = {
+                showRemovePinConfirm = false
+                AppSettings.clearPin()
+                hasPin = false
+                // Без PIN и без биометрии блокировка приложения заперла
+                // бы владельца без способа разблокировки — выключаем.
+                if (!bioAvailable) appLockEnabled = false
             }
         )
     }
 
     if (showWipeConfirm) {
-        AlertDialog(
-            onDismissRequest = { showWipeConfirm = false },
-            title = { Text(stringResource(R.string.priv_delete_q), fontWeight = FontWeight.Bold) },
-            text = { Text(stringResource(R.string.priv_delete_warning)) },
-            confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red),
-                    onClick = {
-                        showWipeConfirm = false
-                        // wipeDone = ok: при ошибке БД сообщение «удалено» НЕ
-                        // показываем, чтобы не давать ложного подтверждения.
-                        AppStateStore.wipeAllData { ok -> wipeDone = ok }
-                    }
-                ) { Text(stringResource(R.string.priv_delete_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showWipeConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { showWipeConfirm = false },
+            title = stringResource(R.string.priv_delete_q),
+            text = stringResource(R.string.priv_delete_warning),
+            confirmText = stringResource(R.string.priv_delete_confirm),
+            destructive = true,
+            onConfirm = {
+                showWipeConfirm = false
+                // wipeDone = ok: при ошибке БД сообщение «удалено» НЕ
+                // показываем, чтобы не давать ложного подтверждения.
+                AppStateStore.wipeAllData { ok -> wipeDone = ok }
             }
         )
     }

@@ -369,6 +369,11 @@ fun MessengerType.label(context: android.content.Context): String = when (this) 
     MessengerType.SIGNAL -> context.getString(R.string.lbl_messenger_type_signal)
     MessengerType.VIBER -> context.getString(R.string.lbl_messenger_type_viber)
     MessengerType.MESSENGER -> context.getString(R.string.lbl_messenger_type_messenger)
+    MessengerType.INSTAGRAM -> context.getString(R.string.lbl_messenger_type_instagram)
+    MessengerType.FACEBOOK -> context.getString(R.string.lbl_messenger_type_facebook)
+    MessengerType.VK -> context.getString(R.string.lbl_messenger_type_vk)
+    MessengerType.LINKEDIN -> context.getString(R.string.lbl_messenger_type_linkedin)
+    MessengerType.X -> context.getString(R.string.lbl_messenger_type_x)
     MessengerType.OTHER -> context.getString(R.string.lbl_messenger_type_other)
 }
 
@@ -378,6 +383,11 @@ fun MessengerType.labelKey(): String = when (this) {
     MessengerType.SIGNAL -> "Signal"
     MessengerType.VIBER -> "Viber"
     MessengerType.MESSENGER -> "Messenger"
+    MessengerType.INSTAGRAM -> "Instagram"
+    MessengerType.FACEBOOK -> "Facebook"
+    MessengerType.VK -> "VK"
+    MessengerType.LINKEDIN -> "LinkedIn"
+    MessengerType.X -> "X"
     MessengerType.OTHER -> "Другое"
 }
 

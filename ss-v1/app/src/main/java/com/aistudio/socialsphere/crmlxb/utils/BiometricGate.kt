@@ -46,15 +46,23 @@ object BiometricGate {
      * был точно активен). Раньше был ОДИН вызов с объединённым флагом — если
      * конкретная комбинация не поддерживается на этой прошивке/API, весь
      * переключатель считался недоступным целиком, хотя способ РЕАЛЬНО работал.
-     * Теперь проверяем каждый способ отдельно и берём тот набор, который
-     * реально доступен (или оба) — таким образом один нерабочий комбо-вызов
-     * платформы не блокирует переключатель полностью.
+     * Теперь проверяем каждый способ отдельно.
+     *
+     * ФИКС (2026-07-11, живой тест владельца на реальном устройстве: «включаю —
+     * запрашивает только PIN, биометрия не появляется», не воспроизводилось на
+     * эмуляторе). Причина — предыдущий фикс всё ещё СКЛЕИВАЛ флаги в один вызов
+     * `canAuthenticate(BIOMETRIC or DEVICE_CREDENTIAL)`, когда доступны оба
+     * способа. На части реальных прошивок (особенно с biometric class *Weak*)
+     * системный BiometricPrompt при таком комбинированном флаге сразу уводит
+     * на экран кода устройства, минуя сенсор — задокументированное поведение
+     * AndroidX BiometricPrompt на некоторых OEM-сборках. Теперь при доступной
+     * биометрии передаём ТОЛЬКО BIOMETRIC — код устройства всё равно остаётся
+     * доступен как отдельный путь через `isAvailable`/DEVICE_CREDENTIAL-ветку.
      */
     private fun resolveAuthenticators(context: Context): Int? {
         val bio = canAuth(context, BIOMETRIC)
         val cred = canAuth(context, DEVICE_CREDENTIAL)
         return when {
-            bio && cred -> BIOMETRIC or DEVICE_CREDENTIAL
             bio -> BIOMETRIC
             cred -> DEVICE_CREDENTIAL
             else -> null
@@ -92,6 +100,16 @@ object BiometricGate {
             .setTitle(title)
             .apply { if (!subtitle.isNullOrBlank()) setSubtitle(subtitle) }
             .setAllowedAuthenticators(authenticators)
+            .apply {
+                // Одиночный BIOMETRIC_WEAK (без DEVICE_CREDENTIAL в том же вызове)
+                // ОБЯЗАН иметь кнопку отмены — иначе PromptInfo.Builder.build()
+                // бросает IllegalArgumentException. DEVICE_CREDENTIAL сам
+                // предоставляет системную кнопку отмены — с ним setNegativeButtonText
+                // несовместим (конфликт на уровне API), поэтому только для BIOMETRIC.
+                if (authenticators == BIOMETRIC) {
+                    setNegativeButtonText(activity.getString(android.R.string.cancel))
+                }
+            }
             .build()
         prompt.authenticate(info)
     }

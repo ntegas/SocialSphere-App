@@ -16,6 +16,13 @@
     <!-- Сканер визитки (OCR по фото с камеры) -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <!-- ФИКС (2026-07-11, найдено при живой проверке #81 на реальном устройстве):
+         без этого разрешения BiometricManager.canAuthenticate() считает биометрию
+         недоступной ДАЖЕ при настроенном отпечатке — BiometricGate.isAvailable()
+         молча возвращал false, requestReveal() уходил в свой PIN-фолбэк вместо
+         системного BiometricPrompt. Разрешение normal-protection, подтверждения
+         пользователя не требует. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
         android:allowBackup="false"
@@ -43,6 +50,34 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Входящий приём контакта: кто-то поделился vCard из своих Контактов/
+                 мессенджера/почты — SocialSphere должна появиться в системном
+                 меню «Отправить через...» (2026-07-22). Разные отправители кладут
+                 разный MIME (text/vcard vs text/x-vcard) — регистрируем оба. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/x-vcard" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/vcard" />
+            </intent-filter>
+            <!-- Открытие .vcf-файла напрямую (менеджер файлов/почтовый клиент "Открыть в"). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="text/x-vcard" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="text/vcard" />
+            </intent-filter>
         </activity>
         
         <receiver android:name=".utils.NotificationReceiver" android:exported="false" />
@@ -52,6 +87,18 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Per-app язык (AndroidX AppCompatDelegate) — авто-сохранение/восстановление
+             выбранного языка между запусками без ручного управления Configuration
+             (2026-07-22, заменяет самодельный LocalizedApp/createConfigurationContext). -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -14,14 +14,19 @@ data class ContactEntity(
     val namePrefix: String? = null,
     val nameSuffix: String? = null,
     val phoneticFirstName: String? = null,
+    val phoneticMiddleName: String? = null,
     val phoneticLastName: String? = null,
     val photoUri: String?,
     val relationshipType: String,
     val customRelationshipType: String? = null,
+    // v17: второстепенные типы отношений, comma-joined — тот же паттерн, что tags.
+    @ColumnInfo(defaultValue = "") val secondaryRelationshipTypes: String = "",
     val connectionLevel: String,
     val importanceLevel: String,
     val socialRole: String,
     val communicationRhythm: String,
+    // v17: «раз в N дней» для communicationRhythm == CUSTOM.
+    val customRhythmDays: Int? = null,
     @ColumnInfo(defaultValue = "ACTIVE") val contactStatus: String = "ACTIVE",
     val lastContactDate: String? = null,
     val nextStep: String? = null,
@@ -113,7 +118,8 @@ data class AddressEntity(
     val comment: String?,
     val latitude: Double?,
     val longitude: Double?,
-    val postalCode: String?
+    val postalCode: String?,
+    val district: String? = null
 )
 
 @Entity(tableName = "calendar_items")
@@ -226,5 +232,21 @@ data class ContactGroupEntity(
 data class ContactGroupMemberEntity(
     @PrimaryKey val id: String,
     val groupId: String,
+    val contactId: String
+)
+
+@Entity(tableName = "tags")
+data class TagEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val category: String?,
+    val createdAt: String,
+    val updatedAt: String
+)
+
+@Entity(tableName = "contact_tag_members")
+data class ContactTagMemberEntity(
+    @PrimaryKey val id: String,
+    val tagId: String,
     val contactId: String
 )

@@ -3,11 +3,14 @@ package com.aistudio.socialsphere.crmlxb.ui.screens
 import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -43,10 +46,25 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aistudio.socialsphere.crmlxb.R
+import java.util.concurrent.TimeUnit
 
 // Тёмная палитра камеры-сканера (как в макете Aurelia)
 private val CamBrand = Color(0xFF5FB894)
 private val CamGold  = Color(0xFFD7B468)
+
+// Геометрия окна-рамки визитки — ЕДИНЫЙ источник и для отрисовки (ScanFrameOverlay),
+// и для кропа захваченного bitmap (cropToCardFrame). 85.6×54мм — стандарт ISO 7810 ID-1.
+private const val FRAME_WIDTH_FRACTION = 0.86f
+private const val CARD_ASPECT = 1.586f // 85.6 / 54
+
+/** Прямоугольник окна визитки в пикселях для канваса/bitmap заданного размера. */
+private fun cardFrameRect(width: Float, height: Float): androidx.compose.ui.geometry.Rect {
+    val frameW = width * FRAME_WIDTH_FRACTION
+    val frameH = frameW / CARD_ASPECT
+    val left = (width - frameW) / 2f
+    val top = (height - frameH) / 2f
+    return androidx.compose.ui.geometry.Rect(left, top, left + frameW, top + frameH)
+}
 
 /**
  * Полноэкранный камера-сканер визитки: CameraX-превью + рамка с уголками и
@@ -104,16 +122,23 @@ fun CardCameraScanner(
             }
         } else {
             val imageCapture = remember {
+                // MAXIMIZE_QUALITY (не MINIMIZE_LATENCY) — карточка снимается один раз и не
+                // торопясь, приоритет точности мелкого печатного текста для OCR важнее задержки.
                 ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                     .build()
             }
+            // Сохраняются для фокус-лока перед съёмкой (см. кнопку ниже) — Camera даёт
+            // cameraControl.startFocusAndMetering, PreviewView даёт meteringPointFactory.
+            var boundCamera by remember { mutableStateOf<Camera?>(null) }
+            var boundPreviewView by remember { mutableStateOf<PreviewView?>(null) }
 
             // ── Превью камеры ──
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     val previewView = PreviewView(ctx)
+                    boundPreviewView = previewView
                     val future = ProcessCameraProvider.getInstance(ctx)
                     future.addListener({
                         val provider = future.get()
@@ -122,9 +147,32 @@ fun CardCameraScanner(
                         }
                         try {
                             provider.unbindAll()
-                            provider.bindToLifecycle(
-                                lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture
-                            )
+                            // ФИКС (2026-07-11, критика воркфлоу «билиберда»): раньше Preview
+                            // и ImageCapture биндились без общего ViewPort — то, что видно в
+                            // превью (координаты Compose-канваса рамки-гида), НЕ соответствовало
+                            // пикселям снятого bitmap (разрешение/aspect сенсора камеры). Общий
+                            // ViewPort от previewView заставляет CameraX кропать ImageCapture по
+                            // тому же кадру, что показан в превью (WYSIWYG) — тогда дробная
+                            // геометрия рамки (cardFrameRect) применима напрямую к bitmap.
+                            // viewPort доступен только после layout — previewView.post{} гарантирует.
+                            previewView.post {
+                                val viewPort = previewView.viewPort
+                                try {
+                                    provider.unbindAll()
+                                    boundCamera = if (viewPort != null) {
+                                        val group = UseCaseGroup.Builder()
+                                            .setViewPort(viewPort)
+                                            .addUseCase(preview)
+                                            .addUseCase(imageCapture)
+                                            .build()
+                                        provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group)
+                                    } else {
+                                        provider.bindToLifecycle(
+                                            lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture
+                                        )
+                                    }
+                                } catch (_: Exception) { /* камера занята/недоступна */ }
+                            }
                         } catch (_: Exception) { /* камера занята/недоступна */ }
                     }, ContextCompat.getMainExecutor(ctx))
                     previewView
@@ -155,18 +203,7 @@ fun CardCameraScanner(
                 modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 36.dp)
                     .size(72.dp).clip(CircleShape).background(Color.White)
                     .clickable {
-                        imageCapture.takePicture(
-                            ContextCompat.getMainExecutor(context),
-                            object : ImageCapture.OnImageCapturedCallback() {
-                                override fun onCaptureSuccess(image: ImageProxy) {
-                                    val rotation = image.imageInfo.rotationDegrees
-                                    val bmp = image.toBitmap()
-                                    image.close()
-                                    onCaptured(if (rotation != 0) rotateBitmap(bmp, rotation) else bmp)
-                                }
-                                override fun onError(exc: ImageCaptureException) { /* игнор — пользователь снимет ещё раз */ }
-                            }
-                        )
+                        focusThenCapture(boundCamera, boundPreviewView, imageCapture, context, onCaptured)
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -184,10 +221,11 @@ private fun ScanFrameOverlay() {
     Canvas(Modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        val frameW = w * 0.86f
-        val frameH = frameW / 1.586f            // пропорция визитки 85.6×54 мм
-        val left = (w - frameW) / 2f
-        val top = (h - frameH) / 2f
+        val frame = cardFrameRect(w, h)
+        val frameW = frame.width
+        val frameH = frame.height
+        val left = frame.left
+        val top = frame.top
         val radius = 18.dp.toPx()
 
         // Затемнение вокруг окна (рисуем 4 прямоугольника, окно остаётся прозрачным)
@@ -225,7 +263,72 @@ private fun ScanFrameOverlay() {
     }
 }
 
+/**
+ * Фокус-лок перед съёмкой: наводит автофокус на центр окна визитки (там, где
+ * реально печатный текст) и ждёт его завершения, ТОЛЬКО ПОТОМ вызывает [capturePhoto].
+ * Мелкий печатный текст на визитке легко смазать, если снять на нестабилизированном
+ * фокусе превью — explicit AF перед кадром напрямую повышает точность OCR.
+ * Если камера/превью ещё не готовы (boundCamera/boundPreviewView == null) или AF
+ * не поддерживается — снимаем сразу текущим фокусом, чтобы не блокировать пользователя.
+ */
+private fun focusThenCapture(
+    camera: Camera?,
+    previewView: PreviewView?,
+    imageCapture: ImageCapture,
+    context: android.content.Context,
+    onCaptured: (Bitmap) -> Unit
+) {
+    val cameraControl = camera?.cameraControl
+    if (cameraControl == null || previewView == null || previewView.width <= 0 || previewView.height <= 0) {
+        capturePhoto(imageCapture, context, onCaptured)
+        return
+    }
+    val point = previewView.meteringPointFactory.createPoint(
+        previewView.width / 2f, previewView.height / 2f
+    )
+    val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+        .setAutoCancelDuration(3, TimeUnit.SECONDS)
+        .build()
+    val future = cameraControl.startFocusAndMetering(action)
+    future.addListener(
+        { capturePhoto(imageCapture, context, onCaptured) },
+        ContextCompat.getMainExecutor(context)
+    )
+}
+
+private fun capturePhoto(
+    imageCapture: ImageCapture,
+    context: android.content.Context,
+    onCaptured: (Bitmap) -> Unit
+) {
+    imageCapture.takePicture(
+        ContextCompat.getMainExecutor(context),
+        object : ImageCapture.OnImageCapturedCallback() {
+            override fun onCaptureSuccess(image: ImageProxy) {
+                val rotation = image.imageInfo.rotationDegrees
+                val bmp = image.toBitmap()
+                image.close()
+                val rotated = if (rotation != 0) rotateBitmap(bmp, rotation) else bmp
+                // Кроп по той же дробной геометрии, что рисует ScanFrameOverlay —
+                // валиден благодаря общему ViewPort (см. bindToLifecycle выше).
+                onCaptured(cropToCardFrame(rotated))
+            }
+            override fun onError(exc: ImageCaptureException) { /* игнор — пользователь снимет ещё раз */ }
+        }
+    )
+}
+
 private fun rotateBitmap(src: Bitmap, degrees: Int): Bitmap {
     val m = Matrix().apply { postRotate(degrees.toFloat()) }
     return Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
+}
+
+/** Обрезает bitmap по той же дробной геометрии окна, что рисует ScanFrameOverlay. */
+private fun cropToCardFrame(src: Bitmap): Bitmap {
+    val frame = cardFrameRect(src.width.toFloat(), src.height.toFloat())
+    val left = frame.left.toInt().coerceIn(0, src.width - 1)
+    val top = frame.top.toInt().coerceIn(0, src.height - 1)
+    val w = frame.width.toInt().coerceIn(1, src.width - left)
+    val h = frame.height.toInt().coerceIn(1, src.height - top)
+    return Bitmap.createBitmap(src, left, top, w, h)
 }

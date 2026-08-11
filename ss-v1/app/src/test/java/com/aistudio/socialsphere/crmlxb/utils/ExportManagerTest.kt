@@ -24,6 +24,7 @@ class ExportManagerTest {
         namePrefix = "г-н",
         nameSuffix = "мл.",
         phoneticFirstName = "Ee-VAHN",
+        phoneticMiddleName = "sehr-GEH-eh-vich",
         phoneticLastName = "peh-TROV",
         photoUri = "/data/photos/${id}_123.jpg",
         relationshipType = RelationshipType.FRIEND,
@@ -128,19 +129,33 @@ class ExportManagerTest {
 
     private fun groupMember(id: String = "gm1") = ContactGroupMember(id = id, groupId = "grp1", contactId = "c1")
 
+    // Заметка компании (companyId, БЕЗ contactId) — до фикса §44 (2026-08-11)
+    // такие заметки не имели пути в бэкап вообще (Company не хранит notes
+    // вложенно, top-level поля в BackupData не было).
+    private fun companyNote(id: String = "cn1") = Note(
+        id = id, contactId = null, companyId = "co1", calendarItemId = null, giftId = null,
+        type = NoteType.GENERAL, text = "Годовой контракт продлевается в январе",
+        date = null, isImportant = false,
+        createdAt = "2026-01-01T00:00", updatedAt = "2026-01-01T00:00"
+    )
+
     // ─── Happy path: полный снимок со всеми сущностями и вложенными полями ───
 
     @Test
     fun roundTrip_fullBackup_preservesEveryField() {
         val original = BackupData(
-            version = 4,
+            version = 5,
             exportedAt = "2026-07-04T10:00",
             contacts = listOf(fullContact("c1"), fullContact("c2")),
             companies = listOf(company("co1")),
             calendarItems = listOf(calendarItem("e1")),
             contactRelations = listOf(relation("rel1")),
             groups = listOf(group("grp1")),
-            groupMembers = listOf(groupMember("gm1"))
+            groupMembers = listOf(groupMember("gm1")),
+            // Заметка контакта (уже дублирована внутри fullContact.notes) +
+            // заметка компании — top-level notes это ОТДЕЛЬНЫЙ источник истины
+            // (как AppStateStore.notes), не производный от Contact.notes.
+            notes = listOf(fullContact("c1").notes.single(), companyNote("cn1"))
         )
 
         val json = ExportManager.backupAdapter.toJson(original)
@@ -150,6 +165,57 @@ class ExportManagerTest {
         // Структурное равенство целиком — если бы Moshi/адаптер потерял хоть одно
         // поле (например забыли добавить в data class), assertEquals бы упал.
         assertEquals(original, restored)
+    }
+
+    // ФИКС §44 (2026-08-11): заметки компании (companyId, без contactId) раньше
+    // не имели пути в бэкап вообще — Company не хранит notes вложенно, и
+    // top-level поля notes в BackupData не существовало. Этот тест — прямая
+    // регрессия на находку: заметка компании обязана пережить сериализацию.
+    @Test
+    fun roundTrip_companyOwnedNote_survivesBackup() {
+        val original = BackupData(companies = listOf(company("co1")), notes = listOf(companyNote("cn1")))
+
+        val json = ExportManager.backupAdapter.toJson(original)
+        val restored = ExportManager.parseJsonBackup(json)
+
+        assertEquals(original, restored)
+        val note = restored!!.notes.single()
+        assertNull(note.contactId)
+        assertEquals("co1", note.companyId)
+    }
+
+    // Частичный бэкап (owner: «сохранить/восстановить отдельно заметки/
+    // календарь»): файл с ОДНОЙ заполненной категорией должен round-trip'иться
+    // так же честно, как полный бэкап — это ровно то, что exportNotesJson/
+    // exportCalendarJson производят.
+    @Test
+    fun roundTrip_notesOnlyBackup_otherCategoriesStayEmpty() {
+        val original = BackupData(
+            version = 5, exportedAt = "2026-08-11T10:00",
+            notes = listOf(fullContact("c1").notes.single(), companyNote("cn1"))
+        )
+        val json = ExportManager.backupAdapter.toJson(original)
+        val restored = ExportManager.parseJsonBackup(json)
+
+        assertEquals(original, restored)
+        assertEquals(2, restored!!.notes.size)
+        assertTrue(restored.contacts.isEmpty())
+        assertTrue(restored.calendarItems.isEmpty())
+    }
+
+    @Test
+    fun roundTrip_calendarOnlyBackup_otherCategoriesStayEmpty() {
+        val original = BackupData(
+            version = 5, exportedAt = "2026-08-11T10:00",
+            calendarItems = listOf(calendarItem("e1"))
+        )
+        val json = ExportManager.backupAdapter.toJson(original)
+        val restored = ExportManager.parseJsonBackup(json)
+
+        assertEquals(original, restored)
+        assertEquals(1, restored!!.calendarItems.size)
+        assertTrue(restored.contacts.isEmpty())
+        assertTrue(restored.notes.isEmpty())
     }
 
     @Test

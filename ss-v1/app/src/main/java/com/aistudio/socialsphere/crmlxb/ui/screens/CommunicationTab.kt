@@ -33,6 +33,7 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.R
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
+import com.aistudio.socialsphere.crmlxb.ui.components.CopyableText
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import com.aistudio.socialsphere.crmlxb.model.*
@@ -50,7 +51,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
     item {
         val ctx = androidx.compose.ui.platform.LocalContext.current
         val phones = contact.phones.distinctBy { it.number.filter(Char::isDigit).takeLast(10) }
-        if (phones.isNotEmpty() || contact.emails.isNotEmpty() || contact.messengers.isNotEmpty() || editing) {
+        // ФИКС (2026-07-12, фидбэк владельца): блок и кнопки «+Добавить» видны ВСЕГДА.
+        run {
             CardBlock(title = stringResource(R.string.cd_comm_channels)) {
                 var editPhone by remember { mutableStateOf<ContactPhone?>(null) }
                 var showPhoneDialog by remember { mutableStateOf(false) }
@@ -64,55 +66,71 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                         onClick = { editPhone = phone; showPhoneDialog = true },
                         onRemove = { pendingRemovePhone = phone }
                     ) {
-                        ActionSquare(Icons.Outlined.Phone, stringResource(R.string.cd_call)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(ctx, phone.number) }
-                        ActionSquare(Icons.Default.Sms, stringResource(R.string.cd_write)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(ctx, phone.number) }
+                        // Те же действия, что и кнопки в шапке карточки — там они отмечают
+                        // «связались» через markContactedNow (баг §35: отсюда раньше не отмечали,
+                        // «дней с последнего контакта» не двигалось для тех, кто звонит из этой вкладки).
+                        ActionSquare(Icons.Outlined.Phone, stringResource(R.string.cd_call)) {
+                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openDialer(ctx, phone.number)
+                            AppStateStore.markContactedNow(contact.id)
+                        }
+                        ActionSquare(Icons.Default.Sms, stringResource(R.string.cd_write)) {
+                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openSms(ctx, phone.number)
+                            AppStateStore.markContactedNow(contact.id)
+                        }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
-                if (editing) {
-                    TextButton(onClick = { editPhone = null; showPhoneDialog = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_phone))
-                    }
+                TextButton(onClick = { editPhone = null; showPhoneDialog = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_phone))
                 }
 
                 if (showPhoneDialog) {
                     val base = editPhone
                     var num by remember { mutableStateOf(base?.number ?: "") }
                     var pType by remember { mutableStateOf(base?.type ?: PhoneType.MOBILE) }
+                    var primary by remember { mutableStateOf(base?.isPrimary ?: contact.phones.isEmpty()) }
                     com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
                         title = stringResource(if (base == null) R.string.cd_add_phone else R.string.ce_edit_phone),
                         onDismiss = { showPhoneDialog = false; editPhone = null },
                         confirmText = stringResource(if (base == null) R.string.common_add else R.string.common_save),
                         confirmEnabled = num.isNotBlank(),
                         onConfirm = {
-                            val list = contact.phones.toMutableList()
+                            val newId = base?.id ?: java.util.UUID.randomUUID().toString()
+                            var list = contact.phones.toMutableList()
                             if (base == null) {
-                                list.add(ContactPhone(java.util.UUID.randomUUID().toString(), contact.id, num.trim(), pType, list.isEmpty()))
+                                list.add(ContactPhone(newId, contact.id, num.trim(), pType, primary))
                             } else {
                                 val i = list.indexOfFirst { it.id == base.id }
-                                if (i >= 0) list[i] = base.copy(number = num.trim(), type = pType)
+                                if (i >= 0) list[i] = base.copy(number = num.trim(), type = pType, isPrimary = primary)
                             }
-                            AppStateStore.updateContact(contact.copy(phones = list))
+                            // Главный может быть только один — при выборе этого снимаем
+                            // флаг с остальных. Затем главный поднимается наверх списка
+                            // (фидбэк владельца 2026-07-19: выбрал главным — сразу видно).
+                            if (primary) list = list.map { if (it.id == newId) it else it.copy(isPrimary = false) }.toMutableList()
+                            AppStateStore.updateContact(contact.copy(phones = list.sortedByDescending { it.isPrimary }))
                             showPhoneDialog = false; editPhone = null
                         }
                     ) {
                         OutlinedTextField(value = num, onValueChange = { num = it }, keyboardOptions = PhoneKeyboard, label = { Text(stringResource(R.string.ce_number)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                         DropdownField(stringResource(R.string.ce_type), pType.label(ctxLabel), PhoneType.values().map { it.label(ctxLabel) }) { v -> pType = PhoneType.values().firstOrNull { it.label(ctxLabel) == v } ?: pType }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Switch(checked = primary, onCheckedChange = { primary = it })
+                            Text(stringResource(R.string.ce_make_primary), style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
                 pendingRemovePhone?.let { rp ->
-                    AlertDialog(
-                        onDismissRequest = { pendingRemovePhone = null },
-                        title = { Text(stringResource(R.string.ce_remove_phone_q), fontWeight = FontWeight.Bold) },
-                        text = { Text(rp.number) },
-                        confirmButton = {
-                            Button(onClick = {
-                                AppStateStore.updateContact(contact.copy(phones = contact.phones.filter { it.id != rp.id }))
-                                pendingRemovePhone = null
-                            }) { Text(stringResource(R.string.common_delete)) }
-                        },
-                        dismissButton = { TextButton(onClick = { pendingRemovePhone = null }) { Text(stringResource(R.string.common_cancel)) } }
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+                        onDismiss = { pendingRemovePhone = null },
+                        title = stringResource(R.string.ce_remove_phone_q),
+                        text = rp.number,
+                        confirmText = stringResource(R.string.common_delete),
+                        destructive = true,
+                        onConfirm = {
+                            AppStateStore.updateContact(contact.copy(phones = contact.phones.filter { it.id != rp.id }))
+                            pendingRemovePhone = null
+                        }
                     )
                 }
 
@@ -128,54 +146,61 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                         onClick = { editEmail = email; showEmailDialog = true },
                         onRemove = { pendingRemoveEmail = email }
                     ) {
-                        ActionSquare(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(ctx, email.email) }
+                        ActionSquare(Icons.Outlined.Email, stringResource(R.string.cd_email_action)) {
+                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(ctx, email.email)
+                            AppStateStore.markContactedNow(contact.id)
+                        }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
-                if (editing) {
-                    TextButton(onClick = { editEmail = null; showEmailDialog = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_email))
-                    }
+                TextButton(onClick = { editEmail = null; showEmailDialog = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_email))
                 }
 
                 if (showEmailDialog) {
                     val base = editEmail
                     var addr by remember { mutableStateOf(base?.email ?: "") }
                     var eType by remember { mutableStateOf(base?.type ?: EmailType.PERSONAL) }
+                    var primary by remember { mutableStateOf(base?.isPrimary ?: contact.emails.isEmpty()) }
                     com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
                         title = stringResource(if (base == null) R.string.cd_add_email else R.string.ce_edit_email),
                         onDismiss = { showEmailDialog = false; editEmail = null },
                         confirmText = stringResource(if (base == null) R.string.common_add else R.string.common_save),
                         confirmEnabled = addr.isNotBlank(),
                         onConfirm = {
-                            val list = contact.emails.toMutableList()
+                            val newId = base?.id ?: java.util.UUID.randomUUID().toString()
+                            var list = contact.emails.toMutableList()
                             if (base == null) {
-                                list.add(ContactEmail(java.util.UUID.randomUUID().toString(), contact.id, addr.trim(), eType, list.isEmpty()))
+                                list.add(ContactEmail(newId, contact.id, addr.trim(), eType, primary))
                             } else {
                                 val i = list.indexOfFirst { it.id == base.id }
-                                if (i >= 0) list[i] = base.copy(email = addr.trim(), type = eType)
+                                if (i >= 0) list[i] = base.copy(email = addr.trim(), type = eType, isPrimary = primary)
                             }
-                            AppStateStore.updateContact(contact.copy(emails = list))
+                            if (primary) list = list.map { if (it.id == newId) it else it.copy(isPrimary = false) }.toMutableList()
+                            AppStateStore.updateContact(contact.copy(emails = list.sortedByDescending { it.isPrimary }))
                             showEmailDialog = false; editEmail = null
                         }
                     ) {
                         OutlinedTextField(value = addr, onValueChange = { addr = it }, keyboardOptions = EmailKeyboard, label = { Text(stringResource(R.string.ce_email)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                         DropdownField(stringResource(R.string.ce_type), eType.label(ctxLabel), EmailType.values().map { it.label(ctxLabel) }) { v -> eType = EmailType.values().firstOrNull { it.label(ctxLabel) == v } ?: eType }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Switch(checked = primary, onCheckedChange = { primary = it })
+                            Text(stringResource(R.string.ce_make_primary), style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
                 pendingRemoveEmail?.let { re ->
-                    AlertDialog(
-                        onDismissRequest = { pendingRemoveEmail = null },
-                        title = { Text(stringResource(R.string.ce_remove_email_q), fontWeight = FontWeight.Bold) },
-                        text = { Text(re.email) },
-                        confirmButton = {
-                            Button(onClick = {
-                                AppStateStore.updateContact(contact.copy(emails = contact.emails.filter { it.id != re.id }))
-                                pendingRemoveEmail = null
-                            }) { Text(stringResource(R.string.common_delete)) }
-                        },
-                        dismissButton = { TextButton(onClick = { pendingRemoveEmail = null }) { Text(stringResource(R.string.common_cancel)) } }
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+                        onDismiss = { pendingRemoveEmail = null },
+                        title = stringResource(R.string.ce_remove_email_q),
+                        text = re.email,
+                        confirmText = stringResource(R.string.common_delete),
+                        destructive = true,
+                        onConfirm = {
+                            AppStateStore.updateContact(contact.copy(emails = contact.emails.filter { it.id != re.id }))
+                            pendingRemoveEmail = null
+                        }
                     )
                 }
 
@@ -193,35 +218,44 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                         onClick = { editMsg = m; showMsgDialog = true },
                         onRemove = { pendingRemoveMsg = m }
                     ) {
-                        ActionSquare(Icons.AutoMirrored.Filled.Chat, stringResource(R.string.cd_write)) { com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(ctx, m) }
+                        ActionSquare(Icons.AutoMirrored.Filled.Chat, stringResource(R.string.cd_write)) {
+                            com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openMessenger(ctx, m)
+                            AppStateStore.markContactedNow(contact.id)
+                        }
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
-                if (editing) {
-                    TextButton(onClick = { editMsg = null; showMsgDialog = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_messenger))
-                    }
+                TextButton(onClick = { editMsg = null; showMsgDialog = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_messenger))
                 }
 
                 if (showMsgDialog) {
                     val base = editMsg
                     var uname by remember { mutableStateOf(base?.value ?: "") }
                     var mType by remember { mutableStateOf(base?.type ?: MessengerType.TELEGRAM) }
+                    // ФИКС (2026-07-12): Messenger.link существовал в модели и уже
+                    // использовался в ExternalActionHandler.openMessenger (приоритет
+                    // над сгенерированной по типу ссылкой), но нигде в UI не выставлялся.
+                    var mLink by remember { mutableStateOf(base?.link ?: "") }
+                    var primary by remember { mutableStateOf(base?.isPrimary ?: contact.messengers.isEmpty()) }
                     com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
                         title = stringResource(if (base == null) R.string.cd_add_messenger else R.string.ce_edit_messenger),
                         onDismiss = { showMsgDialog = false; editMsg = null },
                         confirmText = stringResource(if (base == null) R.string.common_add else R.string.common_save),
                         confirmEnabled = uname.isNotBlank(),
                         onConfirm = {
-                            val list = contact.messengers.toMutableList()
+                            val newId = base?.id ?: java.util.UUID.randomUUID().toString()
+                            var list = contact.messengers.toMutableList()
+                            val link = mLink.trim().ifBlank { null }
                             if (base == null) {
-                                list.add(Messenger(id = java.util.UUID.randomUUID().toString(), contactId = contact.id, type = mType, value = uname.trim(), isPrimary = list.isEmpty()))
+                                list.add(Messenger(id = newId, contactId = contact.id, type = mType, value = uname.trim(), link = link, isPrimary = primary))
                             } else {
                                 val i = list.indexOfFirst { it.id == base.id }
-                                if (i >= 0) list[i] = base.copy(type = mType, value = uname.trim())
+                                if (i >= 0) list[i] = base.copy(type = mType, value = uname.trim(), link = link, isPrimary = primary)
                             }
-                            AppStateStore.updateContact(contact.copy(messengers = list))
+                            if (primary) list = list.map { if (it.id == newId) it else it.copy(isPrimary = false) }.toMutableList()
+                            AppStateStore.updateContact(contact.copy(messengers = list.sortedByDescending { it.isPrimary }))
                             showMsgDialog = false; editMsg = null
                         }
                     ) {
@@ -231,20 +265,24 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                             onSelect = { v -> mType = MessengerType.values().firstOrNull { it.label(ctxLabel) == v } ?: mType }
                         )
                         OutlinedTextField(value = uname, onValueChange = { uname = it }, label = { Text(stringResource(R.string.ce_username)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(value = mLink, onValueChange = { mLink = it }, keyboardOptions = UrlKeyboard, label = { Text(stringResource(R.string.ce_messenger_link)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Switch(checked = primary, onCheckedChange = { primary = it })
+                            Text(stringResource(R.string.ce_make_primary), style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
                 pendingRemoveMsg?.let { rm ->
-                    AlertDialog(
-                        onDismissRequest = { pendingRemoveMsg = null },
-                        title = { Text(stringResource(R.string.ce_remove_messenger_q), fontWeight = FontWeight.Bold) },
-                        text = { Text(rm.value) },
-                        confirmButton = {
-                            Button(onClick = {
-                                AppStateStore.updateContact(contact.copy(messengers = contact.messengers.filter { it.id != rm.id }))
-                                pendingRemoveMsg = null
-                            }) { Text(stringResource(R.string.common_delete)) }
-                        },
-                        dismissButton = { TextButton(onClick = { pendingRemoveMsg = null }) { Text(stringResource(R.string.common_cancel)) } }
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+                        onDismiss = { pendingRemoveMsg = null },
+                        title = stringResource(R.string.ce_remove_messenger_q),
+                        text = rm.value,
+                        confirmText = stringResource(R.string.common_delete),
+                        destructive = true,
+                        onConfirm = {
+                            AppStateStore.updateContact(contact.copy(messengers = contact.messengers.filter { it.id != rm.id }))
+                            pendingRemoveMsg = null
+                        }
                     )
                 }
             }
@@ -257,7 +295,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
         val ctx = androidx.compose.ui.platform.LocalContext.current
         val allAddrs = AppStateStore.addresses.filter { it.ownerId == contact.id && it.ownerType == AddressOwnerType.CONTACT }
         val addresses = allAddrs.filter { it.addressType !in workTypes }
-        if (addresses.isNotEmpty() || editing) {
+        // ФИКС (2026-07-12, фидбэк владельца): блок и «+Добавить» видны ВСЕГДА.
+        run {
             CardBlock(title = stringResource(R.string.cd_addresses)) {
                 var editAddr by remember { mutableStateOf<Address?>(null) }
                 var showAddrDialog by remember { mutableStateOf(false) }
@@ -274,8 +313,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                listOf(addr.addressLine, addr.city, addr.postalCode.orEmpty(), addr.country).filter { it.isNotBlank() }.joinToString(", "),
+                            CopyableText(
+                                listOf(addr.addressLine, addr.district.orEmpty(), addr.city, addr.postalCode.orEmpty(), addr.country).filter { it.isNotBlank() }.joinToString(", "),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Text(addr.addressType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
@@ -295,11 +334,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     }
                     HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
                 }
-                if (editing) {
-                    TextButton(onClick = { editAddr = null; showAddrDialog = true }) {
-                        Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.cd_add_address))
-                    }
+                TextButton(onClick = { editAddr = null; showAddrDialog = true }) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.cd_add_address))
                 }
 
                 if (showAddrDialog) {
@@ -325,17 +362,16 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                     )
                 }
                 pendingRemoveAddr?.let { ra ->
-                    AlertDialog(
-                        onDismissRequest = { pendingRemoveAddr = null },
-                        title = { Text(stringResource(R.string.ce_remove_address_q), fontWeight = FontWeight.Bold) },
-                        text = { Text(listOf(ra.addressLine, ra.city).filter { it.isNotBlank() }.joinToString(", ")) },
-                        confirmButton = {
-                            Button(onClick = {
-                                AppStateStore.updateContact(contact.copy(addresses = allAddrs.filter { it.id != ra.id }))
-                                pendingRemoveAddr = null
-                            }) { Text(stringResource(R.string.common_delete)) }
-                        },
-                        dismissButton = { TextButton(onClick = { pendingRemoveAddr = null }) { Text(stringResource(R.string.common_cancel)) } }
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+                        onDismiss = { pendingRemoveAddr = null },
+                        title = stringResource(R.string.ce_remove_address_q),
+                        text = listOf(ra.addressLine, ra.city).filter { it.isNotBlank() }.joinToString(", "),
+                        confirmText = stringResource(R.string.common_delete),
+                        destructive = true,
+                        onConfirm = {
+                            AppStateStore.updateContact(contact.copy(addresses = allAddrs.filter { it.id != ra.id }))
+                            pendingRemoveAddr = null
+                        }
                     )
                 }
             }
@@ -429,10 +465,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                 val newNamePrefix = contact.namePrefix ?: dev.namePrefix.ifBlank { null }
                 val newNameSuffix = contact.nameSuffix ?: dev.nameSuffix.ifBlank { null }
                 val newPhoneticFirst = contact.phoneticFirstName ?: dev.phoneticFirstName.ifBlank { null }
+                val newPhoneticMiddle = contact.phoneticMiddleName ?: dev.phoneticMiddleName.ifBlank { null }
                 val newPhoneticLast = contact.phoneticLastName ?: dev.phoneticLastName.ifBlank { null }
                 val nameFieldsChanged = newNamePrefix != contact.namePrefix ||
                     newNameSuffix != contact.nameSuffix ||
                     newPhoneticFirst != contact.phoneticFirstName ||
+                    newPhoneticMiddle != contact.phoneticMiddleName ||
                     newPhoneticLast != contact.phoneticLastName
                 val hasContactUpdates = newPhones.isNotEmpty() || newEmails.isNotEmpty() || newAddrs.isNotEmpty() || newNote != null || nameFieldsChanged
                 if (hasContactUpdates) {
@@ -444,19 +482,26 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
                         namePrefix = newNamePrefix,
                         nameSuffix = newNameSuffix,
                         phoneticFirstName = newPhoneticFirst,
+                        phoneticMiddleName = newPhoneticMiddle,
                         phoneticLastName = newPhoneticLast,
                         phones     = contact.phones + newPhones,
                         emails     = contact.emails + newEmails,
-                        addresses  = contact.addresses + newAddrs,
-                        notes      = if (newNote != null) contact.notes + Note(
+                        addresses  = contact.addresses + newAddrs
+                    ))
+                    // addNote(), не contact.copy(notes=...) — иначе заметка попадает
+                    // только во встроенный список контакта и не видна во вкладке
+                    // «Заметки», которая читает глобальный AppStateStore.notes
+                    // (тот же баг был найден и починен в ImportScreens.kt).
+                    if (newNote != null) {
+                        AppStateStore.addNote(Note(
                             id = java.util.UUID.randomUUID().toString(),
                             contactId = contact.id,
                             type = NoteType.GENERAL,
                             text = notePrefix + newNote,
                             isImportant = false,
                             createdAt = now, updatedAt = now
-                        ) else contact.notes
-                    ))
+                        ))
+                    }
                 }
                 // Работа/должность — раньше точечная кнопка её игнорировала (фидбэк
                 // 2026-07-04: «работу тоже подтянуть»), теперь та же функция, что
@@ -508,7 +553,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
 
         if (showLink) {
             val filtered = deviceList.filter {
-                "${it.firstName} ${it.lastName}".contains(search, ignoreCase = true)
+                "${it.firstName} ${it.middleName} ${it.lastName}".contains(search, ignoreCase = true)
             }
             com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showLink = false; search = "" }) {
                 Text(
@@ -576,7 +621,7 @@ private fun ChannelRow(
             // Одна строка всегда: раньше капсула «Основной» справа отжимала ширину
             // и длинный номер переносился на 2 строки — теперь признак «основной»
             // живёт в подписи («Мобильный · Основной»), номер получает всю ширину.
-            Text(
+            CopyableText(
                 value,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,

@@ -50,6 +50,19 @@ class MapperTest {
         assertEquals(emptyList<String>(), entity.toDomain().tags)
     }
 
+    // Регрессия (жалоба владельца: «ввёл 3-4 слова в имя — показывает только 2,
+    // и не ищется»). Расследование показало: middleName сохраняется в БД верно
+    // на всех путях (ручной ввод + все 3 импортёра) — данные НЕ теряются на
+    // уровне persistence, теряются только при отображении в списке/гриде
+    // контактов (см. SearchEngineSortTest/ContactImporterTest). Этот тест
+    // закрепляет часть контракта, за которую отвечают Entities.kt/Mappers.kt:
+    // третье слово имени обязано пережить round-trip Entity↔domain.
+    @Test
+    fun contact_roundTrip_preservesMiddleName() {
+        val back = domainContact().copy(middleName = "Иванович").toEntity().toDomain()
+        assertEquals("Иванович", back.middleName)
+    }
+
     @Test
     fun contact_corruptEnumString_fallsBackToDefault() {
         // Имитация битых данных в БД (переименование enum / кривой импорт)

@@ -3,6 +3,7 @@ package com.aistudio.socialsphere.crmlxb.utils
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.data.local.SocialsphereDatabase
 import com.aistudio.socialsphere.crmlxb.model.CommunicationRhythm
 import com.aistudio.socialsphere.crmlxb.ui.screens.AppSettings
@@ -41,7 +42,7 @@ class StaleContactsReceiver : BroadcastReceiver() {
                     contacts.mapNotNull { c ->
                         val rhythm = try { CommunicationRhythm.valueOf(c.communicationRhythm) }
                             catch (e: Exception) { CommunicationRhythm.NOT_TRACKED }
-                        val days = StaleContacts.overdueDays(rhythm, c.lastContactDate)
+                        val days = StaleContacts.overdueDays(rhythm, c.lastContactDate, c.customRhythmDays)
                             ?: return@mapNotNull null
                         Triple(c, days, phoneOf(c.id))
                     }.sortedByDescending { it.second }.take(15).forEach { (c, days, phone) ->
@@ -49,8 +50,8 @@ class StaleContactsReceiver : BroadcastReceiver() {
                         NotificationHelper.showNotification(
                             context = context,
                             notificationId = ("stale_" + c.id).hashCode(),
-                            title = "Пора связаться",
-                            content = "$name — давно не общались ($days дн.)",
+                            title = context.getString(R.string.notif_reach_out_title),
+                            content = context.getString(R.string.notif_reach_out_body, name, days),
                             targetCalendarItemId = null,
                             phone = phone,
                             channelId = NotificationHelper.CHANNEL_REACH_OUT
@@ -76,7 +77,7 @@ class StaleContactsReceiver : BroadcastReceiver() {
                         NotificationHelper.showNotification(
                             context = context,
                             notificationId = ("bday_" + item.id).hashCode(),
-                            title = "Сегодня день рождения",
+                            title = context.getString(R.string.notif_birthday_today_title),
                             content = name,
                             targetCalendarItemId = item.id,
                             phone = contactId?.let { phoneOf(it) },
@@ -96,8 +97,8 @@ class StaleContactsReceiver : BroadcastReceiver() {
                         NotificationHelper.showNotification(
                             context = context,
                             notificationId = "no_next_step_summary".hashCode(),
-                            title = "Без следующего шага",
-                            content = "Контактов без задачи: $count",
+                            title = context.getString(R.string.notif_no_next_step_title),
+                            content = context.getString(R.string.notif_no_next_step_body, count),
                             targetCalendarItemId = null,
                             phone = null,
                             channelId = NotificationHelper.CHANNEL_REACH_OUT

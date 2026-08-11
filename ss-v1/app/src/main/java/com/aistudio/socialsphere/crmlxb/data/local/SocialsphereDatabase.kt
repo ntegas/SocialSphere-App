@@ -25,9 +25,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SizeInfoEntity::class,
         PersonalDetailEntity::class,
         ContactGroupEntity::class,
-        ContactGroupMemberEntity::class
+        ContactGroupMemberEntity::class,
+        TagEntity::class,
+        ContactTagMemberEntity::class
     ],
-    version = 14,
+    version = 18,
     exportSchema = true
 )
 abstract class SocialsphereDatabase : RoomDatabase() {
@@ -207,6 +209,58 @@ abstract class SocialsphereDatabase : RoomDatabase() {
             }
         }
 
+        // v15 (2026-07-11): phoneticMiddleName — паритет с phoneticFirstName/
+        // phoneticLastName (v13). Android StructuredName хранит фонетическую
+        // фамилию/имя/отчество тремя отдельными полями (DATA7/DATA8/DATA9) —
+        // раньше отчество было единственным без фонетической пары.
+        internal val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE contacts ADD COLUMN phoneticMiddleName TEXT")
+            }
+        }
+
+        // v16 (2026-07-13, фидбэк владельца: «при вводе адреса нужен район,
+        // помимо город/страну») — тот же безопасный паттерн, что postalCode
+        // в MIGRATION_4_5: одна необязательная TEXT-колонка, без пересоздания
+        // таблицы, существующие адреса не затрагиваются (NULL по умолчанию).
+        internal val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE addresses ADD COLUMN district TEXT")
+            }
+        }
+
+        // v17 (2026-07-23, решение владельца): 1) secondaryRelationshipTypes —
+        // произвольное число второстепенных типов отношений (comma-joined,
+        // тот же паттерн, что tags), relationshipType остаётся единственным
+        // главным типом; 2) customRhythmDays — «раз в N дней» для
+        // CommunicationRhythm.CUSTOM (раньше значение было в UI недоступно).
+        internal val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE contacts ADD COLUMN secondaryRelationshipTypes TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE contacts ADD COLUMN customRhythmDays INTEGER")
+            }
+        }
+
+        // v18 (2026-07-28): теги контакта — плоский управляемый список (id, name,
+        // category?), связь с контактом многие-ко-многим. Тот же паттерн, что
+        // contact_groups/contact_group_members (MIGRATION_10_11) — только CREATE
+        // TABLE, без ALTER существующих таблиц.
+        internal val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `tags` (" +
+                    "`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT, " +
+                    "`createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, " +
+                    "PRIMARY KEY(`id`))"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `contact_tag_members` (" +
+                    "`id` TEXT NOT NULL, `tagId` TEXT NOT NULL, " +
+                    "`contactId` TEXT NOT NULL, PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): SocialsphereDatabase {
             return INSTANCE ?: synchronized(this) {
                 // ФИКС КРИТИЧНОГО БАГА (2026-07-07, владелец: «теряю данные при
@@ -227,7 +281,7 @@ abstract class SocialsphereDatabase : RoomDatabase() {
                     SocialsphereDatabase::class.java,
                     "socialsphere_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
                 .build()
                 INSTANCE = instance
                 instance

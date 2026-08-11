@@ -130,12 +130,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
     item {
         val ctx = androidx.compose.ui.platform.LocalContext.current
         var showAddDate by remember { mutableStateOf(false) }
-        OutlinedButton(
-            onClick = { showAddDate = true },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-        ) {
-            Icon(Icons.Default.Add, null, Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
+        TextButton(onClick = { showAddDate = true }, modifier = Modifier.padding(bottom = 12.dp)) {
+            Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
             Text(stringResource(R.string.cd_add_important_date))
         }
         if (showAddDate) {
@@ -252,8 +248,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                 ideas.forEachIndexed { i, gift ->
                     GiftRow(
                         gift = gift,
-                        actionLabel = stringResource(R.string.cd_gift_buy),
-                        onAction = { AppStateStore.updateGift(gift.copy(status = GiftStatus.BOUGHT)) },
+                        onStatusChange = { newStatus -> AppStateStore.updateGift(gift.copy(status = newStatus)) },
                         onEdit = { onEditGift(gift) },
                         onDelete = { onDeleteGift(gift) }
                     )
@@ -269,8 +264,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                 bought.forEachIndexed { i, gift ->
                     GiftRow(
                         gift = gift,
-                        actionLabel = stringResource(R.string.cd_gift_give),
-                        onAction = { AppStateStore.updateGift(gift.copy(status = GiftStatus.GIVEN)) },
+                        onStatusChange = { newStatus -> AppStateStore.updateGift(gift.copy(status = newStatus)) },
                         onEdit = { onEditGift(gift) },
                         onDelete = { onDeleteGift(gift) }
                     )
@@ -286,8 +280,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
                 given.forEachIndexed { i, gift ->
                     GiftRow(
                         gift = gift,
-                        actionLabel = null,
-                        onAction = null,
+                        onStatusChange = null,
                         onEdit = { onEditGift(gift) },
                         onDelete = { onDeleteGift(gift) }
                     )
@@ -398,11 +391,15 @@ fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
 @Composable
 private fun GiftRow(
     gift: GiftIdea,
-    actionLabel: String?,
-    onAction: (() -> Unit)?,
+    onStatusChange: ((GiftStatus) -> Unit)?,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val nextStatus = when (gift.status) {
+        GiftStatus.IDEA   -> GiftStatus.BOUGHT
+        GiftStatus.BOUGHT -> GiftStatus.GIVEN
+        GiftStatus.GIVEN  -> GiftStatus.GIVEN
+    }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -426,18 +423,16 @@ private fun GiftRow(
             else if (!gift.date.isNullOrBlank())
                 Text(gift.date, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
         }
-        GiftStatusPill(gift.status)
-        if (actionLabel != null && onAction != null) {
-            TextButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
-                Text(actionLabel, fontSize = 11.sp, color = AppleTheme.colors.brand)
-            }
-        }
+        GiftStatusPill(
+            status = gift.status,
+            onClick = onStatusChange?.let { change -> { change(nextStatus) } }
+        )
         GiftMenu(onEdit = onEdit, onDelete = onDelete)
     }
 }
 
 @Composable
-private fun GiftStatusPill(status: GiftStatus) {
+private fun GiftStatusPill(status: GiftStatus, onClick: (() -> Unit)? = null) {
     val ctx = LocalContext.current
     val (bg, fg) = when (status) {
         GiftStatus.IDEA   -> AureliaTheme.colors.gold.copy(alpha = 0.14f) to AureliaTheme.colors.gold
@@ -447,6 +442,7 @@ private fun GiftStatusPill(status: GiftStatus) {
     Box(
         modifier = Modifier
             .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .background(bg)
             .padding(horizontal = 11.dp, vertical = 4.dp)
     ) {

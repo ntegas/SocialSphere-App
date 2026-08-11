@@ -150,6 +150,25 @@ class ContactImporterTest {
         assertEquals("Кузнецов", c.lastName)
     }
 
+    // Регрессия (жалоба владельца: «ввёл 3-4 слова в имя — показывает только 2»).
+    // FN-фолбэк (без структурированного поля N) обязан разложить 4 слова на
+    // имя + середину (все слова между первым и последним) + фамилию, а не
+    // отбросить лишние слова.
+    @Test
+    fun vcard_fnFallback_fourWords_keepsAllMiddleWords() {
+        val vcf = """
+            BEGIN:VCARD
+            FN:Иван Петрович Сергеевич Кузнецов
+            TEL:+7 902 123-45-67
+            END:VCARD
+        """.trimIndent()
+
+        val c = parseVCard(vcf).single()
+        assertEquals("Иван", c.firstName)
+        assertEquals("Петрович Сергеевич", c.middleName)
+        assertEquals("Кузнецов", c.lastName)
+    }
+
     @Test
     fun vcard_duplicatePhonesByDigits_areDeduped() {
         val vcf = """
@@ -196,5 +215,23 @@ class ContactImporterTest {
         assertNull(normalizeBirthday(""))
         assertNull(normalizeBirthday("not-a-date"))
         assertNull(normalizeBirthday("1990-13-40"))
+    }
+
+    // Некоторые OEM-синки (Xiaomi/Samsung/Huawei и т.п.) пишут Event.START_DATE
+    // не по ISO — раньше такие дни рождения тихо пропускались при импорте
+    // (жалоба владельца: «не все дни рождения проимпортировались»).
+    @Test
+    fun birthday_legacyDotFormat_isParsed() {
+        assertEquals("1990-03-12", normalizeBirthday("12.03.1990"))
+    }
+
+    @Test
+    fun birthday_legacySlashFormat_isParsed() {
+        assertEquals("1990-03-12", normalizeBirthday("12/03/1990"))
+    }
+
+    @Test
+    fun birthday_legacySpaceFormat_isParsed() {
+        assertEquals("1990-03-12", normalizeBirthday("12 03 1990"))
     }
 }

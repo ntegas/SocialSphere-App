@@ -657,13 +657,14 @@ fun CalendarEventItem(
 // Палитра аватаров — общая AureliaAvatars (ui/theme/AureliaComponents.kt).
 
 // Цвет точки фильтр-чипа = цвет типа события (как в макете). «Все» — без точки.
+@Composable
 private fun calFilterDot(f: CalendarEventFilter): Color? = when (f) {
     CalendarEventFilter.ALL       -> null
     CalendarEventFilter.MEETINGS  -> eventTypeColor(CalendarItemType.MEETING)
     CalendarEventFilter.BIRTHDAYS -> eventTypeColor(CalendarItemType.BIRTHDAY)
     CalendarEventFilter.CALLS     -> eventTypeColor(CalendarItemType.CALL)
     CalendarEventFilter.GIFTS     -> eventTypeColor(CalendarItemType.GIFT)
-    CalendarEventFilter.IMPORTANT -> Color(0xFFC45D34)
+    CalendarEventFilter.IMPORTANT -> AppleTheme.colors.importanceHigh
 }
 
 /**

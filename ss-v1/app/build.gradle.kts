@@ -18,14 +18,14 @@ val keystoreProps = Properties().apply {
 
 android {
   namespace = "com.aistudio.socialsphere.crmlxb"
-  compileSdk = 35
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.aistudio.socialsphere.crmlxb"
     minSdk = 24
-    targetSdk = 35
-    versionCode = 1
-    versionName = "1.0.0"
+    targetSdk = 36
+    versionCode = 10
+    versionName = "1.3.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -64,6 +64,15 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+
+  // Ловит хардкоженные строки мимо stringResource()/@string — единственный
+  // способ поймать ВСЕ такие места (не только те, что нашли грепом вручную).
+  // См. правило локализации в SOCIALSPHERE_KNOWLEDGE.md.
+  lint {
+    checkReleaseBuilds = false
+    abortOnError = false
+    error += "HardcodedText"
+  }
 }
 
 // Kotlin 2.0: jvmTarget задаётся только через compilerOptions (старый DSL запрещён правилами)
@@ -98,6 +107,9 @@ dependencies {
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.fragment.ktx) // фикс lintVital: fragment ≥1.3 для ActivityResult
+  // Per-app язык через AppCompatDelegate.setApplicationLocales (2026-07-22) —
+  // заменяет самодельный createConfigurationContext-хак (LocalizedApp).
+  implementation(libs.androidx.appcompat)
   // Камера-сканер визитки (CameraX) + OCR (Tesseract4Android)
   implementation(libs.androidx.camera.camera2)
   implementation(libs.androidx.camera.core)

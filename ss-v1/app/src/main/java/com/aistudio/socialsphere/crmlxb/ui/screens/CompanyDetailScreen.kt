@@ -25,10 +25,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
+import com.aistudio.socialsphere.crmlxb.ui.components.CopyableText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,26 +60,23 @@ fun CompanyDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { showDeleteDialog = false },
             icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
-            title = { Text(stringResource(R.string.compd_delete_q), fontWeight = FontWeight.Bold) },
-            text  = { Text(stringResource(R.string.compd_delete_warning, company.name)) },
-            confirmButton = {
-                Button(
-                    onClick = { showDeleteDialog = false; AppStateStore.deleteCompany(companyId); onNavigateBack() },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red)
-                ) { Text(stringResource(R.string.common_delete)) }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+            title = stringResource(R.string.compd_delete_q),
+            text  = stringResource(R.string.compd_delete_warning, company.name),
+            confirmText = stringResource(R.string.common_delete),
+            destructive = true,
+            onConfirm = { showDeleteDialog = false; AppStateStore.deleteCompany(companyId); onNavigateBack() }
         )
     }
 
-    // Статистика по сотрудникам (для трёх стат-боксов hero)
+    // Статистика по сотрудникам (для стат-бокса hero)
     val relations = AppStateStore.companyRelations.filter { it.companyId == company.id }
     val peopleCount    = relations.size
-    val keyCount       = relations.count { AppStateStore.getContact(it.contactId)?.importanceLevel == ImportanceLevel.KEY }
-    val importantCount = relations.count { AppStateStore.getContact(it.contactId)?.importanceLevel == ImportanceLevel.IMPORTANT }
+    // ImportanceLevel убран из UI ПОЛНОСТЬЮ (2026-07-23, решение владельца) —
+    // стат-боксы «ключевых»/«важных» контактов (были построены на этом поле)
+    // удалены, остаётся только счётчик сотрудников.
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
@@ -104,14 +103,13 @@ fun CompanyDetailScreen(
             // ── Hero: центрированный лого + название + чипы ──
             CompanyHero(company, ctxLabel)
 
-            // ── 3 стат-бокса: сотрудников · ключевых · важных ──
+            // ── Стат-бокс: сотрудников (ImportanceLevel убран из UI 2026-07-23 —
+            //    боксы «ключевых»/«важных» удалены вместе с полем) ──
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 CompanyStat(peopleCount.toString(), stringResource(R.string.compd_stat_people), AppleTheme.colors.label, Modifier.weight(1f))
-                CompanyStat(keyCount.toString(), stringResource(R.string.comp_stat_key), AppleTheme.colors.orange, Modifier.weight(1f))
-                CompanyStat(importantCount.toString(), stringResource(R.string.comp_stat_important), AppleTheme.colors.red, Modifier.weight(1f))
             }
 
             // ── Вкладки: активная — бренд-подчёркивание 2.5dp + волосяная линия ──
@@ -289,11 +287,12 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(
         var selected by remember { mutableStateOf<Contact?>(null) }
         var position by remember { mutableStateOf("") }
 
-        OutlinedButton(onClick = { showAdd = true }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.PersonAdd, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.compd_add_employee))
-        }
+        Text(
+            "+ " + stringResource(R.string.compd_add_employee),
+            fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            color = AppleTheme.colors.brand,
+            modifier = Modifier.clickable { showAdd = true }
+        )
         if (showAdd) {
             // Шаг 1: канонический пикер людей (шторка + поиск + аватары)
             if (selected == null) {
@@ -354,20 +353,65 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(
     } else {
         // Сгруппированная inset-карточка со строками сотрудников (по макету):
         // аватар-градиент + имя + должность/отдел/роль + шеврон → карточка контакта.
-        item {
-            Card(
-                modifier  = Modifier.fillMaxWidth(),
-                shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
-                colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
-                elevation = CardDefaults.cardElevation(1.dp)
-            ) {
-                Column {
-                    relations.forEachIndexed { idx, rel ->
-                        val contact = AppStateStore.getContact(rel.contactId)
-                        if (contact != null) {
-                            CompanyPersonRow(contact, rel) { onNavigateToContact(contact.id) }
-                            if (idx < relations.lastIndex)
-                                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = AppleTheme.colors.separator, thickness = 0.5.dp)
+        // Группировка по department: именованные отделы — по алфавиту, затем
+        // группа «Без отдела» (null/пустой department) — в конце списка.
+        val grouped = relations.groupBy { it.department?.trim()?.takeIf { d -> d.isNotBlank() } }
+        val namedDepartments = grouped.keys.filterNotNull().sorted()
+
+        namedDepartments.forEach { dept ->
+            item {
+                Text(
+                    dept.uppercase(),
+                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel
+                )
+            }
+            item {
+                val groupRelations = grouped.getValue(dept)
+                Card(
+                    modifier  = Modifier.fillMaxWidth(),
+                    shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
+                    colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(1.dp)
+                ) {
+                    Column {
+                        groupRelations.forEachIndexed { idx, rel ->
+                            val contact = AppStateStore.getContact(rel.contactId)
+                            if (contact != null) {
+                                CompanyPersonRow(contact, rel) { onNavigateToContact(contact.id) }
+                                if (idx < groupRelations.lastIndex)
+                                    HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        val noDeptRelations = grouped[null]
+        if (noDeptRelations != null) {
+            item {
+                Text(
+                    stringResource(R.string.company_no_department).uppercase(),
+                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.1.sp, color = AppleTheme.colors.goldLabel
+                )
+            }
+            item {
+                Card(
+                    modifier  = Modifier.fillMaxWidth(),
+                    shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
+                    colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                    elevation = CardDefaults.cardElevation(1.dp)
+                ) {
+                    Column {
+                        noDeptRelations.forEachIndexed { idx, rel ->
+                            val contact = AppStateStore.getContact(rel.contactId)
+                            if (contact != null) {
+                                CompanyPersonRow(contact, rel) { onNavigateToContact(contact.id) }
+                                if (idx < noDeptRelations.lastIndex)
+                                    HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                            }
                         }
                     }
                 }
@@ -462,7 +506,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyContactsTab(
                                 company.website?.let { add(it) }
                             }
                             company.emails.forEachIndexed { idx, em ->
-                                ChannelRow(Icons.Default.Email, em.email, em.type.label(ctxLabel), Color(0xFF5E78C4)) {
+                                ChannelRow(Icons.Default.Email, em.email, em.type.label(ctxLabel), AureliaTheme.colors.gold) {
                                     com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openEmail(context, em.email)
                                 }
                                 val last = idx == company.emails.lastIndex && company.website == null
@@ -528,11 +572,11 @@ private fun ChannelRow(icon: androidx.compose.ui.graphics.vector.ImageVector, va
         horizontalArrangement = Arrangement.spacedBy(11.dp)
     ) {
         Box(
-            Modifier.size(32.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R9).background(tint.copy(alpha = 0.14f)),
+            Modifier.size(38.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R11).background(tint.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center
-        ) { Icon(icon, null, Modifier.size(16.dp), tint = tint) }
+        ) { Icon(icon, null, Modifier.size(18.dp), tint = tint) }
         Column(modifier = Modifier.weight(1f)) {
-            Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            CopyableText(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub.isNotEmpty())
                 Text(sub, fontSize = 11.sp, color = AppleTheme.colors.secondaryLabel)
         }
@@ -593,7 +637,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyAddressesTab(
                     ) { Icon(addrIcon, null, Modifier.size(16.dp), tint = addrTint) }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(address.addressType.label(ctxLabel), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
-                        Text(
+                        CopyableText(
                             "${address.addressLine}, ${address.city}${address.postalCode?.let { " $it" } ?: ""}",
                             fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis
                         )

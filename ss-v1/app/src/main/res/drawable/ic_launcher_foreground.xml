@@ -29,7 +29,7 @@
     <!-- Letter S in center -->
     <path
         android:pathData="M49,47 C49,45 51,44 54,44 C57,44 59,45 59,47 C59,49 57,50 54,51 C51,52 49,53 49,55 C49,57 51,58 54,58 C57,58 59,57 59,55"
-        android:strokeColor="#4F3DC7"
+        android:strokeColor="#1C6B4C"
         android:strokeWidth="2.5"
         android:strokeLineCap="round"
         android:fillColor="@android:color/transparent"/>

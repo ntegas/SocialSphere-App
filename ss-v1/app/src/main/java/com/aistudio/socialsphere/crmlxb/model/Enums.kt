@@ -29,7 +29,12 @@ enum class EmailType {
     PERSONAL, WORK, OTHER
 }
 enum class MessengerType {
-    TELEGRAM, WHATSAPP, VIBER, SIGNAL, MESSENGER, OTHER
+    TELEGRAM, WHATSAPP, VIBER, SIGNAL, MESSENGER,
+    // Соцсети (2026-07-12, фидбэк владельца: «добавить соцсети» — не были
+    // видны как канал связи вообще). Хранится name-строкой в БД, безопасное
+    // добавление значений без миграции — тот же паттерн, что у Industry ниже.
+    INSTAGRAM, FACEBOOK, VK, LINKEDIN, X,
+    OTHER
 }
 enum class Industry {
     // Расширено 2026-07-02 по фидбэку владельца (хранится name-строкой,

@@ -52,6 +52,10 @@ fun ImportExportSettingsScreen(
     var loadingRestore by remember { mutableStateOf(false) }
     var loadingSaveJson by remember { mutableStateOf(false) }
     var loadingCal     by remember { mutableStateOf(false) }
+    var loadingNotesJson    by remember { mutableStateOf(false) }
+    var loadingRestoreNotes by remember { mutableStateOf(false) }
+    var loadingCalJson       by remember { mutableStateOf(false) }
+    var loadingRestoreCal    by remember { mutableStateOf(false) }
 
     // Восстановление из полного JSON-бэкапа: upsert по id, ничего не удаляет.
     // Прямое сохранение JSON-бэкапа в файл: открывается выбор папки и имени,
@@ -96,6 +100,53 @@ fun ImportExportSettingsScreen(
                 snackbarHostState.showSnackbar(context.getString(R.string.ie_error, e.localizedMessage ?: ""))
             } finally {
                 loadingRestore = false
+            }
+        }
+    }
+
+    // Частичное восстановление (аудит 2026-08-11, жалоба владельца «заметки и
+    // календарь постоянно страдают»): те же кнопки-паттерны, что restoreLauncher
+    // выше, но затрагивают только одну категорию, не всю базу разом.
+    val restoreNotesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        loadingRestoreNotes = true
+        scope.launch {
+            try {
+                val json = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader()?.readText() ?: ""
+                }
+                val n = ExportManager.importNotesJson(json)
+                if (n < 0) snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_bad_file))
+                else snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_notes_done, n))
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_error, e.localizedMessage ?: ""))
+            } finally {
+                loadingRestoreNotes = false
+            }
+        }
+    }
+
+    val restoreCalendarLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        loadingRestoreCal = true
+        scope.launch {
+            try {
+                val json = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader()?.readText() ?: ""
+                }
+                val n = ExportManager.importCalendarJson(json)
+                if (n < 0) snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_bad_file))
+                else snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_calendar_done, n))
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_error, e.localizedMessage ?: ""))
+            } finally {
+                loadingRestoreCal = false
             }
         }
     }
@@ -209,7 +260,7 @@ fun ImportExportSettingsScreen(
                     onClick   = {
                         runExport({ loadingVcf = it }) {
                             val file = ExportManager.exportVCard(context)
-                            ExportManager.shareFile(context, file, "text/vcard")
+                            ExportManager.shareFile(context, file, "text/x-vcard")
                         }
                     }
                 )
@@ -224,7 +275,7 @@ fun ImportExportSettingsScreen(
                         runExport({ loadingToPhone = it }) {
                             val file = ExportManager.exportVCard(context)
                             val ok = ExportManager.openVcfInContacts(context, file)
-                            if (!ok) ExportManager.shareFile(context, file, "text/vcard")
+                            if (!ok) ExportManager.shareFile(context, file, "text/x-vcard")
                         }
                     }
                 )
@@ -285,6 +336,51 @@ fun ImportExportSettingsScreen(
                             ExportManager.shareFile(context, file, "application/zip")
                         }
                     }
+                )
+            }
+
+            // ── Частичный бэкап (только заметки / только календарь) ──
+            ExportSectionCard(stringResource(R.string.ie_partial_backup)) {
+                ExportRow(
+                    icon      = Icons.Default.StickyNote2,
+                    text      = stringResource(R.string.ie_notes_json),
+                    subtitle  = stringResource(R.string.ie_notes_json_sub),
+                    loading   = loadingNotesJson,
+                    onClick   = {
+                        runExport({ loadingNotesJson = it }) {
+                            val file = ExportManager.exportNotesJson(context)
+                            ExportManager.shareFile(context, file, "application/json")
+                        }
+                    }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                ExportRow(
+                    icon      = Icons.Default.Restore,
+                    text      = stringResource(R.string.ie_restore_notes),
+                    subtitle  = stringResource(R.string.ie_restore_notes_sub),
+                    loading   = loadingRestoreNotes,
+                    onClick   = { restoreNotesLauncher.launch("*/*") }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                ExportRow(
+                    icon      = Icons.Default.CalendarMonth,
+                    text      = stringResource(R.string.ie_calendar_json),
+                    subtitle  = stringResource(R.string.ie_calendar_json_sub),
+                    loading   = loadingCalJson,
+                    onClick   = {
+                        runExport({ loadingCalJson = it }) {
+                            val file = ExportManager.exportCalendarJson(context)
+                            ExportManager.shareFile(context, file, "application/json")
+                        }
+                    }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                ExportRow(
+                    icon      = Icons.Default.Restore,
+                    text      = stringResource(R.string.ie_restore_calendar),
+                    subtitle  = stringResource(R.string.ie_restore_calendar_sub),
+                    loading   = loadingRestoreCal,
+                    onClick   = { restoreCalendarLauncher.launch("*/*") }
                 )
             }
 

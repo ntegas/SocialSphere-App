@@ -50,18 +50,22 @@ fun CalendarItemDetailScreen(
     var postponeDate       by remember { mutableStateOf("") }
 
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { showDeleteDialog = false },
             icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
-            title = { Text(stringResource(R.string.cid_delete_event_q), fontWeight = FontWeight.Bold) },
-            text  = { Text(stringResource(R.string.cid_delete_warning, event.title)) },
-            confirmButton = {
-                Button(
-                    onClick = { showDeleteDialog = false; AppStateStore.deleteCalendarItem(calendarItemId); onNavigateBack() },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red)
-                ) { Text(stringResource(R.string.common_delete)) }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+            title = stringResource(R.string.cid_delete_event_q),
+            text  = stringResource(R.string.cid_delete_warning, event.title),
+            confirmText = stringResource(R.string.common_delete),
+            destructive = true,
+            onConfirm = {
+                showDeleteDialog = false
+                // Будильники живут независимо от записи в БД — не отменить их
+                // здесь значит получить уведомление по уже удалённому событию.
+                com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+                    .cancelAllRemindersForCalendarItem(ctxLabel, event.reminders)
+                AppStateStore.deleteCalendarItem(calendarItemId)
+                onNavigateBack()
+            }
         )
     }
 
@@ -75,13 +79,15 @@ fun CalendarItemDetailScreen(
             onConfirm = {
                 val now = java.time.LocalDateTime.now()
                     .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                AppStateStore.updateCalendarItem(
-                    event.copy(
-                        startDate = postponeDate,
-                        status    = CalendarItemStatus.POSTPONED,
-                        updatedAt = now
-                    )
+                val rescheduled = event.copy(
+                    startDate = postponeDate,
+                    updatedAt = now
                 )
+                AppStateStore.updateCalendarItem(rescheduled)
+                // Напоминания привязаны к старой дате/времени — без пересчёта
+                // будильник продолжит стрелять по старому расписанию (баг §34).
+                com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+                    .rescheduleReminders(ctxLabel, event.reminders, rescheduled)
                 showPostponeDialog = false
                 postponeDate = ""
             },
@@ -287,6 +293,8 @@ fun CalendarItemDetailScreen(
                         event.type == CalendarItemType.IMPORTANT_DATE
                     if (!isDateType) Button(
                         onClick = {
+                            com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+                                .cancelAllRemindersForCalendarItem(ctxLabel, event.reminders)
                             AppStateStore.markCalendarItemCompleted(event)
                             onNavigateBack()
                         },

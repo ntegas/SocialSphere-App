@@ -59,7 +59,6 @@ fun CompaniesScreen(
     var cityFilter        by remember { mutableStateOf("") }
     var showFilterSheet   by remember { mutableStateOf(false) }
     var sortOrder         by remember { mutableStateOf(CompanySortOrder.NAME_AZ) }
-    var showSortSheet     by remember { mutableStateOf(false) }
 
     val hasActiveFilters = filterIndustries.isNotEmpty() || cityFilter.isNotBlank()
 
@@ -72,38 +71,6 @@ fun CompaniesScreen(
                 cityFilter = cityFilter,
                 sortOrder  = sortOrder
             )
-        }
-    }
-
-    // ── Sort sheet ────────────────────────────────────────────
-    if (showSortSheet) {
-        ModalBottomSheet(onDismissRequest = { showSortSheet = false }, shape = SocialShape.Sheet) {
-            Column(
-                modifier = Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(stringResource(R.string.contacts_sort_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                CompanySortOrder.values().forEach { order ->
-                    val label = when (order) {
-                        CompanySortOrder.NAME_AZ        -> stringResource(R.string.comp_sort_name_az)
-                        CompanySortOrder.NAME_ZA        -> stringResource(R.string.comp_sort_name_za)
-                        CompanySortOrder.MOST_CONTACTS  -> stringResource(R.string.comp_sort_most)
-                        CompanySortOrder.RECENTLY_ADDED -> stringResource(R.string.home_recently_added)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { sortOrder = order; showSortSheet = false }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
-                        if (sortOrder == order) Icon(Icons.Default.Check, null, tint = AppleTheme.colors.brand)
-                    }
-                    if (order != CompanySortOrder.values().last()) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
-                }
-                Spacer(Modifier.height(32.dp))
-            }
         }
     }
 
@@ -121,6 +88,20 @@ fun CompaniesScreen(
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                     Text(stringResource(R.string.contacts_filters), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     TextButton(onClick = { filterIndustries = emptySet(); cityFilter = "" }) { Text(stringResource(R.string.contacts_reset_all)) }
+                }
+
+                // Сортировка (была отдельным рядом чипов над списком — перенесена
+                // сюда, в один узел контролов вместе с фильтрами, по макету Contacts)
+                FilterSection(stringResource(R.string.contacts_sort_title)) {
+                    CompanySortOrder.values().forEach { order ->
+                        val label = when (order) {
+                            CompanySortOrder.NAME_AZ        -> stringResource(R.string.comp_sort_name_az)
+                            CompanySortOrder.NAME_ZA        -> stringResource(R.string.comp_sort_name_za)
+                            CompanySortOrder.MOST_CONTACTS  -> stringResource(R.string.comp_sort_most)
+                            CompanySortOrder.RECENTLY_ADDED -> stringResource(R.string.home_recently_added)
+                        }
+                        MultiSelectChip(label, sortOrder == order) { sortOrder = order }
+                    }
                 }
 
                 // Industry multi-select
@@ -202,9 +183,6 @@ fun CompaniesScreen(
                             if (hasActiveFilters) Badge(containerColor = AppleTheme.colors.red) {}
                         }) { Icon(Icons.Default.FilterList, stringResource(R.string.contacts_filters)) }
                     }
-                    IconButton(onClick = { showSortSheet = true }) {
-                        Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.contacts_sort_title))
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
@@ -235,23 +213,6 @@ fun CompaniesScreen(
                 }
             }
 
-            // Контролы: чипы сортировки + фильтр (как в Contacts — сортировка видна в обычном режиме)
-            Row(
-                Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    CompaniesSortChip(stringResource(R.string.comp_sort_name_az), sortOrder == CompanySortOrder.NAME_AZ) { sortOrder = CompanySortOrder.NAME_AZ }
-                    CompaniesSortChip(stringResource(R.string.comp_sort_name_za), sortOrder == CompanySortOrder.NAME_ZA) { sortOrder = CompanySortOrder.NAME_ZA }
-                    CompaniesSortChip(stringResource(R.string.comp_sort_most), sortOrder == CompanySortOrder.MOST_CONTACTS) { sortOrder = CompanySortOrder.MOST_CONTACTS }
-                    CompaniesSortChip(stringResource(R.string.home_recently_added), sortOrder == CompanySortOrder.RECENTLY_ADDED) { sortOrder = CompanySortOrder.RECENTLY_ADDED }
-                }
-                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.neutralFill).clickable { showFilterSheet = true }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Tune, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
-                    if (hasActiveFilters) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.red))
-                }
-            }
-
             // ── Active filter chips ───────────────────────────
             val chips = buildList {
                 filterIndustries.forEach { add(it.label(ctxLabel) to { filterIndustries = filterIndustries - it }) }
@@ -262,7 +223,7 @@ fun CompaniesScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(chips.size) { idx ->
+                    items(chips.size, key = { chips[it].first }) { idx ->
                         val (label, remove) = chips[idx]
                         InputChip(
                             selected = true, onClick = remove,
@@ -274,7 +235,8 @@ fun CompaniesScreen(
                 }
             }
 
-            // Сегментные чипы по отраслям (по макету)
+            // Сегментные чипы по отраслям (по макету) + один круглый значок фильтра
+            // справа (в нём же теперь живёт сортировка — как в ContactsScreen.kt)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 14.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -286,6 +248,10 @@ fun CompaniesScreen(
                             filterIndustries = if (filterIndustries.contains(ind)) emptySet() else setOf(ind)
                         }
                     }
+                }
+                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.neutralFill).clickable { showFilterSheet = true }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Tune, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                    if (hasActiveFilters) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.red))
                 }
             }
 
@@ -390,22 +356,6 @@ fun CompanyRow(company: Company, onClick: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-// Чип сортировки (прототип: активный — акцент-заливка с белым 700, неактивный —
-// нейтральная заливка + tx2 600)
-@Composable
-private fun CompaniesSortChip(label: String, active: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.height(30.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15)
-            .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.neutralFill)
-            .clickable { onClick() }.padding(horizontal = 13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, fontSize = 13.sp,
-            fontWeight = if (active) FontWeight.W700 else FontWeight.SemiBold,
-            color = if (active) Color.White else AppleTheme.colors.secondaryLabel)
     }
 }
 

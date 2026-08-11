@@ -165,7 +165,11 @@ private fun PinEntryBody(
  */
 @Composable
 fun AppLockScreen(onUnlocked: () -> Unit) {
-    val context = LocalContext.current
+    // ФИКС (2026-07-11, тот же баг, что в ContactDetailScreen): LocalContext.current
+    // здесь — createConfigurationContext из LocalizedApp, findActivity() из него
+    // до Activity не доходит. LocalView.current.context — настоящий контекст
+    // ComposeView, LocalizedApp его не подменяет.
+    val context = androidx.compose.ui.platform.LocalView.current.context
     val activity = context.findActivity()
     val bioAvailable = remember { activity != null && BiometricGate.isAvailable(context) }
     var pin by remember { mutableStateOf("") }
@@ -222,23 +226,17 @@ fun AppLockScreen(onUnlocked: () -> Unit) {
     }
 
     if (showForgotPinConfirm) {
-        AlertDialog(
-            onDismissRequest = { showForgotPinConfirm = false },
-            title = { Text(stringResource(R.string.lock_forgot_pin_q), fontWeight = FontWeight.Bold) },
-            text = { Text(stringResource(R.string.lock_forgot_pin_warning)) },
-            confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.red),
-                    onClick = {
-                        showForgotPinConfirm = false
-                        AppSettings.clearPin()
-                        AppSettings.appLockEnabled.value = false
-                        onUnlocked()
-                    }
-                ) { Text(stringResource(R.string.lock_forgot_pin_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showForgotPinConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { showForgotPinConfirm = false },
+            title = stringResource(R.string.lock_forgot_pin_q),
+            text = stringResource(R.string.lock_forgot_pin_warning),
+            confirmText = stringResource(R.string.lock_forgot_pin_confirm),
+            destructive = true,
+            onConfirm = {
+                showForgotPinConfirm = false
+                AppSettings.clearPin()
+                AppSettings.appLockEnabled.value = false
+                onUnlocked()
             }
         )
     }

@@ -162,15 +162,25 @@ fun AureliaAvatar(
 @Composable
 fun AureliaSheet(
     onDismiss: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit,
-) {
     // ФИКС (фидбэк владельца 2026-07-06): для высокого контента (PIN-клавиатура
     // и т.п.) шторка по умолчанию открывалась в состоянии PartiallyExpanded —
     // нижние ряды/кнопки оказывались обрезаны снизу видимой области, и это
     // выглядело как «шторка не открывается полностью». skipPartiallyExpanded
     // заставляет её сразу разворачиваться на всю доступную высоту.
+    // dismissOnDrag = false — для вызывающего кода со своим скроллящимся
+    // списком внутри шторки (см. AureliaPickerSheet): без этого неаккуратный
+    // drag по списку иногда перехватывается ModalBottomSheet как
+    // drag-to-dismiss выше по дереву жестов, чем список успевает его
+    // получить (тот же баг, что чинили у WheelDateSheet/WheelTimeSheet в
+    // CommonComponents.kt). Bool, а не SheetState/SheetValue в сигнатуре —
+    // чтобы не тащить @OptIn(ExperimentalMaterial3Api) во все места, где
+    // используется AureliaSheet.
+    dismissOnDrag: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
+        skipPartiallyExpanded = true,
+        confirmValueChange = { dismissOnDrag || it != androidx.compose.material3.SheetValue.Hidden }
     )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -255,6 +265,53 @@ fun AureliaFormSheet(
             }
         }
     }
+}
+
+// ── Единый диалог подтверждения (2 кнопки, без полей) ────────────────────────
+// Задача #87: старые точечные androidx.compose.material3.AlertDialog(...) по
+// экрану выбивались из редизайна визуально (дефолтный M3-заголовок вместо
+// Playfair, дефолтная форма/цвета). Комментарий у AureliaFormSheet СОЗНАТЕЛЬНО
+// не пускает подтверждения удаления в форму-шторку (другой жест: "да/нет" —
+// не поле ввода) — этот компонент закрывает именно тот случай тем же каркасом
+// M3 AlertDialog (модальность/фокус/a11y уже верны), но со стилем Aurelia.
+@Composable
+fun AureliaConfirmDialog(
+    onDismiss: () -> Unit,
+    title: String,
+    text: String? = null,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    icon: (@Composable () -> Unit)? = null,
+    destructive: Boolean = false,
+    dismissText: String = androidx.compose.ui.res.stringResource(com.aistudio.socialsphere.crmlxb.R.string.common_cancel),
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = icon,
+        title = {
+            Text(
+                title, fontFamily = AureliaSerif, fontWeight = FontWeight.W700,
+                fontSize = 18.sp, color = AppleTheme.colors.label,
+            )
+        },
+        text = text?.let { { Text(it, color = AppleTheme.colors.secondaryLabel) } },
+        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R18,
+        containerColor = AppleTheme.colors.sheet,
+        confirmButton = {
+            androidx.compose.material3.Button(
+                onClick = onConfirm,
+                shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = if (destructive) AppleTheme.colors.red else AppleTheme.colors.brand
+                )
+            ) { Text(confirmText, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(dismissText, color = AppleTheme.colors.secondaryLabel, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    )
 }
 
 // ── Тап-анимация масштаба (au-press: transform .12s ease; :active scale .96) ─
@@ -475,7 +532,12 @@ fun AureliaPickerSheet(
             it.title.contains(search.value, ignoreCase = true) ||
             it.subtitle?.contains(search.value, ignoreCase = true) == true
         }
-    AureliaSheet(onDismiss = onDismiss) {
+    // dismissOnDrag = false — список ниже (LazyColumn) скроллится внутри самой
+    // драг-поверхности шторки, и без этого неточный тап на нём иногда
+    // закрывает всю шторку вместо скролла. Тап по скриму и «Назад»
+    // по-прежнему дёргают onDismiss напрямую (в обход confirmValueChange),
+    // так что отдельная кнопка «Отмена» не нужна.
+    AureliaSheet(onDismiss = onDismiss, dismissOnDrag = false) {
         Text(
             title,
             fontFamily = AureliaSerif, fontSize = 22.sp, fontWeight = FontWeight.W800,

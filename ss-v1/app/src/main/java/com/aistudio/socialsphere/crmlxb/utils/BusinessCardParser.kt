@@ -1,21 +1,41 @@
 package com.aistudio.socialsphere.crmlxb.utils
 
-/** Результат разбора текста визитки/произвольного текста по полям контакта. */
+import com.aistudio.socialsphere.crmlxb.model.EmailType
+import com.aistudio.socialsphere.crmlxb.model.PhoneType
+
+/** Телефон с распознанным (эвристически) типом — см. [BusinessCardParser]. */
+data class ParsedPhone(val number: String, val type: PhoneType)
+
+/** Email с распознанным (эвристически) типом — см. [BusinessCardParser]. */
+data class ParsedEmail(val email: String, val type: EmailType)
+
+/** Результат разбора текста визитки/произвольного текста по полям контакта.
+ *  Ничего из найденного не отбрасывается: всё, что не попало в структурные
+ *  поля, оседает в [unmatched] — вызывающий код обязан довести это до
+ *  пользователя (заметкой), а не молча выбросить (фидбэк владельца: «должен
+ *  не терять ни фразы»). */
 data class ParsedCard(
     val firstName: String = "",
     val lastName: String = "",
-    val phones: List<String> = emptyList(),
-    val emails: List<String> = emptyList(),
+    val phones: List<ParsedPhone> = emptyList(),
+    val emails: List<ParsedEmail> = emptyList(),
     val website: String? = null,
     val company: String? = null,
-    val position: String? = null
+    val position: String? = null,
+    /** Строки-кандидаты на почтовый адрес — без попытки разложить на
+     *  улицу/город/страну (это ненадёжно распознавать по OCR-тексту). */
+    val addresses: List<String> = emptyList(),
+    /** Непустые строки, которые не были уверенно отнесены ни к одному другому
+     *  полю. Сеть безопасности парсера: ничего увиденное камерой не исчезает
+     *  бесследно, даже если структурный разбор не справился. */
+    val unmatched: List<String> = emptyList()
 )
 
 /**
  * Офлайн-разбор распознанного текста визитки по полям. Движок-независим:
  * получает уже готовый текст (от OCR, голоса, вставки) и раскладывает его
  * эвристиками. Email/телефон/сайт — надёжные регулярки; имя/компания/должность —
- * по структуре и маркерам. Кириллица и латиница поддерживаются.
+ * по структуре и маркерам. Кириллица, латиница и греческий поддерживаются.
  */
 object BusinessCardParser {
 
@@ -32,26 +52,67 @@ object BusinessCardParser {
         RegexOption.IGNORE_CASE
     )
     private val POSITION = Regex(
-        "(директор|менеджер|инженер|разработчик|программист|маркетолог|дизайнер|бухгалтер|юрист|консультант|руководитель|основатель|владелец|специалист|аналитик|CEO|CTO|CFO|COO|founder|manager|engineer|developer|designer|director|head of|lead)",
+        "(директор|менеджер|инженер|разработчик|программист|маркетолог|дизайнер|бухгалтер|юрист|" +
+        "консультант|руководитель|основатель|владелец|специалист|аналитик|администратор|координатор|" +
+        "ассистент|секретарь|президент|заместитель|представитель|CEO|CTO|CFO|COO|VP|founder|manager|" +
+        "engineer|developer|designer|director|president|partner|coordinator|administrator|assistant|" +
+        "representative|officer|head of|lead|διευθυντής|διευθύντρια|πρόεδρος|υπεύθυνος|διαχειριστής|σύμβουλος)",
+        RegexOption.IGNORE_CASE
+    )
+    private val ADDRESS_MARKER = Regex(
+        "(?<![\\p{L}])(ул\\.?|улица|проспект|пр-?кт|переулок|наб\\.?|шоссе|г\\.|город|дом|кв\\.?|офис|" +
+        "индекс|street|st\\.|ave\\.?|avenue|road|rd\\.|suite|floor|bldg|building|blvd|οδός|λεωφ)(?![\\p{L}])",
         RegexOption.IGNORE_CASE
     )
 
-    fun parse(text: String): ParsedCard {
-        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    private val FAX_MARK = Regex("(?<![\\p{L}])(fax|факс)(?![\\p{L}])", RegexOption.IGNORE_CASE)
+    private val MOBILE_MARK = Regex("(?<![\\p{L}])(mob|cell|моб|сот|κιν)", RegexOption.IGNORE_CASE)
+    private val HOME_MARK = Regex("(?<![\\p{L}])(home|дом|οικ)", RegexOption.IGNORE_CASE)
+    private val WORK_MARK = Regex(
+        "(?<![\\p{L}])(work|office|tel|тел|раб|офис|γραφ)",
+        RegexOption.IGNORE_CASE
+    )
 
-        val emails = EMAIL.findAll(text).map { it.value }.distinct().toList()
+    private val PERSONAL_EMAIL_DOMAINS = setOf(
+        "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "me.com",
+        "mail.ru", "yandex.ru", "yandex.com", "bk.ru", "inbox.ru", "list.ru", "rambler.ru",
+        "protonmail.com", "aol.com", "live.com", "gmx.com"
+    )
 
-        val phones = PHONE.findAll(text).map { it.value.trim() }
-            .filter { m -> m.count { it.isDigit() } in 7..15 }
-            .map { it.replace(Regex("[\\s()\\-.]"), "") }
-            .distinct()
+    fun parse(rawText: String): ParsedCard {
+        // ФИКС (2026-07-11, реальный тест владельца): OCR иногда читает значок
+        // конверта перед адресом как пробел сразу после «@» — «name@ gmail.com».
+        // EMAIL-регулярка не допускает пробелов внутри адреса, из-за чего email
+        // целиком пропадал. Схлопываем «@ » → «@» один раз для всего текста —
+        // остальные регулярки (PHONE/URL/LEGAL/POSITION) от пробелов после @ не
+        // зависят, так что это безопасно для них.
+        val text = rawText.replace(Regex("@\\s+"), "@")
+        // Схлопываем внутренние пробелы (не только края) — OCR со сканов
+        // визиток часто даёт двойные/тройные пробелы («Acme  Corp»), из-за
+        // чего company/position, разобранные из этой строки, не совпадали
+        // бы при .trim()+ignoreCase сравнении с той же компанией, введённой
+        // вручную с одинарным пробелом — и плодили дубль Company. Схлопываем
+        // один раз здесь, для всех производных полей сразу, а не только для
+        // company: split(Regex("\\s+")) в имени и так устойчив к этому, так
+        // что для остальных полей это безопасно.
+        val lines = text.lines().map { it.trim().replace(Regex("\\s+"), " ") }.filter { it.isNotEmpty() }
+
+        val emails = EMAIL.findAll(text).map { it.value }.distinct()
+            .map { ParsedEmail(it, emailType(it)) }
+            .toList()
+
+        val phones = PHONE.findAll(text)
+            .filter { m -> m.value.count { it.isDigit() } in 7..15 }
+            .map { m -> m.value.replace(Regex("[\\s()\\-.]"), "") to phoneTypeNear(text, m.range) }
+            .distinctBy { it.first }
+            .map { (number, type) -> ParsedPhone(number, type) }
             .toList()
 
         val website = URL.findAll(text).map { it.value.trimEnd('.', ',', ';') }
-            .firstOrNull { url -> emails.none { it.contains(url, ignoreCase = true) } }
+            .firstOrNull { url -> emails.none { it.email.contains(url, ignoreCase = true) } }
 
-        val company = lines.firstOrNull { LEGAL.containsMatchIn(it) }
-        val position = lines.firstOrNull { POSITION.containsMatchIn(it) }
+        val legalCompany = lines.firstOrNull { LEGAL.containsMatchIn(it) }
+        val keywordPosition = lines.firstOrNull { POSITION.containsMatchIn(it) }
 
         // Имя: первая строка из 2–3 слов без цифр/@, не компания/должность/сайт.
         val nameLine = lines.firstOrNull { line ->
@@ -62,9 +123,50 @@ object BusinessCardParser {
             line.split(Regex("\\s+")).size in 2..3 &&
             (line.firstOrNull()?.isLetter() == true)
         }
+
+        // РАСШИРЕНИЕ: компания без юр.маркера (ООО/LLC/Inc) — раньше молча
+        // пропускалась. Кандидат: первая ещё не занятая строка (не имя, не
+        // должность, не контакт, не адрес), без цифр, из ≤5 слов — низкая
+        // уверенность, но лучше, чем всегда null.
+        val fallbackCompany = legalCompany ?: lines.firstOrNull { line ->
+            line != nameLine && line != keywordPosition &&
+            !EMAIL.containsMatchIn(line) && !PHONE.containsMatchIn(line) &&
+            !URL.containsMatchIn(line) && !POSITION.containsMatchIn(line) &&
+            !ADDRESS_MARKER.containsMatchIn(line) &&
+            line.none { it.isDigit() } &&
+            line.split(Regex("\\s+")).size in 1..5
+        }
+        val company = legalCompany ?: fallbackCompany
+
+        // РАСШИРЕНИЕ: должность без слова из фиксированного списка — строка
+        // сразу после имени (частая раскладка «Имя / Должность / Компания»),
+        // если она не занята компанией/контактами/адресом.
+        val fallbackPosition = if (keywordPosition == null && nameLine != null) {
+            val idx = lines.indexOf(nameLine)
+            lines.getOrNull(idx + 1)?.takeIf { line ->
+                line != company &&
+                !EMAIL.containsMatchIn(line) && !PHONE.containsMatchIn(line) &&
+                !URL.containsMatchIn(line) && !LEGAL.containsMatchIn(line) &&
+                !ADDRESS_MARKER.containsMatchIn(line) &&
+                line.none { it.isDigit() } &&
+                line.split(Regex("\\s+")).size in 1..4
+            }
+        } else null
+        val position = keywordPosition ?: fallbackPosition
+
+        val addresses = lines.filter { ADDRESS_MARKER.containsMatchIn(it) }.distinct()
+
         val parts = nameLine?.split(Regex("\\s+")) ?: emptyList()
         val firstName = parts.getOrNull(0).orEmpty()
         val lastName = parts.drop(1).joinToString(" ")
+
+        // Сеть безопасности: всё, что не ушло ни в одно структурное поле, —
+        // в unmatched, чтобы вызывающий код мог сохранить это заметкой.
+        val unmatched = lines.filter { line ->
+            line != nameLine && line != company && line != position &&
+            !EMAIL.containsMatchIn(line) && !PHONE.containsMatchIn(line) &&
+            !URL.containsMatchIn(line) && !ADDRESS_MARKER.containsMatchIn(line)
+        }
 
         return ParsedCard(
             firstName = firstName,
@@ -73,7 +175,34 @@ object BusinessCardParser {
             emails    = emails,
             website   = website,
             company   = company,
-            position  = position
+            position  = position,
+            addresses = addresses,
+            unmatched = unmatched
         )
+    }
+
+    private fun emailType(email: String): EmailType {
+        val domain = email.substringAfter('@', "").lowercase()
+        return if (domain in PERSONAL_EMAIL_DOMAINS) EmailType.PERSONAL else EmailType.WORK
+    }
+
+    /** Тип телефона по маркеру-подсказке рядом с числом (та же строка, до и
+     *  после совпадения) — «Моб.: +7…», «+1 415… (fax)» и т.п. Без маркера —
+     *  OTHER (честно неизвестно, не выдумываем MOBILE по умолчанию). */
+    private fun phoneTypeNear(text: String, range: IntRange): PhoneType {
+        val lineStart = text.lastIndexOf('\n', (range.first - 1).coerceAtLeast(0))
+            .let { if (it < 0) 0 else it + 1 }
+        val lineEndExclusive = text.indexOf('\n', range.last + 1)
+            .let { if (it < 0) text.length else it }
+        val before = text.substring(lineStart, range.first)
+        val after = text.substring((range.last + 1).coerceAtMost(text.length), lineEndExclusive)
+        val context = "$before $after"
+        return when {
+            FAX_MARK.containsMatchIn(context) -> PhoneType.OTHER
+            MOBILE_MARK.containsMatchIn(context) -> PhoneType.MOBILE
+            HOME_MARK.containsMatchIn(context) -> PhoneType.HOME
+            WORK_MARK.containsMatchIn(context) -> PhoneType.WORK
+            else -> PhoneType.OTHER
+        }
     }
 }

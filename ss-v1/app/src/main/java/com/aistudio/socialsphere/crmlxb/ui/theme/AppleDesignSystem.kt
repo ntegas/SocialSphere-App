@@ -88,6 +88,13 @@ data class AppleColors(
     // ободка аватара, точек в списке, плиток сетки.
     val importanceKey: Color,     // «Ключевой» — яркое золото
     val importanceHigh: Color,    // «Важный» — яркий терракот
+    // Статус контакта (чип ContactStatus + ободок аватара при NEW) — НАМЕРЕННО
+    // вне палитры акцентов (ФИКС 2026-07-31: раньше был хардкод Color(0xFF2A5DB0),
+    // побайтово совпадающий с AccentColor.SAPPHIRE — на сапфировом акценте статус
+    // сливался с брендовыми элементами). Тил/циан — единственная незанятая ветвь
+    // цветового круга среди 4 акцентов (малахит #1C6B4C, сапфир #2A5DB0,
+    // аметист #7E5180, терракот #C45D34).
+    val statusAccent: Color,
     val green: Color,             // = brand (легаси-поле)
     val blue: Color,              // приглушённый зелёный (легаси-поле)
     val pink: Color,              // = red (легаси-поле)
@@ -95,7 +102,6 @@ data class AppleColors(
 )
 
 // --- общие акценты ---
-private val BrandIndigo = Color(0xFF5B53D6)
 private val SystemRed    = Color(0xFFFF3B30)
 private val SystemOrange = Color(0xFFFF9500)
 private val SystemGreen  = Color(0xFF34C759)
@@ -128,6 +134,7 @@ val AppleLightColors = AppleColors(
     goldLabel = Color(0xFF9A7223),         // тёмное золото подписей на светлом
     importanceKey  = Color(0xFFD18A00),    // яркое золото (виднее #B68A36)
     importanceHigh = Color(0xFFD2521F),    // яркий терракот (виднее #C45D34)
+    statusAccent = Color(0xFF1C7A8C),      // тил, вне палитры акцентов
     green  = Color(0xFF1C6B4C),            // малахит
     blue   = Color(0xFF2E6B57),            // приглушённый зелёный
     pink   = Color(0xFFC45D34),
@@ -157,6 +164,7 @@ val AppleDarkColors = AppleColors(
     goldLabel = Color(0xFFD7B468),         // на тёмном — светлое золото
     importanceKey  = Color(0xFFF2C14E),    // яркое золото на тёмном
     importanceHigh = Color(0xFFF08A5C),    // яркий терракот на тёмном
+    statusAccent = Color(0xFF4DB6CB),      // тил, осветлён для тёмного фона
     green  = Color(0xFF5FB894),
     blue   = Color(0xFF7FBDB2),
     pink   = Color(0xFFE0846E),

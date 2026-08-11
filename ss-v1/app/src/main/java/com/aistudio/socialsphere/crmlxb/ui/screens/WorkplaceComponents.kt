@@ -46,7 +46,8 @@ import com.aistudio.socialsphere.crmlxb.utils.label
 @Composable
 fun ProfessionRow(contact: Contact, editing: Boolean) {
     val professionText = contact.profession?.takeIf { it.isNotBlank() }
-    if (professionText == null && !editing) return
+    // ФИКС (2026-07-12, фидбэк владельца): строка видна ВСЕГДА — подсказка
+    // cd_profession_hint уже была готова для пустого состояния.
     var showDialog by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth()
@@ -139,8 +140,7 @@ fun WorkplaceAddFlow(
             confirmEnabled = newCompanyName.isNotBlank(),
             onConfirm = {
                 val clean = newCompanyName.trim()
-                val existing = AppStateStore.companies
-                    .firstOrNull { it.name.equals(clean, ignoreCase = true) }
+                val existing = AppStateStore.findCompanyByName(clean)
                 if (existing != null) {
                     compSelected = existing
                 } else {

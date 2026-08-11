@@ -39,6 +39,8 @@ fun SettingsScreen(
     onNavigateToAppearance: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onNavigateToDuplicates: () -> Unit = {},
+    onNavigateToCompanyDuplicates: () -> Unit = {},
+    onNavigateToContactDisplay: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -89,9 +91,13 @@ fun SettingsScreen(
                 AppleDivider()
                 SettingsRow(AppleTheme.colors.brand, Icons.Default.CalendarMonth, stringResource(R.string.settings_calendar), stringResource(R.string.settings_calendar_sub), "setting_calendar", onNavigateToCalendar)
                 AppleDivider()
+                SettingsRow(Color(0xFF5E8C66), Icons.Default.SortByAlpha, stringResource(R.string.settings_contact_display), stringResource(R.string.settings_contact_display_sub), "setting_contact_display", onNavigateToContactDisplay)
+                AppleDivider()
                 SettingsRow(AppleTheme.colors.orange, Icons.Default.Lock, stringResource(R.string.settings_privacy), stringResource(R.string.settings_privacy_sub), "setting_privacy", onNavigateToPrivacy)
                 AppleDivider()
                 SettingsRow(AppleTheme.colors.red, Icons.Default.Merge, stringResource(R.string.settings_duplicates), stringResource(R.string.settings_duplicates_sub), "setting_duplicates", onNavigateToDuplicates)
+                AppleDivider()
+                SettingsRow(AppleTheme.colors.red, Icons.Default.Domain, stringResource(R.string.settings_duplicates_companies), stringResource(R.string.settings_duplicates_sub), "setting_duplicates_companies", onNavigateToCompanyDuplicates)
             }
 
             Spacer(modifier = Modifier.height(22.dp))

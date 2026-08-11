@@ -48,16 +48,46 @@ object BusinessCardOcr {
         val dataPath = ensureTessData(context)
         val tess = TessBaseAPI()
         try {
-            if (!tess.init(dataPath, LANGS)) return@withContext ""
+            // ВРЕМЕННАЯ ДИАГНОСТИКА (2026-07-27, живая проверка с владельцем на
+            // реальном устройстве) — сохраняет кадр ДО и ПОСЛЕ preprocess() в
+            // externalFilesDir, чтобы вытащить через adb pull и увидеть глазами,
+            // что реально уходит в Tesseract. Убрать после диагностики.
+            saveDebugBitmap(context, bitmap, "01_captured_cropped.png")
+            // ФИКС (2026-07-11, «билиберда» на выходе OCR): движок LSTM инициализировался
+            // с дефолтным PageSegMode 3 (полностью автоматическая сегментация страницы) —
+            // это режим для связного текста-страницы (колонки/абзацы), худший выбор для
+            // визитки, где текст — разрозненные короткие строки по углам. Индустриальный
+            // консенсус для такого layout — PSM_SPARSE_TEXT (11). OEM теперь тоже задаётся
+            // явно третьим параметром init() (API проверен по исходнику Tesseract4Android
+            // 4.9.0, не угадан) — раньше полагались на неявный дефолт библиотеки.
+            if (!tess.init(dataPath, LANGS, TessBaseAPI.OEM_LSTM_ONLY)) return@withContext ""
+            tess.pageSegMode = TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT
             // Предобработка (фидбэк 2026-07-04 «плохо читает»): апскейл мелких
             // кадров + ч/б с усиленным контрастом — заметно поднимает точность
             // Tesseract на визитках при слабом свете/мелком шрифте.
-            tess.setImage(preprocess(bitmap))
-            tess.getUTF8Text().orEmpty().trim()
+            val pre = preprocess(bitmap)
+            saveDebugBitmap(context, pre, "02_preprocessed.png") // ВРЕМЕННО, см. выше
+            tess.setImage(pre)
+            val result = tess.getUTF8Text().orEmpty().trim()
+            android.util.Log.d("BusinessCardOcr", "raw OCR text (${result.length} chars):\n$result") // ВРЕМЕННО
+            result
         } catch (e: Exception) {
+            android.util.Log.e("BusinessCardOcr", "OCR failed", e) // ВРЕМЕННО
             ""
         } finally {
             tess.recycle()
+        }
+    }
+
+    /** ВРЕМЕННО (см. выше) — сохраняет bitmap в externalFilesDir/debug_scan для adb pull. */
+    private fun saveDebugBitmap(context: Context, bitmap: Bitmap, name: String) {
+        try {
+            val dir = File(context.getExternalFilesDir(null), "debug_scan").apply { mkdirs() }
+            File(dir, name).outputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("BusinessCardOcr", "debug save failed", e)
         }
     }
 
