@@ -242,4 +242,36 @@ class BusinessCardParserTest {
         assertTrue("NFD-форма ДОЛЖНА находить position ТАК ЖЕ надёжно (после нормализации внутри parse()), был: ${cardNfd.position}",
             cardNfd.position?.contains("Χειρουργός") == true)
     }
+
+    @Test
+    fun companyNotDuplicatedFromPositionMentioningLegalEntity_realDeviceOcrText() {
+        // Сырой OCR-текст с реальной визитки Logicom/HP (живая проверка,
+        // 2026-08-11, после фикса поворота камеры — текст читается почти
+        // полностью связно). Должность «Head of HP Inc. Personal Systems &
+        // Printing» содержит юр.маркер «Inc» ПРЯМО ВНУТРИ фразы — LEGAL-регулярка
+        // находила совпадение и возвращала ВСЮ строку должности как company,
+        // задваивая её с position, вместо реального «Logicom» чуть выше по тексту.
+        val text = """
+            А
+            es
+            Logicom
+            Konstantinos Kyritsis
+            Head of HP Inc. Personal Systems & Printing
+            Roupaki Area, РО. Box 114,
+            19300 Aspropyrgos, Greece
+            к kyritsis@logicom.net
+            win distribution. logicom.net
+            Т: +30 210 28 83 600 | D: +30 210 28 83 739
+        """.trimIndent()
+
+        val card = BusinessCardParser.parse(text)
+
+        assertEquals("Konstantinos", card.firstName)
+        assertTrue(card.lastName.contains("Kyritsis"))
+        assertTrue("position должен найти «Head of», был: ${card.position}",
+            card.position?.contains("Head of") == true)
+        assertTrue("company НЕ должен дублировать position, был company='${card.company}'",
+            card.company != card.position)
+        assertTrue(card.emails.any { it.email == "kyritsis@logicom.net" })
+    }
 }

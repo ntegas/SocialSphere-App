@@ -145,8 +145,15 @@ object BusinessCardParser {
         val website = URL.findAll(text).map { it.value.trimEnd('.', ',', ';') }
             .firstOrNull { url -> emails.none { it.email.contains(url, ignoreCase = true) } }
 
-        val legalCompany = lines.firstOrNull { LEGAL.containsMatchIn(it) }
         val keywordPosition = lines.firstOrNull { POSITION.containsMatchIn(it) }
+        // ФИКС (2026-08-11, живая визитка Logicom/HP): должность в реальной жизни
+        // иногда упоминает юрлицо работодателя прямо в тексте титула («Head of HP
+        // Inc. Personal Systems & Printing») — LEGAL-регулярка (Inc/LLC/Ltd/…)
+        // находила совпадение ВНУТРИ этой фразы и возвращала её ЦЕЛИКОМ как
+        // company, дублируя ровно то же самое, что уже ушло в position. Исключаем
+        // строку должности из кандидатов на юр.маркер — тот же фильтр, что уже
+        // стоял у fallbackCompany ниже, просто здесь его раньше не было.
+        val legalCompany = lines.firstOrNull { it != keywordPosition && LEGAL.containsMatchIn(it) }
 
         // Имя: из строк-кандидатов (2-4 «слова» ПОСЛЕ вычитания титулов/степеней,
         // без цифр/@, не компания/должность/сайт) берём не ПЕРВУЮ попавшуюся
