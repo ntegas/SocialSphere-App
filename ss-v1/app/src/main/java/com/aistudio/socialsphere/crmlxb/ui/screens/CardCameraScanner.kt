@@ -128,6 +128,33 @@ fun CardCameraScanner(
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                     .build()
             }
+            // ФИКС (2026-08-11, живая проверка на реальном устройстве: одна из визиток
+            // на снятом кадре оказалась развёрнута боком — OCR на повёрнутом тексте
+            // выдал полную кашу, хотя фото само по себе было чётким и не размытым).
+            // targetRotation у ImageCapture проставляется ОДИН РАЗ при создании — по
+            // display.rotation в этот самый момент — и дальше САМ не следит за поворотом
+            // устройства. Экран без screenOrientation-лока в манифесте (Activity держит
+            // orientation в android:configChanges и не пересоздаётся при повороте) — если
+            // визитку удобнее снимать, повернув телефон в альбомную ориентацию (обычное
+            // поведение при кадрировании горизонтального объекта), targetRotation
+            // оставался устаревшим от момента открытия экрана, и итоговый bitmap
+            // разворачивался неверно. Официальный паттерн CameraX — следить за поворотом
+            // через OrientationEventListener и держать targetRotation в синхроне.
+            DisposableEffect(imageCapture) {
+                val orientationListener = object : android.view.OrientationEventListener(context) {
+                    override fun onOrientationChanged(orientation: Int) {
+                        if (orientation == ORIENTATION_UNKNOWN) return
+                        imageCapture.targetRotation = when (orientation) {
+                            in 45 until 135 -> android.view.Surface.ROTATION_270
+                            in 135 until 225 -> android.view.Surface.ROTATION_180
+                            in 225 until 315 -> android.view.Surface.ROTATION_90
+                            else -> android.view.Surface.ROTATION_0
+                        }
+                    }
+                }
+                orientationListener.enable()
+                onDispose { orientationListener.disable() }
+            }
             // Сохраняются для фокус-лока перед съёмкой (см. кнопку ниже) — Camera даёт
             // cameraControl.startFocusAndMetering, PreviewView даёт meteringPointFactory.
             var boundCamera by remember { mutableStateOf<Camera?>(null) }
