@@ -74,16 +74,51 @@ object BusinessCardOcr {
             // Tesseract на визитках при слабом свете/мелком шрифте.
             val pre = preprocess(bitmap)
             saveDebugBitmap(context, pre, "${stamp}_02_preprocessed.png") // ВРЕМЕННО, см. выше
-            tess.setImage(pre)
-            val result = tess.getUTF8Text().orEmpty().trim()
-            android.util.Log.d("BusinessCardOcr", "[$stamp] raw OCR text (${result.length} chars):\n$result") // ВРЕМЕННО
-            result
+
+            // ФИКС (2026-08-11, живая проверка: владелец прямо снял 2 визитки БОКОМ
+            // относительно кадра — не телефон дёрнулся между открытием камеры и
+            // снимком (это отдельный, уже исправленный класс бага через
+            // OrientationEventListener в CardCameraScanner), а сама визитка легла
+            // в кадр повёрнутой). Метаданные поворота устройства тут ничем не
+            // помогут — телефон был неподвижен и держался правильно, просто
+            // карточка внутри кадра оказалась боком. Tesseract4Android не даёт
+            // отдельного OSD-метода (проверено по исходнику библиотеки) без
+            // отдельной osd.traineddata модели — вместо этого пробуем все 4
+            // поворота предобработанного кадра и берём тот, где meanConfidence()
+            // реально выше: связный текст даёт куда более уверенное распознавание,
+            // чем та же картинка боком. Дороже (до 4 OCR-проходов вместо одного),
+            // но это разовое действие по кнопке, не то, что происходит в реальном
+            // времени — секунды ожидания за рабочий результат вместо гарантированной
+            // билиберды того стоят.
+            var best = ""
+            var bestConfidence = -1
+            var bestDegrees = 0
+            for (degrees in intArrayOf(0, 90, 180, 270)) {
+                val candidate = if (degrees == 0) pre else rotateBitmapDegrees(pre, degrees)
+                tess.setImage(candidate)
+                val text = tess.getUTF8Text().orEmpty().trim()
+                val confidence = tess.meanConfidence()
+                if (confidence > bestConfidence) {
+                    bestConfidence = confidence
+                    best = text
+                    bestDegrees = degrees
+                }
+            }
+            android.util.Log.d("BusinessCardOcr", // ВРЕМЕННО
+                "[$stamp] best rotation=$bestDegrees° confidence=$bestConfidence raw OCR text (${best.length} chars):\n$best")
+            best
         } catch (e: Exception) {
             android.util.Log.e("BusinessCardOcr", "OCR failed", e) // ВРЕМЕННО
             ""
         } finally {
             tess.recycle()
         }
+    }
+
+    /** Поворот bitmap на кратные 90° градусы — для перебора ориентаций в [recognize]. */
+    private fun rotateBitmapDegrees(src: Bitmap, degrees: Int): Bitmap {
+        val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+        return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
     }
 
     /** ВРЕМЕННО (см. выше) — сохраняет bitmap в externalFilesDir/debug_scan для adb pull. */
