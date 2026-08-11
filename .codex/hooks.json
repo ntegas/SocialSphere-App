@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python 'C:\\ss\\.codex\\hooks\\qa_gate.py' post",
+            "timeout": 120,
+            "statusMessage": "qa_check.py (гейт после правки .kt)"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python 'C:\\ss\\.codex\\hooks\\qa_gate.py' stop",
+            "timeout": 120,
+            "statusMessage": "Финальный qa_check.py"
+          }
+        ]
+      }
+    ]
+  }
+}
