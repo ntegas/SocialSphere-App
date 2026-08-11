@@ -215,4 +215,31 @@ class BusinessCardParserTest {
         assertTrue(card.emails.any { it.email == "info@arthroclinic.gr" })
         assertTrue(card.website?.contains("arthroclinic.gr") == true)
     }
+
+    @Test
+    fun positionMatchesRegardlessOfUnicodeNormalizationForm() {
+        // Живая проверка (2026-08-11, тот же владелец, ПОВТОРНОЕ сканирование ТОЙ
+        // ЖЕ визитки): «Ορθοπαιδικός Χειρουργός» иногда находился как position,
+        // иногда — нет, в разных снимках одной и той же карточки. Гипотеза:
+        // Tesseract не всегда отдаёт греческие буквы с ударением (тонос) одной и
+        // той же Unicode-формой — «ό» может прийти как один готовый символ
+        // (NFC, U+03CC) или как «о» + отдельный символ ударения (NFD, U+03BF +
+        // U+0301) — визуально неотличимо, но строковое сравнение/regex их не
+        // считает одинаковыми без нормализации. Тест намеренно строит NFD-форму
+        // (java.text.Normalizer), даже если исходники самого файла хранятся в NFC —
+        // это и воспроизводит то, что реально прилетало от Tesseract через раз.
+        val nfcLine = "Ορθοπαιδικός Χειρουργός"
+        val nfdLine = java.text.Normalizer.normalize(nfcLine, java.text.Normalizer.Form.NFD)
+        // Если исходники теста случайно уже хранят строку в NFD — тест ничего не
+        // докажет; подстраховка, что формы реально разные байтово.
+        assertTrue("NFC и NFD должны отличаться побайтово для теста", nfcLine != nfdLine)
+
+        val cardNfc = BusinessCardParser.parse("Иван Петров\n$nfcLine\nivan@test.gr")
+        val cardNfd = BusinessCardParser.parse("Иван Петров\n$nfdLine\nivan@test.gr")
+
+        assertTrue("NFC-форма должна находить position, был: ${cardNfc.position}",
+            cardNfc.position?.contains("Χειρουργός") == true)
+        assertTrue("NFD-форма ДОЛЖНА находить position ТАК ЖЕ надёжно (после нормализации внутри parse()), был: ${cardNfd.position}",
+            cardNfd.position?.contains("Χειρουργός") == true)
+    }
 }

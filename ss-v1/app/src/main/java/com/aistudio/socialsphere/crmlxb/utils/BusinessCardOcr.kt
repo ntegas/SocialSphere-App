@@ -52,7 +52,14 @@ object BusinessCardOcr {
             // реальном устройстве) — сохраняет кадр ДО и ПОСЛЕ preprocess() в
             // externalFilesDir, чтобы вытащить через adb pull и увидеть глазами,
             // что реально уходит в Tesseract. Убрать после диагностики.
-            saveDebugBitmap(context, bitmap, "01_captured_cropped.png")
+            // ФИКС (2026-08-11): имя файла раньше было фиксированным — каждый
+            // следующий снимок перезатирал предыдущий, и после серии из
+            // нескольких сканирований подряд (как в живой проверке владельца)
+            // посмотреть, что именно было в НЕУДАЧНЫХ кадрах, было уже нельзя —
+            // оставался только самый последний. Таймстемп в имени сохраняет всю
+            // серию снимков одной сессии для сравнения удачных/неудачных кадров.
+            val stamp = System.currentTimeMillis()
+            saveDebugBitmap(context, bitmap, "${stamp}_01_captured_cropped.png")
             // ФИКС (2026-07-11, «билиберда» на выходе OCR): движок LSTM инициализировался
             // с дефолтным PageSegMode 3 (полностью автоматическая сегментация страницы) —
             // это режим для связного текста-страницы (колонки/абзацы), худший выбор для
@@ -66,10 +73,10 @@ object BusinessCardOcr {
             // кадров + ч/б с усиленным контрастом — заметно поднимает точность
             // Tesseract на визитках при слабом свете/мелком шрифте.
             val pre = preprocess(bitmap)
-            saveDebugBitmap(context, pre, "02_preprocessed.png") // ВРЕМЕННО, см. выше
+            saveDebugBitmap(context, pre, "${stamp}_02_preprocessed.png") // ВРЕМЕННО, см. выше
             tess.setImage(pre)
             val result = tess.getUTF8Text().orEmpty().trim()
-            android.util.Log.d("BusinessCardOcr", "raw OCR text (${result.length} chars):\n$result") // ВРЕМЕННО
+            android.util.Log.d("BusinessCardOcr", "[$stamp] raw OCR text (${result.length} chars):\n$result") // ВРЕМЕННО
             result
         } catch (e: Exception) {
             android.util.Log.e("BusinessCardOcr", "OCR failed", e) // ВРЕМЕННО
