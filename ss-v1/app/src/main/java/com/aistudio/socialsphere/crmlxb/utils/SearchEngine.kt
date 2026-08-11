@@ -31,21 +31,6 @@ sealed class SearchResult {
 // ─── Main search engine ───────────────────────────────────────
 object SearchEngine {
 
-    /** Global search across contacts + companies. Returns top-N results sorted by score. */
-    fun globalSearch(query: String, limit: Int = 20): List<SearchResult> {
-        if (query.isBlank()) return emptyList()
-        val q = query.trim().searchNormalize()
-        val results = mutableListOf<SearchResult>()
-        results += searchContacts(q)
-        results += searchCompanies(q)
-        return results.sortedByDescending {
-            when (it) {
-                is SearchResult.ContactResult -> it.score
-                is SearchResult.CompanyResult -> it.score
-            }
-        }.take(limit)
-    }
-
     /** Search only contacts with rich field matching. */
     fun searchContacts(query: String): List<SearchResult.ContactResult> {
         if (query.isBlank()) return emptyList()

@@ -466,6 +466,7 @@
     <string name="scan_source">Визитка</string>
     <string name="scan_camera_permission">Чтобы сканировать визитку камерой, разрешите доступ к камере.</string>
     <string name="scan_frame_hint">Наведите камеру на визитку и совместите её с рамкой</string>
+    <string name="scan_blurry_retake">Фото получилось размытым — держите телефон неподвижно и переснимите для лучшего распознавания</string>
     <string name="scan_capture">Сфотографировать</string>
     <string name="scan_website_note">Сайт: %1$s</string>
     <string name="scan_unmatched_note">Не удалось уверенно распознать на визитке:\n%1$s</string>

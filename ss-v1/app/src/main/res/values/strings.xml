@@ -466,6 +466,7 @@
     <string name="scan_source">Business card</string>
     <string name="scan_camera_permission">To scan a business card with the camera, allow camera access.</string>
     <string name="scan_frame_hint">Point the camera at the card and align it with the frame</string>
+    <string name="scan_blurry_retake">The photo looks blurry — hold the phone still and retake for better recognition</string>
     <string name="scan_capture">Take photo</string>
     <string name="scan_website_note">Website: %1$s</string>
     <string name="scan_unmatched_note">Not confidently recognized on the card:\n%1$s</string>

@@ -1,5 +1,7 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,7 +14,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,10 +44,37 @@ private fun rememberPinLockSeconds(): Long {
     return seconds
 }
 
+/**
+ * Haptic + горизонтальный shake на точках PIN при неверном коде (стандартная
+ * практика iOS/банковских приложений — см. PIN_BIOMETRIC_UX_PROMPT.md §3.2-3.3,
+ * владелец прямо указал на отсутствие haptic/shake во всём приложении). Триггерится
+ * переходом `error` false→true; следующий тап цифры сбрасывает `error` в false
+ * (см. AppLockScreen/PinVerifySheet/PinSetupSheet), поэтому LaunchedEffect(error)
+ * корректно перезапускается на каждую отдельную неудачную попытку.
+ */
+@Composable
+private fun rememberPinShakeOffset(error: Boolean): Float {
+    val offset = remember { Animatable(0f) }
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(error) {
+        if (error) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            listOf(-10f, 10f, -8f, 8f, -4f, 4f, 0f).forEach { target ->
+                offset.animateTo(target, animationSpec = tween(durationMillis = 40))
+            }
+        }
+    }
+    return offset.value
+}
+
 /** Точки-индикаторы введённых цифр PIN (по образцу iOS/системных PIN-экранов). */
 @Composable
 private fun PinDots(enteredLength: Int, maxLength: Int, error: Boolean) {
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    val shakeOffset = rememberPinShakeOffset(error)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.offset(x = shakeOffset.dp)
+    ) {
         repeat(maxLength) { i ->
             val filled = i < enteredLength
             Box(

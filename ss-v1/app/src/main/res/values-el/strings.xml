@@ -466,6 +466,7 @@
     <string name="scan_source">Επαγγελματική κάρτα</string>
     <string name="scan_camera_permission">Για να σαρώσετε μια κάρτα με την κάμερα, επιτρέψτε την πρόσβαση στην κάμερα.</string>
     <string name="scan_frame_hint">Στρέψτε την κάμερα στην κάρτα και ευθυγραμμίστε την με το πλαίσιο</string>
+    <string name="scan_blurry_retake">Η φωτογραφία είναι θολή — κρατήστε το τηλέφωνο ακίνητο και ξαναβγάλτε τη για καλύτερη αναγνώριση</string>
     <string name="scan_capture">Λήψη φωτογραφίας</string>
     <string name="scan_website_note">Ιστότοπος: %1$s</string>
     <string name="scan_unmatched_note">Δεν αναγνωρίστηκε με βεβαιότητα στην κάρτα:\n%1$s</string>

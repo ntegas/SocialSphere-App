@@ -814,13 +814,29 @@ fun ContactEditScreen(
             }
             if (showCustomRelDialog) {
                 var draft by remember { mutableStateOf(customRelationType) }
+                // ФИКС (аудит 2026-08-11, жалоба владельца: «тип отношений, который
+                // я создавал, не видно, когда пытаюсь поставить что-то новое» —
+                // тот же класс бага, что уже чинили для тегов в этом же файле:
+                // distinctCustomRelationshipTypes() существовал в AppStateStore и
+                // уже питал фильтры/поиск, но эта форма его никогда не читала —
+                // своё значение заводилось вслепую, без связи с уже созданными.
+                val relSuggestions = remember(draft) {
+                    val existing = AppStateStore.distinctCustomRelationshipTypes()
+                    val q = draft.trim()
+                    if (q.isBlank()) existing
+                    else existing.filter { it.contains(q, ignoreCase = true) }
+                }
                 com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
                     title = stringResource(R.string.ce_relation_custom_title),
                     onDismiss = { showCustomRelDialog = false },
                     confirmText = stringResource(R.string.common_save),
                     confirmEnabled = draft.isNotBlank(),
                     onConfirm = {
-                        customRelationType = draft.trim()
+                        val typed = draft.trim()
+                        // Тот же фикс, что у тегов: совпадение без учёта регистра
+                        // берёт УЖЕ существующее написание, не плодит «Кум»/«кум».
+                        customRelationType = AppStateStore.distinctCustomRelationshipTypes()
+                            .firstOrNull { it.equals(typed, ignoreCase = true) } ?: typed
                         relationshipType = RelationshipType.OTHER
                         // Главный тип не может одновременно быть второстепенным
                         secondaryRelationshipTypes = secondaryRelationshipTypes - RelationshipType.OTHER
@@ -829,11 +845,30 @@ fun ContactEditScreen(
                     secondaryText = stringResource(R.string.common_cancel),
                     onSecondary = { showCustomRelDialog = false }
                 ) {
-                    OutlinedTextField(
-                        value = draft, onValueChange = { draft = it }, keyboardOptions = CapSentences,
-                        label = { Text(stringResource(R.string.ce_relation_custom_hint)) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = draft, onValueChange = { draft = it }, keyboardOptions = CapSentences,
+                            label = { Text(stringResource(R.string.ce_relation_custom_hint)) },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
+                        // Уже созданные свои типы — видны сразу, тапом выбираются
+                        // без перепечатывания (то же, что уже видно в фильтрах/поиске).
+                        if (relSuggestions.isNotEmpty()) {
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement   = Arrangement.spacedBy(4.dp)
+                            ) {
+                                relSuggestions.forEach { suggestion ->
+                                    AssistChip(
+                                        onClick = { draft = suggestion },
+                                        label   = { Text(suggestion, style = MaterialTheme.typography.labelSmall) },
+                                        shape   = SocialShape.Full
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

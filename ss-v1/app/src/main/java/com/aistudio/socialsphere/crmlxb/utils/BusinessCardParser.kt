@@ -65,6 +65,17 @@ object BusinessCardParser {
         RegexOption.IGNORE_CASE
     )
 
+    // Дипломы/титулы после имени («Στέργιος Λάλλος MD, MSc») — раньше делали
+    // строку 5-словной, она вылетала из фильтра «2-3 слова», и настоящее имя
+    // на живой визитке (диагностика 2026-08-11) пропускалось мимо кандидатов
+    // на nameLine целиком.
+    private val CREDENTIAL_SUFFIX = Regex(
+        "(?<![\\p{L}])(MD|PhD|MSc|BSc|MBA|LLM|DDS|DVM|CPA|CFA|Dr\\.?|Prof\\.?|Mr\\.?|Mrs\\.?|Ms\\.?)(?![\\p{L}])\\.?,?",
+        RegexOption.IGNORE_CASE
+    )
+    private fun stripCredentials(line: String): String =
+        line.replace(CREDENTIAL_SUFFIX, "").trim().trimEnd(',', '.').trim().replace(Regex("\\s+"), " ")
+
     private val FAX_MARK = Regex("(?<![\\p{L}])(fax|факс)(?![\\p{L}])", RegexOption.IGNORE_CASE)
     private val MOBILE_MARK = Regex("(?<![\\p{L}])(mob|cell|моб|сот|κιν)", RegexOption.IGNORE_CASE)
     private val HOME_MARK = Regex("(?<![\\p{L}])(home|дом|οικ)", RegexOption.IGNORE_CASE)
@@ -114,15 +125,32 @@ object BusinessCardParser {
         val legalCompany = lines.firstOrNull { LEGAL.containsMatchIn(it) }
         val keywordPosition = lines.firstOrNull { POSITION.containsMatchIn(it) }
 
-        // Имя: первая строка из 2–3 слов без цифр/@, не компания/должность/сайт.
-        val nameLine = lines.firstOrNull { line ->
-            !EMAIL.containsMatchIn(line) && !PHONE.containsMatchIn(line) &&
-            !URL.containsMatchIn(line) && !LEGAL.containsMatchIn(line) &&
-            !POSITION.containsMatchIn(line) &&
-            line.none { it.isDigit() } &&
-            line.split(Regex("\\s+")).size in 2..3 &&
-            (line.firstOrNull()?.isLetter() == true)
+        // Имя: из строк-кандидатов (2-4 «слова» ПОСЛЕ вычитания титулов/степеней,
+        // без цифр/@, не компания/должность/сайт) берём не ПЕРВУЮ попавшуюся
+        // (реальный OCR-шум типа обрывка логотипа сверху кадра легко проходил
+        // этот же фильтр и перехватывал место настоящего имени — диагностика
+        // 2026-08-11), а с наибольшей долей слов с заглавной буквы — имена
+        // собственные почти всегда Title Case, обрывки OCR-мусора обычно нет.
+        val nameCandidates = lines.mapNotNull { rawLine ->
+            val stripped = stripCredentials(rawLine)
+            val words = stripped.split(Regex("\\s+")).filter { it.isNotBlank() }
+            val valid = stripped.isNotBlank() &&
+                !EMAIL.containsMatchIn(stripped) && !PHONE.containsMatchIn(stripped) &&
+                !URL.containsMatchIn(stripped) && !LEGAL.containsMatchIn(stripped) &&
+                !POSITION.containsMatchIn(stripped) &&
+                stripped.none { it.isDigit() } &&
+                words.size in 2..4 &&
+                (stripped.firstOrNull()?.isLetter() == true)
+            if (!valid) return@mapNotNull null
+            val capRatio = words.count { it.firstOrNull()?.isUpperCase() == true }.toDouble() / words.size
+            Triple(rawLine, words, capRatio)
         }
+        val bestNameCandidate = nameCandidates.maxByOrNull { it.third }
+        // Сырая строка (не «вычищенная») — нужна дальше для сравнений line != nameLine
+        // при поиске компании/должности/unmatched, чтобы не задублировать одну и ту же
+        // строку одновременно как имя и как «нераспознанное».
+        val nameLine = bestNameCandidate?.first
+        val nameWords = bestNameCandidate?.second ?: emptyList()
 
         // РАСШИРЕНИЕ: компания без юр.маркера (ООО/LLC/Inc) — раньше молча
         // пропускалась. Кандидат: первая ещё не занятая строка (не имя, не
@@ -156,9 +184,8 @@ object BusinessCardParser {
 
         val addresses = lines.filter { ADDRESS_MARKER.containsMatchIn(it) }.distinct()
 
-        val parts = nameLine?.split(Regex("\\s+")) ?: emptyList()
-        val firstName = parts.getOrNull(0).orEmpty()
-        val lastName = parts.drop(1).joinToString(" ")
+        val firstName = nameWords.getOrNull(0).orEmpty()
+        val lastName = nameWords.drop(1).joinToString(" ")
 
         // Сеть безопасности: всё, что не ушло ни в одно структурное поле, —
         // в unmatched, чтобы вызывающий код мог сохранить это заметкой.

@@ -52,6 +52,10 @@ fun ScanCardScreen(
     // Камера открывается сразу (как в макете SCANNER); вставка текста — запасной путь.
     var showCamera by remember { mutableStateOf(true) }
     var ocrRunning by remember { mutableStateOf(false) }
+    // Предупреждение о размытом кадре (см. BusinessCardOcr.isBlurry) — снимок всё
+    // равно распознаём (лучше нечёткий результат, чем ничего), но явно говорим
+    // владельцу, почему могло получиться плохо, вместо тихой билиберды без причины.
+    var blurryWarning by remember { mutableStateOf(false) }
 
     var firstName by remember { mutableStateOf("") }
     var lastName  by remember { mutableStateOf("") }
@@ -110,6 +114,7 @@ fun ScanCardScreen(
             onCaptured = { bmp ->
                 showCamera = false
                 ocrRunning = true
+                blurryWarning = com.aistudio.socialsphere.crmlxb.utils.BusinessCardOcr.isBlurry(bmp)
                 scope.launch {
                     val text = com.aistudio.socialsphere.crmlxb.utils.BusinessCardOcr.recognize(ctx, bmp)
                     if (text.isNotBlank()) { rawText = text; applyParsed(text) }
@@ -179,9 +184,20 @@ fun ScanCardScreen(
                             color = AppleTheme.colors.secondaryLabel)
                     }
                 }
+                // Кадр похож на размытый (см. BusinessCardOcr.isBlurry) — явно
+                // предупреждаем, а не оставляем владельца гадать, почему билиберда.
+                if (blurryWarning && !ocrRunning) {
+                    Text(
+                        stringResource(R.string.scan_blurry_retake),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppleTheme.colors.red,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 // Снять визитку камерой (повторно)
                 Button(
-                    onClick = { showCamera = true },
+                    onClick = { showCamera = true; blurryWarning = false },
                     enabled = !ocrRunning,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = AppleTheme.colors.brand)

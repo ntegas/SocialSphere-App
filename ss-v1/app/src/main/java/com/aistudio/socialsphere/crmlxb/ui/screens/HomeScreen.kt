@@ -43,39 +43,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-// SearchEngine.matchField приходит как стабильный ASCII-ключ (см. SearchEngine.kt,
-// аудит хардкода 2026-07-22) — здесь резолвится в локализованную подпись чипа.
-// Ветка else покрывает значения из MessengerType/PersonalDetailCategory.labelKey()
-// (уже в основном language-neutral имена собственные вроде "Telegram"/"VK").
-@Composable
-private fun searchMatchFieldLabel(key: String): String = when (key) {
-    "name" -> stringResource(R.string.srch_field_name)
-    "surname" -> stringResource(R.string.srch_field_surname)
-    "patronymic" -> stringResource(R.string.srch_field_patronymic)
-    "nickname" -> stringResource(R.string.srch_field_nickname)
-    "phone" -> stringResource(R.string.srch_field_phone)
-    "email" -> stringResource(R.string.srch_field_email)
-    "company" -> stringResource(R.string.srch_field_company)
-    "position" -> stringResource(R.string.srch_field_position)
-    "profession" -> stringResource(R.string.srch_field_profession)
-    "department" -> stringResource(R.string.srch_field_department)
-    "city" -> stringResource(R.string.srch_field_city)
-    "country" -> stringResource(R.string.srch_field_country)
-    "district" -> stringResource(R.string.srch_field_district)
-    "note" -> stringResource(R.string.srch_field_note)
-    "gift" -> stringResource(R.string.srch_field_gift)
-    "tag" -> stringResource(R.string.srch_field_tag)
-    "group" -> stringResource(R.string.srch_field_group)
-    "type" -> stringResource(R.string.srch_field_type)
-    "next_step" -> stringResource(R.string.srch_field_next_step)
-    "company_name" -> stringResource(R.string.srch_field_company_name)
-    "industry" -> stringResource(R.string.srch_field_industry)
-    "description" -> stringResource(R.string.srch_field_description)
-    "website" -> stringResource(R.string.srch_field_website)
-    "employee" -> stringResource(R.string.srch_field_employee)
-    else -> key
-}
-
 // ─── Local data wrappers ──────────────────────────────────────
 private data class HomeContact(
     val id: String,
@@ -147,18 +114,6 @@ fun HomeScreen(
             else raw
         } catch (e: Exception) {
             today.toString()
-        }
-    }
-
-    var searchQuery   by remember { mutableStateOf("") }
-    var searchActive  by remember { mutableStateOf(false) }
-    val focusRequester = remember { FocusRequester() }
-
-    val searchResults by remember {
-        derivedStateOf {
-            if (searchQuery.length >= 2)
-                SearchEngine.globalSearch(searchQuery, limit = 15)
-            else emptyList()
         }
     }
 
@@ -428,85 +383,15 @@ fun HomeScreen(
 
     Scaffold(
         modifier = modifier,
-        containerColor = AppleTheme.colors.groupedBackground,
-        topBar = {
-          if (searchActive) {
-            TopAppBar(
-                title = {
-                    if (!searchActive) {
-                        Column {
-                            Text("Socialsphere",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleLarge)
-                            Text(dateLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleTheme.colors.secondaryLabel)
-                        }
-                    } else {
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(focusRequester)
-                                .testTag("home_search_input"),
-                            placeholder = { Text(stringResource(R.string.home_search_placeholder)) },
-                            singleLine = true,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor   = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor   = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            )
-                        )
-                        LaunchedEffect(searchActive) {
-                            if (searchActive) focusRequester.requestFocus()
-                        }
-                    }
-                },
-                navigationIcon = {
-                    if (searchActive) {
-                        IconButton(onClick = { searchActive = false; searchQuery = "" }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_close))
-                        }
-                    }
-                },
-                actions = {
-                    if (!searchActive) {
-                        IconButton(
-                            onClick  = { searchActive = true },
-                            modifier = Modifier.testTag("home_settings_button")
-                        ) {
-                            Icon(Icons.Default.Search, stringResource(R.string.common_search))
-                        }
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Default.Settings, stringResource(R.string.common_settings))
-                        }
-                    } else if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, stringResource(R.string.common_clear))
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AppleTheme.colors.groupedBackground
-                )
-            )
-          }
-        }
+        containerColor = AppleTheme.colors.groupedBackground
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
 
-            // ── SEARCH OVERLAY ────────────────────────────────
-            if (searchActive && searchQuery.length >= 2) {
-                HomeSearchResults(
-                    results             = searchResults,
-                    query               = searchQuery,
-                    onNavigateToContact = onNavigateToContact,
-                    onNavigateToCompany = onNavigateToCompany,
-                    modifier            = Modifier.fillMaxSize()
-                )
-            } else {
+            // ФИКС (аудит 2026-08-11, решение владельца): поиск на главной убран —
+            // работал плохо и не планировался доводиться до полноценного состояния.
+            // Поиск по контактам остаётся на вкладке «Контакты» (ContactsScreen.kt),
+            // не тронут.
+            run {
                 // ── DASHBOARD ─────────────────────────────────
                 Column(
                     modifier = Modifier.fillMaxSize().verticalScroll(scrollState)
@@ -525,15 +410,10 @@ fun HomeScreen(
                             // Сканер визитки (по макету: акцент-заливка)
                             AureliaCircleButton(Icons.Default.DocumentScanner, stringResource(R.string.scan_title),
                                 style = AureliaCircleStyle.Filled, testTag = "home_scan_button") { onNavigateToScan() }
-                            // Лупу прячем когда поиск активен — поле ввода уже в
-                            // TopAppBar, иначе на экране две лупы.
-                            if (!searchActive) AureliaCircleButton(Icons.Default.Search, stringResource(R.string.common_search)) { searchActive = true }
                             AureliaCircleButton(Icons.Default.Settings, stringResource(R.string.common_settings),
                                 testTag = "home_settings_button") { onNavigateToSettings() }
                         }
                     }
-                    // Поисковой капсулы нет — в макете Aurelia поиск с Главной идёт
-                    // через круглую кнопку-лупу в шапке (дублирующая капсула убрана).
                     // Stats
                     Row(
                         modifier = Modifier
@@ -685,143 +565,6 @@ fun HomeScreen(
                 }
             }
         }
-    }
-}
-
-// ─── Search results overlay ───────────────────────────────────
-@Composable
-private fun HomeSearchResults(
-    results: List<SearchResult>,
-    query: String,
-    onNavigateToContact: (String) -> Unit,
-    onNavigateToCompany: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (results.isEmpty()) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp),
-                    tint = AppleTheme.colors.separator)
-                Text(stringResource(R.string.home_nothing_found, query),
-                    color = AppleTheme.colors.secondaryLabel)
-            }
-        }
-        return
-    }
-
-    val contacts  = results.filterIsInstance<SearchResult.ContactResult>()
-    val companies = results.filterIsInstance<SearchResult.CompanyResult>()
-
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        if (contacts.isNotEmpty()) {
-            item {
-                Text(stringResource(R.string.common_contacts),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppleTheme.colors.brand)
-            }
-            items(contacts, key = { it.contact.id }) { r ->
-                // FIX: clickable search result
-                val c = r.contact
-                val compRel = c.companyRelations.firstOrNull { it.isPrimary }
-                    ?: c.companyRelations.firstOrNull()
-                val company = compRel?.companyId
-                    ?.let { AppStateStore.getCompany(it)?.name } ?: ""
-                Card(
-                    onClick   = { onNavigateToContact(c.id) },
-                    modifier  = Modifier.fillMaxWidth(),
-                    shape     = SocialShape.Medium,
-                    colors    = CardDefaults.cardColors(
-                        containerColor = AppleTheme.colors.card),
-                    elevation = CardDefaults.cardElevation(1.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        val searchRowName = formatContactName(c, AppSettings.contactNameFormat.value)
-                        AureliaAvatar(c.id, searchRowName,
-                            size = 40.dp, fontSize = 13.sp)
-                        Column(Modifier.weight(1f)) {
-                            Text(searchRowName,
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodyMedium)
-                            val sub = listOf(company, compRel?.position)
-                                .filter { !it.isNullOrEmpty() }.joinToString(" · ")
-                            if (sub.isNotEmpty())
-                                Text(sub, style = MaterialTheme.typography.bodySmall,
-                                    color = AppleTheme.colors.secondaryLabel)
-                        }
-                        Surface(shape = SocialShape.Full,
-                            color = AppleTheme.colors.brand.copy(alpha = 0.10f).copy(0.6f)) {
-                            Text(searchMatchFieldLabel(r.matchField),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleTheme.colors.brand,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
-                        }
-                    }
-                }
-            }
-        }
-
-        if (companies.isNotEmpty()) {
-            item {
-                Text(stringResource(R.string.common_companies),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppleTheme.colors.brand)
-            }
-            items(companies, key = { it.company.id }) { r ->
-                // FIX: clickable search result
-                val c = r.company
-                Card(
-                    onClick   = { onNavigateToCompany(c.id) },
-                    modifier  = Modifier.fillMaxWidth(),
-                    shape     = SocialShape.Medium,
-                    colors    = CardDefaults.cardColors(
-                        containerColor = AppleTheme.colors.card),
-                    elevation = CardDefaults.cardElevation(1.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            Modifier.size(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R10)
-                                .background(AppleTheme.colors.brand),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Business, null, Modifier.size(20.dp),
-                                tint = Color.White)
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text(c.name, fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodyMedium)
-                            Text(c.industry.label(LocalContext.current),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AppleTheme.colors.secondaryLabel)
-                        }
-                        Surface(shape = SocialShape.Full,
-                            color = AppleTheme.colors.fill.copy(0.6f)) {
-                            Text(searchMatchFieldLabel(r.matchField),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleTheme.colors.secondaryLabel,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
-                        }
-                    }
-                }
-            }
-        }
-        item { Spacer(Modifier.height(80.dp)) }
     }
 }
 

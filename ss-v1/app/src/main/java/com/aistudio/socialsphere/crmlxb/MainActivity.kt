@@ -79,6 +79,18 @@ class MainActivity : androidx.appcompat.app.AppCompatActivity() {
             notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        // ФИКС (аудит 2026-08-11, PIN_BIOMETRIC_UX_PROMPT.md §3.1): без FLAG_SECURE
+        // содержимое приложения (контакты, заметки) видно в скриншоте карточки в
+        // Recents/переключателе задач и снимается сторонними скриншот-инструментами —
+        // даже когда AppLockScreen прямо сейчас не показан. Стандартная практика для
+        // любого приложения с PIN/биометрией и личными данными. Ставим ВСЕГДА (не
+        // только при включённой защите) — та же приватность-по-умолчанию, что уже
+        // выбрана для allowBackup=false/отсутствия сетевой поверхности.
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        )
+
         enableEdgeToEdge()
         setContent {
             val isDarkTheme by AppSettings.isDarkTheme
