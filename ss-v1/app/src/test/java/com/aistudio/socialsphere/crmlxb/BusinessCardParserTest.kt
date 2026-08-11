@@ -162,4 +162,57 @@ class BusinessCardParserTest {
 
         assertTrue(card.unmatched.contains("Мы меняем мир"))
     }
+
+    @Test
+    fun greekDoctorCard_realDeviceOcrText_2026_08_11() {
+        // Сырой OCR-текст с реальной визитки (живая проверка на устройстве,
+        // 2026-08-11) — до фикса: firstName/lastName оставались пустыми
+        // (мусорная строка "Ан го" перехватывала место имени раньше настоящей
+        // строки с именем, а сама строка с именем не проходила фильтр слов
+        // из-за приписанных степеней MD, MSc), position не находился вообще
+        // (в словаре не было ни одного медицинского термина), company был
+        // "ssi." (обрывок нечитаемого логотипа).
+        val text = """
+            ssi.
+            /
+            4
+            Ан го
+            C linic
+            Στέργιος М. Λάλλος MD, MSc
+            Ορθοπαιδικό
+            ς Χειρουργός
+            Αν. Διευθυντής Ορθοπαιδικής
+            Κλινική
+            Χειρουρ
+            γική Ισχίου, [όνατος & Αθ
+            ς Metropolitan General
+            т. Επιμελητής Sale
+            т Spital Bern, Ελβετία - АТ
+            λητικών Κακώσεων
+            OS Klinik Heidelberg, Γερμανία
+            Βαλτετσίου 4, 153 43 Ay. Nap
+            ασκευή
+            Т: 215 5405 400 К: 6977 584 820
+            Е: info@arthroclinic.gr -
+            www.arthroclinic.gr
+            ==
+            ell
+            м,
+        """.trimIndent()
+
+        val card = BusinessCardParser.parse(text)
+
+        assertEquals("Στέργιος", card.firstName)
+        assertTrue("фамилия должна содержать Λάλλος, была: ${card.lastName}",
+            card.lastName.contains("Λάλλος"))
+        assertTrue("должность должна найти «хирург», была: ${card.position}",
+            card.position?.contains("Χειρουργός") == true)
+        // "ssi." — мусор с нечитаемого логотипа, не должен уверенно попадать в company
+        assertTrue("company не должен быть мусором 'ssi.', был: ${card.company}",
+            card.company != "ssi.")
+        assertTrue(card.phones.any { it.number.contains("2155405400") })
+        assertTrue(card.phones.any { it.number.contains("6977584820") })
+        assertTrue(card.emails.any { it.email == "info@arthroclinic.gr" })
+        assertTrue(card.website?.contains("arthroclinic.gr") == true)
+    }
 }

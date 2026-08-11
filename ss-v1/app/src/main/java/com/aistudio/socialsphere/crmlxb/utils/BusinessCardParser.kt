@@ -51,12 +51,25 @@ object BusinessCardParser {
         "(?<![\\p{L}])(ООО|ОАО|ЗАО|ПАО|АО|ИП|LLC|Inc|Ltd|GmbH|LLP|Corp)(?![\\p{L}])",
         RegexOption.IGNORE_CASE
     )
+    // РАСШИРЕНИЕ (2026-08-11, живая визитка врача — «хирург, ортопед» полностью
+    // пропускался): список раньше был чисто офисным (директор/менеджер/CEO),
+    // ни одного медицинского/врачебного термина ни на одном из 3 языков —
+    // визитка врача, юриста, преподавателя и т.п. не находила position вообще,
+    // хотя реальная должность на карточке была прямо написана.
     private val POSITION = Regex(
         "(директор|менеджер|инженер|разработчик|программист|маркетолог|дизайнер|бухгалтер|юрист|" +
         "консультант|руководитель|основатель|владелец|специалист|аналитик|администратор|координатор|" +
-        "ассистент|секретарь|президент|заместитель|представитель|CEO|CTO|CFO|COO|VP|founder|manager|" +
+        "ассистент|секретарь|президент|заместитель|представитель|врач|хирург|терапевт|стоматолог|" +
+        "педиатр|кардиолог|невролог|психиатр|психолог|фармацевт|ветеринар|профессор|преподаватель|" +
+        "адвокат|нотариус|архитектор|дизайнерка|" +
+        "CEO|CTO|CFO|COO|VP|founder|manager|" +
         "engineer|developer|designer|director|president|partner|coordinator|administrator|assistant|" +
-        "representative|officer|head of|lead|διευθυντής|διευθύντρια|πρόεδρος|υπεύθυνος|διαχειριστής|σύμβουλος)",
+        "representative|officer|head of|lead|doctor|surgeon|physician|dentist|pediatrician|" +
+        "cardiologist|neurologist|psychiatrist|psychologist|pharmacist|veterinarian|professor|lecturer|" +
+        "attorney|lawyer|notary|architect|consultant|" +
+        "διευθυντής|διευθύντρια|πρόεδρος|υπεύθυνος|διαχειριστής|σύμβουλος|" +
+        "ιατρός|χειρουργός|οδοντίατρος|παιδίατρος|καρδιολόγος|νευρολόγος|ψυχίατρος|ψυχολόγος|" +
+        "φαρμακοποιός|κτηνίατρος|καθηγητής|καθηγήτρια|δικηγόρος|συμβολαιογράφος|αρχιτέκτονας)",
         RegexOption.IGNORE_CASE
     )
     private val ADDRESS_MARKER = Regex(
@@ -156,13 +169,22 @@ object BusinessCardParser {
         // пропускалась. Кандидат: первая ещё не занятая строка (не имя, не
         // должность, не контакт, не адрес), без цифр, из ≤5 слов — низкая
         // уверенность, но лучше, чем всегда null.
+        // ФИКС (2026-08-11, живая визитка со сложным графическим логотипом):
+        // логотип-картинка нечитаем для OCR и даёт короткий строчный мусор
+        // («ssi.») — тот же фильтр без доп. проверки уверенно подставлял его
+        // как компанию. Тот же сигнал «имя собственное», что и у nameLine —
+        // компания почти всегда начинается с заглавной буквы, OCR-мусор с
+        // логотипа обычно нет. Не убирает проблему нечитаемого логотипа (это
+        // физически невозможно), но не подсовывает вместо честной пустой
+        // строки уверенный неверный ответ.
         val fallbackCompany = legalCompany ?: lines.firstOrNull { line ->
             line != nameLine && line != keywordPosition &&
             !EMAIL.containsMatchIn(line) && !PHONE.containsMatchIn(line) &&
             !URL.containsMatchIn(line) && !POSITION.containsMatchIn(line) &&
             !ADDRESS_MARKER.containsMatchIn(line) &&
             line.none { it.isDigit() } &&
-            line.split(Regex("\\s+")).size in 1..5
+            line.split(Regex("\\s+")).size in 1..5 &&
+            (line.firstOrNull()?.isUpperCase() == true)
         }
         val company = legalCompany ?: fallbackCompany
 
