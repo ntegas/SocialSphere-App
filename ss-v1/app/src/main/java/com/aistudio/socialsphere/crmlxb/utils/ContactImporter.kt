@@ -241,6 +241,18 @@ object ContactImporter {
 
                         val addrLine = street ?: formattedAddress ?: ""
                         if (addrLine.isNotBlank() || !city.isNullOrBlank() || !country.isNullOrBlank()) {
+                            // ФИКС (аудит 2026-08-11, жалоба владельца: «разделял рабочие и
+                            // домашние адреса в телефоне — после импорта ВСЕ стали домашними»):
+                            // тип адреса был захардкожен на AddressType.HOME, полностью игнорируя
+                            // DATA2 (реальный TYPE_HOME/TYPE_WORK/TYPE_OTHER из телефонной книги) —
+                            // тот же класс бага, что уже читается для Phone/Email/GroupMembership
+                            // чуть выше в этом же файле, просто не был применён к адресам.
+                            val addrType = it.getInt(data2Idx)
+                            val addressType = when (addrType) {
+                                ContactsContract.CommonDataKinds.StructuredPostal.TYPE_WORK -> AddressType.WORK
+                                ContactsContract.CommonDataKinds.StructuredPostal.TYPE_HOME -> AddressType.HOME
+                                else -> AddressType.OTHER
+                            }
                             val addr = Address(
                                 id = UUID.randomUUID().toString(),
                                 addressLine = addrLine,
@@ -249,7 +261,7 @@ object ContactImporter {
                                 country = country ?: "",
                                 ownerId = candidate.id,
                                 ownerType = AddressOwnerType.CONTACT,
-                                addressType = AddressType.HOME
+                                addressType = addressType
                             )
                             candidates[contactId] = candidate.copy(addresses = candidate.addresses + addr)
                         }
@@ -309,6 +321,16 @@ object ContactImporter {
     }
 }
 
+/** Обратная операция к ExportManager.vEsc — распаковывает экранированный
+ *  vCard-текст (\n → перенос строки, \, \; \\ → сами символы) обратно в
+ *  обычный текст. Порядок важен: сначала переносы/запятые/точки-с-запятой,
+ *  одиночный «\\» — последним, иначе он бы «съел» уже восстановленные символы. */
+private fun vUnescape(s: String): String = s
+    .replace(Regex("\\\\[nN]"), "\n")
+    .replace("\\,", ",")
+    .replace("\\;", ";")
+    .replace("\\\\", "\\")
+
 // ─── vCard (.vcf) parser ──────────────────────────────────────
 fun parseVCard(content: String): List<ImportContactCandidate> {
     val results = mutableListOf<ImportContactCandidate>()
@@ -328,6 +350,7 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
         var company   = ""
         var title     = ""
         var birthday  = ""
+        var notes     = ""
         val id        = UUID.randomUUID().toString()
 
         card.lines().forEach { raw ->
@@ -425,6 +448,16 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                         else -> normalized
                     }
                 }
+                // NOTE: раньше вообще не читался при импорте .vcf-файла (баг
+                // найден 2026-08-11, тот же класс, что и «не все пути импорта
+                // обрабатывают X» — getDeviceContacts() уже читает Note.
+                // CONTENT_ITEM_TYPE, а этот путь — нет). ExportManager пишет
+                // ВСЮ заметку одной эскейпленной vCard-строкой — распаковываем
+                // обратно перед тем, как candidate.notes уйдёт в
+                // ContactNoteCodec.decode (та же функция, что разбирает
+                // «сырую» заметку из телефонной книги).
+                line.startsWith("NOTE:") || line.startsWith("NOTE;") ->
+                    notes = vUnescape(line.substringAfter(":", ""))
             }
         }
 
@@ -447,6 +480,7 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                 companyName = company.ifBlank { null },
                 jobTitle    = title.ifBlank { null },
                 birthday    = birthday.ifBlank { null },
+                notes       = notes.ifBlank { null },
                 source      = "vCard"
             ))
         }

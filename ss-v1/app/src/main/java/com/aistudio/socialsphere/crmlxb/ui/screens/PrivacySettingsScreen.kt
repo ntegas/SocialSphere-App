@@ -56,10 +56,28 @@ fun PrivacySettingsScreen(
     // экран уже открыт разблокированным устройством/приложением.
     var showAppLockVerify by remember { mutableStateOf(false) }
     var showBioLockVerify by remember { mutableStateOf(false) }
-    val canEnableLock = hasPin || bioAvailable
+    // ФИКС (2026-08-12, владелец: «сначала PIN, потом биометрия, иначе как во всех
+    // телефонах отказ биометрии должен уводить на PIN»): раньше было `hasPin ||
+    // bioAvailable` — системная биометрия/код устройства сама по себе считалась
+    // достаточным основанием включить защиту, БЕЗ своего PIN приложения вообще.
+    // Формально это не совсем неверно (BiometricPrompt с DEVICE_CREDENTIAL сам
+    // падает в системный экран кода при неудаче) — но если владелец ОТМЕНИТ
+    // системный диалог биометрии (не введёт код, просто закроет), он попадает на
+    // СВОЙ экран `AppLockScreen`, где показана кастомная PIN-клавиатура — а она
+    // физически ничего не делает, если `AppSettings.hasPinSet()` ложно: цифры
+    // вводятся, `LaunchedEffect(pin)` их не проверяет. Тупиковая клавиатура —
+    // ровно то, о чём владелец сообщил. Правило теперь как в самом Android:
+    // биометрия ВСЕГДА требует уже настроенный запасной способ (свой PIN), не
+    // наоборот и не «любой из двух».
+    val canEnableLock = hasPin
     // Поднято сюда (было внутри Column) — читается и пишется из PinVerifySheet
     // ниже Scaffold, как и appLockEnabled/hasPin.
     var bioLock by remember { AppSettings.biometricLock }
+    // Какую защиту включить сразу после того, как владелец только что задал PIN
+    // (см. onCheckedChange обоих переключателей ниже) — не теряем намерение
+    // «хотел включить биометрию/блокировку», пока он проходит обязательный шаг
+    // установки PIN.
+    var pendingLockTarget by remember { mutableStateOf<LockTarget?>(null) }
 
     Scaffold(
         containerColor = AppleTheme.colors.groupedBackground,
@@ -129,32 +147,31 @@ fun PrivacySettingsScreen(
                         Text(stringResource(R.string.priv_biometric_title), fontSize = 15.sp,
                             fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
                         Text(
-                            if (bioAvailable) stringResource(R.string.priv_biometric_sub)
-                            else stringResource(R.string.priv_biometric_unavailable),
+                            when {
+                                !hasPin -> stringResource(R.string.priv_biometric_needs_pin)
+                                bioAvailable -> stringResource(R.string.priv_biometric_sub)
+                                else -> stringResource(R.string.priv_biometric_unavailable)
+                            },
                             fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel
                         )
                     }
                     Switch(
                         checked = bioLock,
-                        // ФИКС (владелец сообщил: тап по тумблеру не делал ничего):
-                        // раньше был `enabled = bioAvailable` — тумблер оставался
-                        // НАВСЕГДА disabled на устройстве без биометрии, даже если
-                        // задан свой PIN (requestReveal() в ContactDetailScreen.kt
-                        // умеет проверять PIN как раз для этого случая, но включить
-                        // саму защиту без биометрии было physически невозможно).
-                        enabled = canEnableLock,
+                        // Тумблер ВСЕГДА enabled (не гасим по canEnableLock) — без
+                        // PIN тап должен вести на установку PIN, а не быть мёртвым
+                        // элементом, который непонятно почему не реагирует.
                         onCheckedChange = { turnOn ->
                             when {
                                 !turnOn -> bioLock = false
-                                // Реальная проверка ПЕРЕД включением, тем же
-                                // приоритетом «биометрия, иначе свой PIN», что и
-                                // у «Блокировки приложения» ниже.
+                                !hasPin -> { pendingLockTarget = LockTarget.BIO_LOCK; showPinSetup = true }
+                                // PIN уже есть — реальная проверка ПЕРЕД включением,
+                                // тем же приоритетом «биометрия, иначе свой PIN», что
+                                // и у «Блокировки приложения» ниже.
                                 bioAvailable && activity != null ->
                                     com.aistudio.socialsphere.crmlxb.utils.BiometricGate.authenticate(
                                         activity, confirmEnableTitle
                                     ) { bioLock = true }
-                                hasPin -> showBioLockVerify = true
-                                else -> {} // canEnableLock=false уже не даёт сюда попасть
+                                else -> showBioLockVerify = true
                             }
                         }
                     )
@@ -191,19 +208,21 @@ fun PrivacySettingsScreen(
                         }
                         Switch(
                             checked = appLockEnabled,
-                            enabled = canEnableLock,
+                            // Тумблер ВСЕГДА enabled — без PIN тап ведёт на его
+                            // установку (см. комментарий у canEnableLock выше).
                             onCheckedChange = { turnOn ->
                                 when {
                                     !turnOn -> appLockEnabled = false
-                                    // Предпочитаем биометрию для проверки, если она
-                                    // доступна; иначе — свой PIN через ту же шторку,
-                                    // что используется для раскрытия заметок.
+                                    !hasPin -> { pendingLockTarget = LockTarget.APP_LOCK; showPinSetup = true }
+                                    // PIN уже есть — предпочитаем биометрию для
+                                    // проверки, если она доступна; иначе — свой PIN
+                                    // через ту же шторку, что используется для
+                                    // раскрытия заметок.
                                     bioAvailable && activity != null ->
                                         com.aistudio.socialsphere.crmlxb.utils.BiometricGate.authenticate(
                                             activity, confirmEnableTitle
                                         ) { appLockEnabled = true }
-                                    hasPin -> showAppLockVerify = true
-                                    else -> {} // canEnableLock=false уже не даёт сюда попасть
+                                    else -> showAppLockVerify = true
                                 }
                             }
                         )
@@ -300,8 +319,21 @@ fun PrivacySettingsScreen(
 
     if (showPinSetup) {
         PinSetupSheet(
-            onDone = { showPinSetup = false; hasPin = AppSettings.hasPinSet() },
-            onDismiss = { showPinSetup = false }
+            onDone = {
+                showPinSetup = false
+                hasPin = AppSettings.hasPinSet()
+                // Владелец только что задал PIN именно затем, чтобы включить
+                // защиту, с которой начал (см. !hasPin -> ветки обоих Switch выше) —
+                // раз PIN уже подтверждён вводом дважды, доп. проверка не нужна,
+                // включаем сразу, без второго запроса того же кода через шторку.
+                when (pendingLockTarget) {
+                    LockTarget.BIO_LOCK -> bioLock = true
+                    LockTarget.APP_LOCK -> appLockEnabled = true
+                    null -> {}
+                }
+                pendingLockTarget = null
+            },
+            onDismiss = { showPinSetup = false; pendingLockTarget = null }
         )
     }
 
@@ -316,9 +348,15 @@ fun PrivacySettingsScreen(
                 showRemovePinConfirm = false
                 AppSettings.clearPin()
                 hasPin = false
-                // Без PIN и без биометрии блокировка приложения заперла
-                // бы владельца без способа разблокировки — выключаем.
-                if (!bioAvailable) appLockEnabled = false
+                // ФИКС (2026-08-12, тот же принцип, что и у canEnableLock выше):
+                // PIN — обязательный запасной способ для ОБЕИХ защит, не только
+                // для «Блокировки приложения». Раньше выключали appLockEnabled
+                // только если ЕЩЁ И биометрии нет — но тумблеры сами по себе
+                // больше не зависят от bioAvailable, значит без PIN отключаем
+                // ОБА безусловно, иначе владелец мог остаться с включённой
+                // защитой и снова мёртвой PIN-клавиатурой при отказе биометрии.
+                appLockEnabled = false
+                bioLock = false
             }
         )
     }
@@ -339,6 +377,8 @@ fun PrivacySettingsScreen(
         )
     }
 }
+
+private enum class LockTarget { BIO_LOCK, APP_LOCK }
 
 @Composable
 private fun SectionCaps(text: String, color: Color = AppleTheme.colors.tertiaryLabel) {

@@ -534,7 +534,7 @@ fun ContactEditScreen(
                         } else {
                             val initial = (firstName.firstOrNull() ?: lastName.firstOrNull())?.uppercaseChar()
                             if (initial != null) {
-                                Text(initial.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand)
+                                Text(initial.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = AppleTheme.colors.brand, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(initial.toString()))
                             } else {
                                 Icon(Icons.Default.Person, null, Modifier.size(36.dp), tint = AppleTheme.colors.brand.copy(alpha = 0.6f))
                             }

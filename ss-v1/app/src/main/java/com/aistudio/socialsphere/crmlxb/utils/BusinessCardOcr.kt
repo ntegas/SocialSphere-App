@@ -48,18 +48,6 @@ object BusinessCardOcr {
         val dataPath = ensureTessData(context)
         val tess = TessBaseAPI()
         try {
-            // ВРЕМЕННАЯ ДИАГНОСТИКА (2026-07-27, живая проверка с владельцем на
-            // реальном устройстве) — сохраняет кадр ДО и ПОСЛЕ preprocess() в
-            // externalFilesDir, чтобы вытащить через adb pull и увидеть глазами,
-            // что реально уходит в Tesseract. Убрать после диагностики.
-            // ФИКС (2026-08-11): имя файла раньше было фиксированным — каждый
-            // следующий снимок перезатирал предыдущий, и после серии из
-            // нескольких сканирований подряд (как в живой проверке владельца)
-            // посмотреть, что именно было в НЕУДАЧНЫХ кадрах, было уже нельзя —
-            // оставался только самый последний. Таймстемп в имени сохраняет всю
-            // серию снимков одной сессии для сравнения удачных/неудачных кадров.
-            val stamp = System.currentTimeMillis()
-            saveDebugBitmap(context, bitmap, "${stamp}_01_captured_cropped.png")
             // ФИКС (2026-07-11, «билиберда» на выходе OCR): движок LSTM инициализировался
             // с дефолтным PageSegMode 3 (полностью автоматическая сегментация страницы) —
             // это режим для связного текста-страницы (колонки/абзацы), худший выбор для
@@ -73,7 +61,6 @@ object BusinessCardOcr {
             // кадров + ч/б с усиленным контрастом — заметно поднимает точность
             // Tesseract на визитках при слабом свете/мелком шрифте.
             val pre = preprocess(bitmap)
-            saveDebugBitmap(context, pre, "${stamp}_02_preprocessed.png") // ВРЕМЕННО, см. выше
 
             // ФИКС (2026-08-11, живая проверка: владелец прямо снял 2 визитки БОКОМ
             // относительно кадра — не телефон дёрнулся между открытием камеры и
@@ -92,7 +79,6 @@ object BusinessCardOcr {
             // билиберды того стоят.
             var best = ""
             var bestConfidence = -1
-            var bestDegrees = 0
             for (degrees in intArrayOf(0, 90, 180, 270)) {
                 val candidate = if (degrees == 0) pre else rotateBitmapDegrees(pre, degrees)
                 tess.setImage(candidate)
@@ -101,14 +87,10 @@ object BusinessCardOcr {
                 if (confidence > bestConfidence) {
                     bestConfidence = confidence
                     best = text
-                    bestDegrees = degrees
                 }
             }
-            android.util.Log.d("BusinessCardOcr", // ВРЕМЕННО
-                "[$stamp] best rotation=$bestDegrees° confidence=$bestConfidence raw OCR text (${best.length} chars):\n$best")
             best
         } catch (e: Exception) {
-            android.util.Log.e("BusinessCardOcr", "OCR failed", e) // ВРЕМЕННО
             ""
         } finally {
             tess.recycle()
@@ -119,18 +101,6 @@ object BusinessCardOcr {
     private fun rotateBitmapDegrees(src: Bitmap, degrees: Int): Bitmap {
         val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
         return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
-    }
-
-    /** ВРЕМЕННО (см. выше) — сохраняет bitmap в externalFilesDir/debug_scan для adb pull. */
-    private fun saveDebugBitmap(context: Context, bitmap: Bitmap, name: String) {
-        try {
-            val dir = File(context.getExternalFilesDir(null), "debug_scan").apply { mkdirs() }
-            File(dir, name).outputStream().use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("BusinessCardOcr", "debug save failed", e)
-        }
     }
 
     /**

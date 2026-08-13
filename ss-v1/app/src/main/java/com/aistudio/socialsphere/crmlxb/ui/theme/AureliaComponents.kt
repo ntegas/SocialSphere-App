@@ -152,7 +152,7 @@ fun AureliaAvatar(
             color = Color.White,
             fontSize = fontSize,
             fontWeight = if (serif) FontWeight.W600 else FontWeight.W700,
-            fontFamily = if (serif) AureliaSerif else AureliaSans,
+            fontFamily = if (serif) aureliaSerifFor(name) else AureliaSans,
         )
     }
 }
@@ -241,7 +241,7 @@ fun AureliaFormSheet(
                 titleLeading?.invoke()
                 Text(
                     title,
-                    fontFamily = AureliaSerif, fontWeight = FontWeight.W700,
+                    fontFamily = aureliaSerifFor(title), fontWeight = FontWeight.W700,
                     fontSize = 20.sp, color = AppleTheme.colors.label,
                 )
             }
@@ -290,7 +290,7 @@ fun AureliaConfirmDialog(
         icon = icon,
         title = {
             Text(
-                title, fontFamily = AureliaSerif, fontWeight = FontWeight.W700,
+                title, fontFamily = aureliaSerifFor(title), fontWeight = FontWeight.W700,
                 fontSize = 18.sp, color = AppleTheme.colors.label,
             )
         },
@@ -425,7 +425,7 @@ fun AureliaStatCard(
             }
             Column {
                 // font:700 26px 'Playfair Display'
-                Text(value, fontFamily = AureliaSerif, fontWeight = FontWeight.W700,
+                Text(value, fontFamily = aureliaSerifFor(value), fontWeight = FontWeight.W700,
                     fontSize = 26.sp, lineHeight = 26.sp, color = valueColor)
                 Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                     color = AppleTheme.colors.secondaryLabel, maxLines = 1,
@@ -540,7 +540,7 @@ fun AureliaPickerSheet(
     AureliaSheet(onDismiss = onDismiss, dismissOnDrag = false) {
         Text(
             title,
-            fontFamily = AureliaSerif, fontSize = 22.sp, fontWeight = FontWeight.W800,
+            fontFamily = aureliaSerifFor(title), fontSize = 22.sp, fontWeight = FontWeight.W800,
             color = AppleTheme.colors.label,
             modifier = Modifier.padding(bottom = 12.dp)
         )
@@ -638,7 +638,7 @@ fun AureliaPickerSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(item.title.take(1).uppercase(), color = Color.White,
-                                fontFamily = AureliaSerif, fontSize = 17.sp, fontWeight = FontWeight.W700)
+                                fontFamily = aureliaSerifFor(item.title), fontSize = 17.sp, fontWeight = FontWeight.W700)
                         }
                     } else {
                         AureliaAvatar(id = item.id, name = item.title, size = 40.dp, fontSize = 14.sp)

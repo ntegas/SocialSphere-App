@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.R
-import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif
 
 // Тёмная палитра онбординга (макет Aurelia, тёмный экран приветствия).
 // internal (не private): переиспользуется остальными экранами тура —
@@ -71,7 +70,7 @@ fun OnboardingScreen(onStart: () -> Unit) {
             // ── Заголовок + подзаголовок ──
             Text(
                 stringResource(R.string.onboarding_headline),
-                fontFamily = AureliaSerif, fontWeight = FontWeight.W800,
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.onboarding_headline)), fontWeight = FontWeight.W800,
                 fontSize = 40.sp, lineHeight = 46.sp, color = ObTx
             )
             Spacer(Modifier.height(16.dp))

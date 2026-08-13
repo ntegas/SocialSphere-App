@@ -24,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.R
-import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif
 import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
 
 /**
@@ -73,7 +72,7 @@ fun OnboardingPersonaScreen(onNext: () -> Unit, onSkip: () -> Unit) {
 
             Text(
                 stringResource(R.string.onboarding_persona_title),
-                fontFamily = AureliaSerif, fontWeight = FontWeight.W800,
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.onboarding_persona_title)), fontWeight = FontWeight.W800,
                 fontSize = 28.sp, lineHeight = 34.sp, color = ObTx
             )
 

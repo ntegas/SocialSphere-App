@@ -18,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.R
-import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif
 import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
 
 /**
@@ -115,7 +114,7 @@ private fun OnboardingImportIntroScreen(onImportNow: () -> Unit, onSkip: () -> U
             Spacer(Modifier.weight(1f))
             Text(
                 stringResource(R.string.onboarding_step_import_title),
-                fontFamily = AureliaSerif, fontWeight = FontWeight.W800,
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.onboarding_step_import_title)), fontWeight = FontWeight.W800,
                 fontSize = 30.sp, lineHeight = 36.sp, color = ObTx
             )
             Spacer(Modifier.height(14.dp))
@@ -160,7 +159,7 @@ private fun OnboardingFinalScreen(onFinish: () -> Unit) {
             Spacer(Modifier.weight(1f))
             Text(
                 stringResource(R.string.onboarding_finish_title),
-                fontFamily = AureliaSerif, fontWeight = FontWeight.W800,
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.onboarding_finish_title)), fontWeight = FontWeight.W800,
                 fontSize = 34.sp, lineHeight = 40.sp, color = ObTx
             )
             Spacer(Modifier.height(16.dp))

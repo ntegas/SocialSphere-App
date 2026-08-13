@@ -109,27 +109,40 @@ fun MapScreen(
 
     var searchQuery by remember { mutableStateOf("") }
 
-    // Check permission on first composition (don't request automatically).
-    // FIX (корень бага «пропала точка/кнопка, острова», 2026-07-04): проверяем
-    // ОБА разрешения — FINE и COARSE. Раньше здесь был только FINE, а permLauncher
-    // ниже засчитывает и COARSE. Из-за этого при выданном «Приблизительно» карта
-    // работала в ту сессию, но при следующем запуске эта проверка видела «точного
-    // нет» → locationPermGranted=false → нет синей точки, нет кнопки «где я»,
-    // userLatLng не запрашивался → карта падала на заглушку (Афины, острова).
-    LaunchedEffect(Unit) {
-        locationPermGranted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED ||
-        ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
         locationPermGranted = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                               perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    }
+
+    // Check permission on first composition, and PROACTIVELY request it if not
+    // yet granted — раньше только проверяли и молча ждали, пока владелец сам
+    // не нажмёт кнопку «где я» (которая к тому же в углу, легко не заметить).
+    // ФИКС (аудит 2026-08-11, жалоба владельца: «при первом включении карты сразу
+    // должен спросить про GPS, иначе люди не увидят себя»): запрашиваем сразу при
+    // первом открытии вкладки, если разрешения ещё нет. Системный диалог сам
+    // перестаёт появляться после повторных отказов (стандартное поведение
+    // Android) — это не превращается в назойливый повтор на каждый заход.
+    // FIX (корень бага «пропала точка/кнопка, острова», 2026-07-04): проверяем
+    // ОБА разрешения — FINE и COARSE. Раньше здесь был только FINE, а permLauncher
+    // выше засчитывает и COARSE. Из-за этого при выданном «Приблизительно» карта
+    // работала в ту сессию, но при следующем запуске эта проверка видела «точного
+    // нет» → locationPermGranted=false → нет синей точки, нет кнопки «где я»,
+    // userLatLng не запрашивался → карта падала на заглушку (Афины, острова).
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        locationPermGranted = granted
+        if (!granted) {
+            permLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+            )
+        }
     }
 
     // stringResource нельзя в derivedStateOf — захватываем лейблы типов адреса
@@ -463,8 +476,16 @@ fun MapScreen(
                             properties = MapProperties(
                                 isMyLocationEnabled = safeLocationEnabled
                             ),
+                            // ФИКС (аудит 2026-08-11, жалоба владельца: «за этой кнопкой тоже
+                            // что-то стоит, закрывает другой кнопкой»): myLocationButtonEnabled
+                            // включает СОБСТВЕННУЮ, нативную кнопку-локатор Google Maps SDK —
+                            // в фиксированной позиции, вне контроля нашего Compose-layout — ПОВЕРХ
+                            // уже существующей своей, Aurelia-стилизованной кнопки «моё местоположение»
+                            // в строке поиска (см. ниже, Icons.Default.MyLocation). Две кнопки одной
+                            // и той же функции визуально накладывались друг на друга. Нативная
+                            // больше не нужна — своя уже делает и запрос разрешения, и recenter.
                             uiSettings = MapUiSettings(
-                                myLocationButtonEnabled = safeLocationEnabled,
+                                myLocationButtonEnabled = false,
                                 zoomControlsEnabled     = true,
                                 mapToolbarEnabled       = false
                             ),
@@ -585,7 +606,14 @@ fun MapScreen(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        // ФИКС (аудит 2026-08-11, жалоба владельца: «текст переполовинен, не
+                        // видно» — подтверждено): жёсткий .height(48.dp) на OutlinedTextField
+                        // обрезал контент — M3-поле не сжимает свой внутренний padding под
+                        // навязанную высоту меньше собственной естественной (~56dp), лишнее
+                        // просто клипается родительским Box. .heightIn(min=...) вместо
+                        // .height(...) даёт полю вырасти до нужной высоты без обрезания текста,
+                        // 48dp по-прежнему гарантирован как МИНИМУМ (тач-таргет не уменьшился).
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         placeholder = { Text(stringResource(R.string.map_search_hint), color = AppleTheme.colors.secondaryLabel) },
                         leadingIcon = { Icon(Icons.Default.Search, null, tint = AppleTheme.colors.secondaryLabel, modifier = Modifier.size(18.dp)) },
                         trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) } },
@@ -697,7 +725,7 @@ fun MapScreen(
                         com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showRelSheet = false }) {
                             Text(
                                 stringResource(R.string.map_filter_title),
-                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.map_filter_title)),
                                 fontSize = 20.sp, fontWeight = FontWeight.W700,
                                 color = AppleTheme.colors.label,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -846,7 +874,7 @@ fun MapScreen(
                         com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showCompanySheet = false }) {
                             Text(
                                 stringResource(R.string.map_filter_by_company),
-                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.map_filter_by_company)),
                                 fontSize = 20.sp, fontWeight = FontWeight.W700,
                                 color = AppleTheme.colors.label,
                                 modifier = Modifier.padding(bottom = 8.dp)

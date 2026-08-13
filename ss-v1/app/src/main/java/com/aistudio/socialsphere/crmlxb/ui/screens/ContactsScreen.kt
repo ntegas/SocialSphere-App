@@ -172,7 +172,7 @@ fun ContactsScreen(
             TopAppBar(
                 title = {
                     if (!searchActive) {
-                        Text(stringResource(R.string.common_contacts), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.common_contacts), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.common_contacts)))
                     } else {
                         TextField(
                             value = searchQuery,
@@ -354,7 +354,10 @@ fun ContactsScreen(
                         Text(
                             if (noContactsAtAll) stringResource(R.string.contacts_empty_title)
                             else stringResource(R.string.home_nothing_found, searchQuery),
-                            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(
+                                if (noContactsAtAll) stringResource(R.string.contacts_empty_title)
+                                else stringResource(R.string.home_nothing_found, searchQuery)
+                            ),
                             fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
                             color = AppleTheme.colors.label,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -553,7 +556,7 @@ internal fun ContactFilterSheet(
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.contacts_filters),
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.contacts_filters)),
                     fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = AppleTheme.colors.label
                 )
                 TextButton(onClick = {
@@ -679,7 +682,7 @@ internal fun ContactFilterSheet(
                         com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { editingCustomType = null }) {
                             Text(
                                 ct,
-                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(ct),
                                 fontSize = 20.sp, fontWeight = FontWeight.W700,
                                 color = AppleTheme.colors.label,
                                 modifier = Modifier.padding(bottom = 12.dp)

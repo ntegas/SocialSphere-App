@@ -641,11 +641,12 @@
     <string name="priv_biometric_title">Βιομετρικά για «Προστατευμένο»</string>
     <string name="priv_biometric_sub">Δακτυλικό αποτύπωμα ή κωδικός συσκευής για εμφάνιση προστατευμένων εγγραφών</string>
     <string name="priv_biometric_unavailable">Βιομετρικά ή κλείδωμα οθόνης δεν έχουν ρυθμιστεί στη συσκευή</string>
+    <string name="priv_biometric_needs_pin">Ορίστε πρώτα κωδικό PIN — είναι το εφεδρικό αν αποτύχουν κάποτε τα βιομετρικά</string>
     <string name="bio_prompt_title">Εμφάνιση προστατευμένων εγγραφών</string>
     <string name="lock_app_section">Κλείδωμα εφαρμογής</string>
     <string name="lock_app_title">Κλείδωμα εφαρμογής</string>
     <string name="lock_app_sub">Απαίτηση PIN ή βιομετρικών κατά το άνοιγμα</string>
-    <string name="lock_app_needs_method">Ορίστε πρώτα κωδικό PIN ή ενεργοποιήστε τα βιομετρικά</string>
+    <string name="lock_app_needs_method">Ορίστε πρώτα κωδικό PIN — είναι το εφεδρικό αν αποτύχουν κάποτε τα βιομετρικά</string>
     <string name="lock_pin_title">Κωδικός PIN</string>
     <string name="lock_pin_set">Ορισμός κωδικού PIN</string>
     <string name="lock_pin_change">Αλλαγή κωδικού PIN</string>
@@ -989,7 +990,7 @@
     <string name="lbl_note_type_general">Γενική</string>
     <string name="lbl_note_type_important_to_remember">Σημαντικό να θυμάσαι</string>
     <string name="lbl_note_type_work">Εργασία</string>
-    <string name="lbl_note_type_personal_detail">Προσωπική λεπτομέρεια</string>
+    <string name="lbl_note_type_personal_detail">Στόχος / όνειρο</string>
     <string name="lbl_note_type_gift">Δώρο</string>
     <string name="lbl_note_type_date_event">Ημερομηνία/γεγονός</string>
     <string name="lbl_gift_status_idea">Ιδέα</string>

@@ -27,7 +27,7 @@ import java.util.zip.ZipOutputStream
  */
 @JsonClass(generateAdapter = true)
 data class BackupData(
-    val version: Int = 5,
+    val version: Int = 6,
     val exportedAt: String = "",
     val contacts: List<Contact> = emptyList(),
     val companies: List<Company> = emptyList(),
@@ -47,7 +47,13 @@ data class BackupData(
     // вообще. Плоский список — единственный источник истины (как в AppStateStore),
     // покрывает и контактные, и компанийные заметки разом. Default emptyList()
     // — старые бэкапы (version<5) по-прежнему парсятся, просто без заметок.
-    val notes: List<Note> = emptyList()
+    val notes: List<Note> = emptyList(),
+    // ФИКС (2026-08-12, тот же класс бага, что и notes/§44, просто не был
+    // найден вместе с ним): подарки живут в собственной таблице (giftDao),
+    // addContactDb её никогда не писал — restoreContact восстанавливал контакт,
+    // но не его подарки, они не переживали переустановку. version 5→6, default
+    // emptyList() — старые бэкапы по-прежнему парсятся, просто без подарков.
+    val gifts: List<GiftIdea> = emptyList()
 )
 
 object ExportManager {
@@ -225,7 +231,7 @@ object ExportManager {
         }
     }
 
-    private fun writeVCard(pw: PrintWriter, c: Contact, context: Context) {
+    private fun writeVCard(pw: PrintWriter, c: Contact) {
         pw.println("BEGIN:VCARD")
         pw.println("VERSION:3.0")
         writeNameFields(pw, c)
@@ -264,17 +270,15 @@ object ExportManager {
                 pw.println("BDAY:${birthday.replace("-", "")}")
         }
 
-        // NOTE: все заметки + app-поля (нет в стандарте vCard — кладём текстом)
-        val noteParts = mutableListOf<String>()
-        c.notes.forEach { noteParts.add(it.text) }
-        if (!c.nextStep.isNullOrBlank())      noteParts.add(context.getString(R.string.export_vcard_next_step_prefix) + c.nextStep)
-        if (!c.talkingPoints.isNullOrBlank()) noteParts.add(context.getString(R.string.export_vcard_talking_points_prefix) + c.talkingPoints)
-        if (!c.canHelpWith.isNullOrBlank())   noteParts.add(context.getString(R.string.export_vcard_can_help_prefix) + c.canHelpWith)
-        if (!c.iCanHelpWith.isNullOrBlank())  noteParts.add(context.getString(R.string.export_vcard_i_can_help_prefix) + c.iCanHelpWith)
-        if (!c.meetContext.isNullOrBlank())   noteParts.add(context.getString(R.string.export_vcard_meet_context_prefix) + c.meetContext)
-        if (c.tags.isNotEmpty())              noteParts.add(context.getString(R.string.export_vcard_tags_prefix) + c.tags.joinToString(", "))
-        if (noteParts.isNotEmpty())
-            pw.println("NOTE:${vEsc(noteParts.joinToString("\n"))}")
+        // NOTE: заметки/личные детали/подарки/следующий шаг и т.д. — нет в
+        // стандарте vCard, кладём текстом. Каждая запись помечена меткой
+        // (см. ContactNoteCodec), чтобы «Импорт из контактов телефона» умел
+        // разложить их обратно по своим местам, а не одной общей заметкой
+        // (фидбэк владельца 2026-08-11: «чтобы приложение определяло, что и
+        // куда добавить»). R.string.export_vcard_*_prefix больше не читаются
+        // здесь — метки теперь фиксированные (не зависят от языка интерфейса
+        // на момент экспорта), см. ContactNoteCodec.
+        ContactNoteCodec.encode(c)?.let { pw.println("NOTE:${vEsc(it)}") }
 
         pw.println("END:VCARD")
         pw.println()
@@ -315,7 +319,7 @@ object ExportManager {
         cleanOldExports(context)
         val file = File(exportsDir(context), "contacts_$ts.vcf")
         PrintWriter(FileWriter(file)).use { pw ->
-            AppStateStore.contacts.forEach { writeVCard(pw, it, context) }
+            AppStateStore.contacts.forEach { writeVCard(pw, it) }
         }
         file
     }
@@ -327,7 +331,7 @@ object ExportManager {
             val safe = "${contact.firstName}_${contact.lastName}"
                 .replace(Regex("[^A-Za-z0-9_]"), "")
             val file = File(exportsDir(context), "contact_${safe.ifBlank { "card" }}_$ts.vcf")
-            PrintWriter(FileWriter(file)).use { pw -> writeVCard(pw, contact, context) }
+            PrintWriter(FileWriter(file)).use { pw -> writeVCard(pw, contact) }
             file
         }
 
@@ -361,7 +365,7 @@ object ExportManager {
     }
 
     private fun buildBackup(): BackupData = BackupData(
-        version = 5,
+        version = 6,
         exportedAt = LocalDateTime.now().toString(),
         contacts = AppStateStore.contacts.toList(),
         companies = AppStateStore.companies.toList(),
@@ -371,7 +375,8 @@ object ExportManager {
         groupMembers = AppStateStore.groupMembers.toList(),
         tags = AppStateStore.tags.toList(),
         tagMembers = AppStateStore.tagMembers.toList(),
-        notes = AppStateStore.notes.toList()
+        notes = AppStateStore.notes.toList(),
+        gifts = AppStateStore.gifts.toList()
     )
 
     // Бэкап как строка JSON — для прямого сохранения в файл через SAF.
@@ -401,7 +406,7 @@ object ExportManager {
         // Лёгкая проверка целостности: версия формата в разумных границах.
         // Отсекает мусор/чужой JSON, который Moshi случайно распарсил.
         // (Криптоподпись для локального личного бэкапа намеренно вне рамок.)
-        if (data.version < 1 || data.version > 5) return -1
+        if (data.version < 1 || data.version > 6) return -1
         data.companies.forEach { co ->
             if (AppStateStore.companies.any { it.id == co.id }) AppStateStore.updateCompany(co)
             else AppStateStore.addCompany(co)
@@ -427,6 +432,10 @@ object ExportManager {
         // вообще не попадали в бэкап (Company.notes не существует). Теперь —
         // явно, из плоского top-level списка, с реальной записью в БД.
         data.notes.forEach { n -> AppStateStore.restoreNote(n) }
+        // ФИКС (2026-08-12): та же дыра, что была у заметок (§44) — подарки жили
+        // только вложенными в Contact, addContactDb/restoreContact их не писали
+        // в giftDao, поэтому не переживали переустановку. См. BackupData.gifts.
+        data.gifts.forEach { g -> AppStateStore.restoreGift(g) }
         return data.contacts.size
     }
 
@@ -455,7 +464,7 @@ object ExportManager {
      *  если есть, игнорируются). Возвращает число заметок, -1 если файл не бэкап. */
     fun importNotesJson(json: String): Int {
         val data = parseJsonBackup(json) ?: return -1
-        if (data.version < 1 || data.version > 5) return -1
+        if (data.version < 1 || data.version > 6) return -1
         data.notes.forEach { n -> AppStateStore.restoreNote(n) }
         return data.notes.size
     }
@@ -477,7 +486,7 @@ object ExportManager {
     /** Восстанавливает ТОЛЬКО события календаря (остальные категории игнорируются). */
     fun importCalendarJson(json: String): Int {
         val data = parseJsonBackup(json) ?: return -1
-        if (data.version < 1 || data.version > 5) return -1
+        if (data.version < 1 || data.version > 6) return -1
         data.calendarItems.forEach { ci -> AppStateStore.restoreCalendarItem(ci) }
         return data.calendarItems.size
     }

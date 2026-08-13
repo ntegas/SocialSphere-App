@@ -238,7 +238,7 @@ fun ContactDetailScreen(
         com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showGroupsSheet = false }) {
             Text(
                 stringResource(R.string.cd_groups),
-                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.cd_groups)),
                 fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label,
                 modifier = Modifier.padding(bottom = 6.dp)
             )
@@ -308,7 +308,7 @@ fun ContactDetailScreen(
             com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { editingGroup = null }) {
                 Text(
                     g.name,
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(g.name),
                     fontSize = 20.sp, fontWeight = FontWeight.W700,
                     color = AppleTheme.colors.label,
                     modifier = Modifier.padding(bottom = 12.dp)
@@ -644,7 +644,7 @@ fun ContactDetailScreen(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     stringResource(R.string.cd_preference),
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.cd_preference)),
                     fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
                 )
                 PillChoiceRow(
@@ -890,7 +890,7 @@ fun ContactDetailScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(
                         stringResource(R.string.cd_add_personal_detail),
-                        fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                        fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.cd_add_personal_detail)),
                         fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
                     )
 
@@ -1146,7 +1146,7 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
                             modifier = Modifier.size(56.dp).clip(CircleShape)
                         )
                     } else Text(initials.uppercase(), color = Color.White,
-                        fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                        fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(initials),
                         fontSize = 22.sp, fontWeight = FontWeight.W600)
                 }
                 DropdownMenu(expanded = showStatusMenu, onDismissRequest = { showStatusMenu = false }) {
@@ -1166,7 +1166,7 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
             }
             Column(Modifier.weight(1f)) {
                 com.aistudio.socialsphere.crmlxb.ui.components.CopyableText(name, color = AppleTheme.colors.label,
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(name),
                     fontSize = 21.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.01).em,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle.isNotEmpty())
@@ -1356,7 +1356,7 @@ private fun SecondaryRelationshipTypesSheet(
     com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = onDismiss) {
         Text(
             stringResource(R.string.cd_secondary_rel_types_title),
-            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.cd_secondary_rel_types_title)),
             fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label,
             modifier = Modifier.padding(bottom = 4.dp)
         )

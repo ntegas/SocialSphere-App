@@ -24,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.R
-import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif
 import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
 
 /**
@@ -141,7 +140,7 @@ private fun DemoAvatar(name: String, colorIdx: Int, size: androidx.compose.ui.un
 @Composable
 private fun DemoHome(names: List<String>) {
     Column {
-        Text(stringResource(R.string.home_today), fontFamily = AureliaSerif, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 24.sp, color = ApInk)
+        Text(stringResource(R.string.home_today), fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.home_today)), fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 24.sp, color = ApInk)
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             repeat(3) { Box(Modifier.weight(1f).height(36.dp).clip(SocialShape.Medium).background(ApCard)) }
@@ -169,7 +168,7 @@ private fun DemoHome(names: List<String>) {
 @Composable
 private fun DemoContacts(names: List<String>) {
     Column {
-        Text(stringResource(R.string.nav_contacts), fontFamily = AureliaSerif, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = ApInk)
+        Text(stringResource(R.string.nav_contacts), fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.nav_contacts)), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = ApInk)
         Spacer(Modifier.height(10.dp))
         Row(
             Modifier.fillMaxWidth().clip(SocialShape.Medium).background(ApCard).padding(horizontal = 12.dp, vertical = 10.dp),
@@ -195,7 +194,7 @@ private fun DemoDetail(name: String) {
     Column {
         DemoAvatar(name, 0, 44.dp)
         Spacer(Modifier.height(8.dp))
-        Text(name, fontFamily = AureliaSerif, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = ApInk)
+        Text(name, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(name), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = ApInk)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             DemoChip(stringResource(R.string.lbl_relationship_type_family), true)
@@ -230,7 +229,7 @@ private fun DemoChip(text: String, on: Boolean) {
 @Composable
 private fun DemoCalendar() {
     Column {
-        Text(stringResource(R.string.nav_calendar), fontFamily = AureliaSerif, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = ApInk)
+        Text(stringResource(R.string.nav_calendar), fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.nav_calendar)), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = ApInk)
         Spacer(Modifier.height(10.dp))
         Column(Modifier.fillMaxWidth().clip(SocialShape.Medium).background(ApCard).padding(10.dp)) {
             Text(

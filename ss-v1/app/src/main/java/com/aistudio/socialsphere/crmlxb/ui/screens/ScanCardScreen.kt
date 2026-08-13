@@ -84,9 +84,6 @@ fun ScanCardScreen(
     // редактируемые поля шага 2 (см. reviewed-ветку ниже).
     fun applyParsed(text: String) {
         val p = BusinessCardParser.parse(text)
-        android.util.Log.d("ScanCardScreen", "parsed: name='${p.firstName} ${p.lastName}' " + // ВРЕМЕННО
-            "phones=${p.phones} emails=${p.emails} company=${p.company} position=${p.position} " +
-            "website=${p.website} addresses=${p.addresses} unmatched=${p.unmatched}")
         firstName = p.firstName
         lastName  = p.lastName
         phones = p.phones.mapIndexed { i, pp ->

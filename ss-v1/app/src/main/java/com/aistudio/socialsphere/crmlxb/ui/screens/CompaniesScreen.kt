@@ -147,7 +147,7 @@ fun CompaniesScreen(
             TopAppBar(
                 title = {
                     if (!searchActive) {
-                        Text(stringResource(R.string.comp_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.comp_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.comp_title)))
                     } else {
                         TextField(
                             value = searchQuery,

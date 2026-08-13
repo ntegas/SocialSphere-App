@@ -434,7 +434,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                                 sel.id, "${sel.firstName} ${sel.lastName}".trim(), size = 38.dp, fontSize = 14.sp)
                             Text(
                                 "${sel.firstName} ${sel.lastName}".trim(),
-                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor("${sel.firstName} ${sel.lastName}"),
                                 fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
                             )
                         }

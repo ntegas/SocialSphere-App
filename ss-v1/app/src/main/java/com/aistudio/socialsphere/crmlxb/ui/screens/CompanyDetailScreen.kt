@@ -214,12 +214,12 @@ fun CompanyHero(company: Company, ctxLabel: android.content.Context) {
             contentAlignment = Alignment.Center
         ) {
             Text(initial, color = Color.White,
-                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(initial),
                 fontSize = 34.sp, fontWeight = FontWeight.Bold)
         }
         Text(
             company.name,
-            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(company.name),
             fontSize = 26.sp, fontWeight = FontWeight.Bold,
             color = AppleTheme.colors.label,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -254,7 +254,7 @@ private fun CompanyStat(value: String, label: String, valueColor: Color, modifie
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            Text(value, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(value),
                 fontSize = 22.sp, fontWeight = FontWeight.Bold, color = valueColor)
             Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                 color = AppleTheme.colors.secondaryLabel, modifier = Modifier.padding(top = 1.dp))

@@ -558,7 +558,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.communicationTab(contact: Con
             com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = { showLink = false; search = "" }) {
                 Text(
                     stringResource(R.string.sync_pick_contact),
-                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                    fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.sync_pick_contact)),
                     fontSize = 20.sp, fontWeight = FontWeight.W700,
                     color = AppleTheme.colors.label,
                     modifier = Modifier.padding(bottom = 8.dp)

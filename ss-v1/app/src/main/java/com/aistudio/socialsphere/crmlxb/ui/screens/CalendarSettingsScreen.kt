@@ -190,7 +190,7 @@ private fun EventColorPickerSheet(
     com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSheet(onDismiss = onDismiss) {
         Text(
             stringResource(R.string.calset_pick_color, typeName),
-            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.calset_pick_color, typeName)),
             fontSize = 18.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label,
             modifier = Modifier.padding(bottom = 14.dp)
         )

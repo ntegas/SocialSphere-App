@@ -29,6 +29,7 @@ import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.ContactImporter
+import com.aistudio.socialsphere.crmlxb.utils.ContactNoteCodec
 import com.aistudio.socialsphere.crmlxb.utils.parseVCard
 import com.aistudio.socialsphere.crmlxb.utils.parseCsv
 import com.aistudio.socialsphere.crmlxb.utils.DuplicateStatus
@@ -653,15 +654,20 @@ internal fun applyImportedCompany(
         AppStateStore.updateContact(current.copy(companyRelations = current.companyRelations + relation))
         return true
     } else if (!jobTitle.isNullOrBlank()) {
-        val text = context.getString(R.string.imp_job_on_import, jobTitle)
+        // ФИКС (аудит 2026-08-11, жалоба владельца при сканировании визитки: «только
+        // компания добавилась, а там больше написано... почему не можешь сканировать»):
+        // раньше должность БЕЗ компании (визитка/CSV/vCard без явной компании) пряталась
+        // в generic-заметке — непрозрачное текстовое поле, не видна в шапке карточки,
+        // не участвует в поиске. §46 этой же сессии чинил ОТОБРАЖЕНИЕ/ПОИСК по
+        // Contact.profession — но само поле никогда не заполнялось ни одним из путей
+        // импорта (CSV/vCard/телефонная книга/сканер визитки — все идут через эту же
+        // функцию). Теперь пишем в САМ Contact.profession, а не в заметку — тот текст
+        // уже не теряется (сканер пишет ВЕСЬ сырой OCR-текст отдельной заметкой в любом
+        // случае, см. ScanCardScreen.kt scan_raw_text_note), просто структурное поле
+        // получает структурное значение вместо того, чтобы прятаться в тексте заметки.
         val current = AppStateStore.contacts.find { it.id == contactId } ?: return false
-        if (current.notes.any { it.text == text }) return false
-        val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-        AppStateStore.addNote(Note(
-            id = java.util.UUID.randomUUID().toString(), contactId = contactId,
-            type = NoteType.GENERAL, text = text, isImportant = false,
-            createdAt = now, updatedAt = now
-        ))
+        if (!current.profession.isNullOrBlank()) return false
+        AppStateStore.updateContact(current.copy(profession = jobTitle.trim()))
         return true
     }
     return false
@@ -677,6 +683,15 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
 
     selected.forEach { candidate ->
         val contactId = java.util.UUID.randomUUID().toString()
+        // ФИКС (фидбэк владельца 2026-08-11: «чтобы приложение определяло, что
+        // и куда добавить» при обратном импорте из контактов телефона) —
+        // candidate.notes раньше целиком уходил в ОДНУ generic-заметку (см. блок
+        // ниже). ContactNoteCodec распознаёт метки, которыми ExportManager
+        // теперь помечает каждую запись, и раскладывает их обратно по
+        // структурным полям контакта; нераспознанное (например, заметка,
+        // написанная владельцем прямо в Контактах телефона) не теряется —
+        // остаётся в decoded.fallbackText и всё равно попадает в заметку ниже.
+        val decoded = ContactNoteCodec.decode(candidate.notes)
         val newContact = Contact(
             id = contactId,
             firstName = candidate.firstName,
@@ -693,6 +708,21 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
             importanceLevel = ImportanceLevel.NORMAL,
             socialRole = SocialRole.REGULAR,
             communicationRhythm = CommunicationRhythm.NOT_TRACKED,
+            nextStep = decoded.nextStep,
+            talkingPoints = decoded.talkingPoints,
+            canHelpWith = decoded.canHelpWith,
+            iCanHelpWith = decoded.iCanHelpWith,
+            meetContext = decoded.meetContext,
+            tags = decoded.tags,
+            personalDetails = decoded.personalDetails.map {
+                PersonalDetail(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    category = it.category,
+                    value = it.value,
+                    note = it.note
+                )
+            },
             // Связь с контактом телефона — candidate.id уже в формате
             // "device_contact_<ID>" (см. ContactImporter.getDeviceContacts).
             // Раньше не проставлялось — импортированные так контакты никогда
@@ -754,21 +784,51 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
             birthdaysCreated++
         }
         
-        if (!candidate.notes.isNullOrBlank()) {
-            // ФИКС (данные-потеря, «должен не терять ни фразы»): раньше заметка
-            // добавлялась через updateContact(contact.copy(notes = ...)) — это
-            // кладёт её ТОЛЬКО во встроенный список контакта, но НЕ в глобальный
-            // AppStateStore.notes, откуда реально читает вкладка «Заметки»
-            // (NotesTab.kt: allNotes = AppStateStore.notes.filter{contactId==...}).
-            // Заметка технически создавалась, но была невидима в UI без перезапуска
-            // приложения. addNote() — канонический путь, синхронизирует оба списка
-            // (тот же паттерн, что уже применён для addresses/companyRelations).
+        // Распознанные (помеченные) заметки — addNote(), канонический путь,
+        // синхронизирует и глобальный AppStateStore.notes, и встроенный
+        // contact.notes (тот же паттерн, что уже применён для addresses/
+        // companyRelations — иначе запись технически создаётся, но невидима
+        // в UI без перезапуска приложения).
+        decoded.notes.forEach { dn ->
+            AppStateStore.addNote(
+                Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    type = dn.type,
+                    text = dn.text,
+                    isImportant = false,
+                    isLocked = dn.isLocked,
+                    createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                )
+            )
+        }
+        // Идеи подарков — addGift(), синхронизирует AppStateStore.gifts
+        // (читает GiftsTab) и встроенный contact.gifts.
+        decoded.gifts.forEach { dg ->
+            AppStateStore.addGift(
+                GiftIdea(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    title = dg.title,
+                    note = dg.note,
+                    link = dg.link,
+                    date = dg.date,
+                    status = dg.status
+                )
+            )
+        }
+        if (!decoded.fallbackText.isNullOrBlank()) {
+            // Нераспознанные строки поля NOTE (например, заметка, которую
+            // владелец написал прямо в Контактах телефона, а не через наш
+            // экспорт) — как раньше, одна общая заметка импорта, ничего не
+            // теряется, просто не раскладывается по структурным полям.
             AppStateStore.addNote(
                 Note(
                     id = java.util.UUID.randomUUID().toString(),
                     contactId = contactId,
                     type = NoteType.GENERAL,
-                    text = context.getString(R.string.imp_note_from_import, candidate.notes),
+                    text = context.getString(R.string.imp_note_from_import, decoded.fallbackText),
                     isImportant = false,
                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
                     updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -953,9 +1013,50 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
     // Заметка/группы телефона — раньше переносились ТОЛЬКО при создании нового
     // контакта; при слиянии с существующим (этот путь) молча терялись, хотя
     // ContactImporter их уже распарсил (найдено при разборе жалобы 2026-07-04).
-    if (!candidate.notes.isNullOrBlank()) {
+    // ФИКС (фидбэк владельца 2026-08-11: «чтобы приложение определяло, что и
+    // куда добавить») — та же логика, что и в performImport выше: помеченные
+    // записи раскладываются по структурным полям, а не в одну generic-заметку.
+    // При слиянии НЕ перезаписываем уже заполненные скалярные поля (nextStep
+    // и т.д.) импортированными — только дополняем пустые, тот же принцип,
+    // что уже применён в applyImportedCompany (не затирать данные владельца).
+    val decoded = ContactNoteCodec.decode(candidate.notes)
+
+    decoded.notes.forEach { dn ->
+        val already = existingContact.notes.any { it.type == dn.type && it.text == dn.text }
+        if (!already) {
+            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            AppStateStore.addNote(
+                Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = existingId,
+                    type = dn.type,
+                    text = dn.text,
+                    isImportant = false,
+                    isLocked = dn.isLocked,
+                    createdAt = now, updatedAt = now
+                )
+            )
+        }
+    }
+    decoded.gifts.forEach { dg ->
+        val already = existingContact.gifts.any { it.title == dg.title && it.status == dg.status }
+        if (!already) {
+            AppStateStore.addGift(
+                GiftIdea(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = existingId,
+                    title = dg.title,
+                    note = dg.note,
+                    link = dg.link,
+                    date = dg.date,
+                    status = dg.status
+                )
+            )
+        }
+    }
+    if (!decoded.fallbackText.isNullOrBlank()) {
         val hasImportedNote = existingContact.notes.any {
-            it.text == context.getString(R.string.imp_note_from_import, candidate.notes)
+            it.text == context.getString(R.string.imp_note_from_import, decoded.fallbackText)
         }
         if (!hasImportedNote) {
             val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -966,12 +1067,47 @@ fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.C
                     id = java.util.UUID.randomUUID().toString(),
                     contactId = existingId,
                     type = NoteType.GENERAL,
-                    text = context.getString(R.string.imp_note_from_import, candidate.notes),
+                    text = context.getString(R.string.imp_note_from_import, decoded.fallbackText),
                     isImportant = false,
                     createdAt = now, updatedAt = now
                 )
             )
         }
+    }
+    val newPersonalDetails = decoded.personalDetails.filter { d ->
+        existingContact.personalDetails.none { it.category == d.category && it.value == d.value }
+    }
+    val scalarFieldsChanged = newPersonalDetails.isNotEmpty() ||
+        (existingContact.nextStep.isNullOrBlank() && !decoded.nextStep.isNullOrBlank()) ||
+        (existingContact.talkingPoints.isNullOrBlank() && !decoded.talkingPoints.isNullOrBlank()) ||
+        (existingContact.canHelpWith.isNullOrBlank() && !decoded.canHelpWith.isNullOrBlank()) ||
+        (existingContact.iCanHelpWith.isNullOrBlank() && !decoded.iCanHelpWith.isNullOrBlank()) ||
+        (existingContact.meetContext.isNullOrBlank() && !decoded.meetContext.isNullOrBlank()) ||
+        decoded.tags.any { it !in existingContact.tags }
+    if (scalarFieldsChanged) {
+        // Свежая выборка, а не «existingContact» из начала функции — иначе
+        // перезаписали бы адреса, добавленные чуть выше этим же слиянием
+        // (тот же приём, что и в блоке адресов).
+        val fresh = AppStateStore.contacts.find { it.id == existingId } ?: existingContact
+        AppStateStore.updateContact(
+            fresh.copy(
+                nextStep = fresh.nextStep ?: decoded.nextStep,
+                talkingPoints = fresh.talkingPoints ?: decoded.talkingPoints,
+                canHelpWith = fresh.canHelpWith ?: decoded.canHelpWith,
+                iCanHelpWith = fresh.iCanHelpWith ?: decoded.iCanHelpWith,
+                meetContext = fresh.meetContext ?: decoded.meetContext,
+                tags = (fresh.tags + decoded.tags).distinct(),
+                personalDetails = fresh.personalDetails + newPersonalDetails.map {
+                    PersonalDetail(
+                        id = java.util.UUID.randomUUID().toString(),
+                        contactId = existingId,
+                        category = it.category,
+                        value = it.value,
+                        note = it.note
+                    )
+                }
+            )
+        )
     }
     if (candidate.groupNames.isNotEmpty()) {
         val groupIds = candidate.groupNames.mapNotNull { AppStateStore.addGroup(it)?.id }.toSet()
@@ -1037,7 +1173,7 @@ fun ImportResultScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.imp_success), modifier = Modifier.size(64.dp), tint = AppleTheme.colors.brand)
-            Text(stringResource(R.string.imp_done), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.imp_done), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.imp_done)))
             
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.3f))) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -192,6 +192,38 @@ fun calendarDisplayTitle(
     return title
 }
 
+/**
+ * Обратная операция к [calendarDisplayTitle]: если заголовок начинается с
+ * названия типа (в любой локали приложения) — возвращает то, что записано
+ * ПОСЛЕ разделителя («День рождения: Иван Петров» → «Иван Петров»). null,
+ * если заголовок не в этом формате (пользовательский текст, где имени может
+ * не быть вообще).
+ *
+ * Используется для самовосстановления связи «дата-событие → контакт» (см.
+ * §52 SOCIALSPHERE_KNOWLEDGE.md, 2026-08-12): владелец указал, что имя УЖЕ
+ * видно в Календаре текстом — эта функция и есть то самое чтение имени
+ * обратно, которого раньше не было нигде.
+ */
+fun extractNameFromDateTitle(
+    title: String,
+    type: CalendarItemType,
+    context: android.content.Context
+): String? {
+    val t = title.trim()
+    if (t.isEmpty()) return null
+    val keys = (localizedVariants(context, type.labelResId()) + type.labelKey())
+        .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    for (key in keys) {
+        if (t.startsWith(key, ignoreCase = true) &&
+            t.length > key.length &&
+            !t[key.length].isLetterOrDigit()
+        ) {
+            return t.substring(key.length).trimStart(':', '·', '-', ' ').trim().ifBlank { null }
+        }
+    }
+    return null
+}
+
 fun com.aistudio.socialsphere.crmlxb.model.CalendarItem.displayTitle(
     context: android.content.Context
 ): String = calendarDisplayTitle(title, type, context)
@@ -240,11 +272,16 @@ fun NoteType.label(context: android.content.Context): String = when (this) {
     NoteType.DATE_EVENT -> context.getString(R.string.lbl_note_type_date_event)
 }
 
+// ФИКС (2026-08-12): было "Личная деталь" — путалось с СОВСЕМ другой моделью
+// PersonalDetail/personalDetails (Нравится/Аллергии/Привычки и т.д.), хотя
+// NoteType.PERSONAL_DETAIL на деле рисует раздел «Мечты и цели» (cd_goals_dreams).
+// Имя константы enum'а НЕ трогаем (хранится как строка в БД/JSON — переименование
+// сломало бы старые записи), меняем только видимый текст/vCard-тег.
 fun NoteType.labelKey(): String = when (this) {
     NoteType.GENERAL -> "Общая"
     NoteType.IMPORTANT_TO_REMEMBER -> "Важно помнить"
     NoteType.WORK -> "Рабочая"
-    NoteType.PERSONAL_DETAIL -> "Личная деталь"
+    NoteType.PERSONAL_DETAIL -> "Цель/мечта"
     NoteType.GIFT -> "Подарок"
     NoteType.DATE_EVENT -> "Дата/событие"
 }

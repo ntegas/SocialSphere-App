@@ -358,7 +358,9 @@ fun EventHeader(event: CalendarItem) {
         )
         Text(
             com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel),
-            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(
+                com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel)
+            ),
             fontSize = 28.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label,
             modifier = Modifier.padding(top = 4.dp)
         )

@@ -179,11 +179,11 @@ fun CheatSheetScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text((contact.firstName.take(1) + contact.lastName.take(1)).uppercase(),
-                            color = Color.White, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                            color = Color.White, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(contact.firstName + contact.lastName),
                             fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     }
                     Column {
-                        Text(name, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif,
+                        Text(name, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(name),
                             fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CsTx)
                         val sub = listOf(position, company, city).filter { it.isNotBlank() }.joinToString(" · ")
                         if (sub.isNotEmpty())

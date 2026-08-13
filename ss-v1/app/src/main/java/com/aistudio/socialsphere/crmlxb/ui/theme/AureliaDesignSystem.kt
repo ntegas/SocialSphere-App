@@ -123,6 +123,18 @@ val AureliaSans: FontFamily = FontFamily(
     variableFont(MR, 700), variableFont(MR, 800),
 )
 
+// Playfair Display не существует в греческой раскладке (у Google Fonts для него нет
+// такого начертания вообще) — ни одного греческого глифа в файле. Без этой проверки
+// Android молча подменяет отсутствующие буквы системным шрифтом ПОСИМВОЛЬНО (Minikin
+// fallback): греческое слово целиком становится «тонким», а греческая буква рядом с
+// цифрой/латиницей — кривой на фоне соседних Playfair-символов. Manrope греческий
+// покрывает полностью (включая тонос и конечную сигму ς), поэтому для греческого
+// текста используем его вместо Playfair — жирный и цельный, а не разнобой начертаний.
+private fun containsGreek(text: String): Boolean =
+    text.any { it.code in 0x0370..0x03FF || it.code in 0x1F00..0x1FFF }
+
+fun aureliaSerifFor(text: String): FontFamily = if (containsGreek(text)) AureliaSans else AureliaSerif
+
 // Шкала выверена по CSS макета: Playfair-заголовки letter-spacing -.01em/-.02em
 // (в em, как в CSS), вес 800; Manrope-интерфейс 500/600/700. Размеры и line-height 1:1.
 val AureliaTypography = Typography(
@@ -166,7 +178,7 @@ fun AureliaScreenTitle(
 ) {
     androidx.compose.material3.Text(
         text = text,
-        fontFamily = AureliaSerif,
+        fontFamily = aureliaSerifFor(text),
         fontWeight = FontWeight.W800,
         fontSize = fontSize,
         lineHeight = fontSize * 1.18f,

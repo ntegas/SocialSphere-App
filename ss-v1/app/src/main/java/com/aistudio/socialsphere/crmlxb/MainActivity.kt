@@ -79,21 +79,29 @@ class MainActivity : androidx.appcompat.app.AppCompatActivity() {
             notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // ФИКС (аудит 2026-08-11, PIN_BIOMETRIC_UX_PROMPT.md §3.1): без FLAG_SECURE
-        // содержимое приложения (контакты, заметки) видно в скриншоте карточки в
-        // Recents/переключателе задач и снимается сторонними скриншот-инструментами —
-        // даже когда AppLockScreen прямо сейчас не показан. Стандартная практика для
-        // любого приложения с PIN/биометрией и личными данными. Ставим ВСЕГДА (не
-        // только при включённой защите) — та же приватность-по-умолчанию, что уже
-        // выбрана для allowBackup=false/отсутствия сетевой поверхности.
-        window.setFlags(
-            android.view.WindowManager.LayoutParams.FLAG_SECURE,
-            android.view.WindowManager.LayoutParams.FLAG_SECURE
-        )
-
         enableEdgeToEdge()
         setContent {
             val isDarkTheme by AppSettings.isDarkTheme
+
+            // ФИКС (аудит 2026-08-11, PIN_BIOMETRIC_UX_PROMPT.md §3.1): без FLAG_SECURE
+            // содержимое приложения видно в скриншоте карточки в Recents/переключателе
+            // задач и снимается сторонними скриншот-инструментами. Реактивно, не статично
+            // в onCreate() — владелец явно попросил ставить его ТОЛЬКО пока включена хотя бы
+            // одна из защит (блокировка приложения / приватность записей), не всегда: иначе
+            // теряется возможность верифицировать UI скриншотами, пока владелец сам не
+            // включил защиту. Включаешь защиту — флаг встаёт немедленно; выключаешь — снимается.
+            val appLockOn by AppSettings.appLockEnabled
+            val bioLockOn by AppSettings.biometricLock
+            androidx.compose.runtime.LaunchedEffect(appLockOn, bioLockOn) {
+                if (appLockOn || bioLockOn) {
+                    window.setFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE
+                    )
+                } else {
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
 
             com.aistudio.socialsphere.crmlxb.ui.theme.AppleAppTheme(darkTheme = isDarkTheme) {
                 SocialsphereApp()

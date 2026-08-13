@@ -183,6 +183,41 @@ class ContactImporterTest {
         assertEquals(1, c.phones.size)
     }
 
+    @Test
+    fun vcard_note_wasNeverParsed_nowReadAndUnescaped() {
+        // ФИКС (2026-08-11): раньше NOTE вообще не читался при импорте .vcf-
+        // файла (getDeviceContacts() читал, а этот путь — нет). ExportManager
+        // пишет ВЕСЬ блок ОДНОЙ vCard-строкой с эскейпингом (\n → \\n,
+        // запятая/точка-с-запятой экранируются) — проверяем, что распаковка
+        // (vUnescape) возвращает настоящие переносы строк, готовые для
+        // ContactNoteCodec.decode.
+        val vcf = """
+            BEGIN:VCARD
+            N:Петров;Иван;;;
+            TEL:+7 900 111-22-33
+            NOTE:[Важно помнить] Не любит громкую музыку\n[Личное:Нравится] кофе\, чай и печенье\; всё сразу
+            END:VCARD
+        """.trimIndent()
+
+        val c = parseVCard(vcf).single()
+        assertEquals(
+            "[Важно помнить] Не любит громкую музыку\n[Личное:Нравится] кофе, чай и печенье; всё сразу",
+            c.notes
+        )
+    }
+
+    @Test
+    fun vcard_noteAbsent_candidateNotesIsNull() {
+        val vcf = """
+            BEGIN:VCARD
+            N:Петров;Иван;;;
+            TEL:+7 900 111-22-33
+            END:VCARD
+        """.trimIndent()
+
+        assertNull(parseVCard(vcf).single().notes)
+    }
+
     // ─── normalizeBirthday: форматы из телефонной книги / vCard ───
 
     // Поведение изменено (см. док normalizeBirthday): даты БЕЗ года сохраняются

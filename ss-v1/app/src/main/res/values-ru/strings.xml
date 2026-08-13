@@ -641,11 +641,12 @@
     <string name="priv_biometric_title">Биометрия для «Защищено»</string>
     <string name="priv_biometric_sub">Отпечаток или код устройства при показе защищённых записей</string>
     <string name="priv_biometric_unavailable">Биометрия или код блокировки не настроены на устройстве</string>
+    <string name="priv_biometric_needs_pin">Сначала задайте PIN-код — это запасной способ, если биометрия не сработает</string>
     <string name="bio_prompt_title">Показать защищённые записи</string>
     <string name="lock_app_section">Блокировка приложения</string>
     <string name="lock_app_title">Блокировать приложение</string>
     <string name="lock_app_sub">Запрашивать PIN или биометрию при открытии</string>
-    <string name="lock_app_needs_method">Сначала задайте PIN-код или включите биометрию</string>
+    <string name="lock_app_needs_method">Сначала задайте PIN-код — это запасной способ, если биометрия не сработает</string>
     <string name="lock_pin_title">PIN-код</string>
     <string name="lock_pin_set">Задать PIN-код</string>
     <string name="lock_pin_change">Изменить PIN-код</string>
@@ -989,7 +990,7 @@
     <string name="lbl_note_type_general">Общая</string>
     <string name="lbl_note_type_important_to_remember">Важно помнить</string>
     <string name="lbl_note_type_work">Рабочая</string>
-    <string name="lbl_note_type_personal_detail">Личная деталь</string>
+    <string name="lbl_note_type_personal_detail">Цель / мечта</string>
     <string name="lbl_note_type_gift">Подарок</string>
     <string name="lbl_note_type_date_event">Дата/событие</string>
     <string name="lbl_gift_status_idea">Идея</string>

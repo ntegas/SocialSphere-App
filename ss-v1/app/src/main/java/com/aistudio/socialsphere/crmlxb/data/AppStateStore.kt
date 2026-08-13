@@ -55,6 +55,28 @@ object AppStateStore {
         scope.launch { loadInitialData() }
     }
 
+    /**
+     * Только для тестов — сбрасывает `isInitialized`, чтобы следующий
+     * `initialize()` реально переподключился к новой (тестовой) БД.
+     *
+     * ФИКС (2026-08-12): `isInitialized`-гвард в initialize() верно защищает
+     * прод-сценарий (повторный onCreate() Activity не должен пере-грузить всё
+     * состояние заново) — но AppStateStore это `object`-синглтон, живущий на
+     * весь JVM-процесс. В Robolectric-тестах один и тот же JVM/classloader
+     * гоняет НЕСКОЛЬКО тестовых методов подряд — второй `@Test` в том же
+     * классе вызывает `initialize(ctx, db2)`, гвард молча возвращает управление
+     * без переподключения, и `database` НАВСЕГДА остаётся указывать на `db`
+     * ПЕРВОГО теста — уже закрытую его `@After` (`db.close()`) к моменту
+     * второго теста. Все фоновые `scope.launch { db()?.let {...} }` второго
+     * теста молча падают на закрытой БД, и тест ловит это как ложный таймаут
+     * опроса — выглядит как регресс кода, хотя на самом деле баг в тестовой
+     * обвязке. Вызывать из `@Before`/`@After` тестов, НЕ из прод-кода.
+     */
+    internal fun resetForTests() {
+        isInitialized = false
+        database = null
+    }
+
     // Безопасный доступ к БД — не крашит если не инициализирована
     private fun db(): SocialsphereDatabase? {
         return database ?: run {
@@ -84,9 +106,64 @@ object AppStateStore {
             // проверился бы раньше, чем список реально загружен, и сидирование
             // срабатывало бы на каждом холодном старте заново.
             appContext?.let { seedDefaultTagsIfNeeded(it) }
+            // ФИКС (2026-08-12, §52 KNOWLEDGE.md): самовосстановление связи
+            // дата-событие→контакт по имени из заголовка — ПОСЛЕ reloadFromDb,
+            // т.к. работает по уже загруженным calendarItems/contacts.
+            repairMissingContactLinksFromTitles()
         } finally {
             withContext(Dispatchers.Main) { isLoading = false }
         }
+    }
+
+    private val DATE_EVENT_TYPES_FOR_LINK_REPAIR = setOf(
+        CalendarItemType.BIRTHDAY, CalendarItemType.ANNIVERSARY,
+        CalendarItemType.NAMEDAY, CalendarItemType.IMPORTANT_DATE
+    )
+
+    /**
+     * Самовосстановление связи «дата-событие → контакт» по имени, запечённому
+     * в заголовке (владелец, 2026-08-12: «оно в календаре всё равно пишет,
+     * чей это день рождения — почему оно обратно не присоединится к
+     * контакту?»). До этого фикса имя в заголовке («День рождения: Иван
+     * Петров») было мёртвым текстом — нигде не читалось обратно, даже когда
+     * реальная связь `CalendarItemLink` на этот контакт отсутствовала (старые
+     * бэкапы до появления links, события без выбора контакта при ручном
+     * создании и т.п.) — контакт при этом никогда не показывал такое событие
+     * в «Ближайших» (см. §52).
+     *
+     * Работает ТОЛЬКО при ОДНОЗНАЧНОМ совпадении полного имени: 0 или ≥2
+     * кандидатов — ничего не делает, не гадает (привязать не того человека
+     * хуже, чем оставить как есть — это про чужие личные данные). Идемпотентна:
+     * повторный вызов на уже привязанных событиях находит 0 кандидатов.
+     */
+    internal suspend fun repairMissingContactLinksFromTitles() {
+        val ctx = appContext ?: return
+        val database = db() ?: return
+        val candidates = calendarItems.filter { item ->
+            item.type in DATE_EVENT_TYPES_FOR_LINK_REPAIR &&
+                item.links.none { it.targetType == CalendarTargetType.CONTACT }
+        }
+        if (candidates.isEmpty()) return
+        val newLinksByItemId = mutableMapOf<String, CalendarItemLink>()
+        candidates.forEach { item ->
+            val name = com.aistudio.socialsphere.crmlxb.utils.extractNameFromDateTitle(item.title, item.type, ctx)
+                ?: return@forEach
+            val matches = contacts.filter { "${it.firstName} ${it.lastName}".trim().equals(name, ignoreCase = true) }
+            if (matches.size == 1) {
+                newLinksByItemId[item.id] = CalendarItemLink(
+                    id = generateId(), calendarItemId = item.id,
+                    targetType = CalendarTargetType.CONTACT, targetId = matches[0].id
+                )
+            }
+        }
+        if (newLinksByItemId.isEmpty()) return
+        withContext(Dispatchers.Main) {
+            newLinksByItemId.forEach { (itemId, link) ->
+                val idx = calendarItems.indexOfFirst { it.id == itemId }
+                if (idx >= 0) calendarItems[idx] = calendarItems[idx].copy(links = calendarItems[idx].links + link)
+            }
+        }
+        database.calendarDao().insertCalendarItemLinks(newLinksByItemId.values.map { it.toEntity() })
     }
 
     suspend fun reloadFromDb() {
@@ -209,6 +286,15 @@ object AppStateStore {
         // не видны до перезапуска приложения (аналогично updateContact).
         addresses.addAll(c.addresses)
         companyRelations.addAll(c.companyRelations)
+        // ФИКС (аудит 2026-08-12): та же синхронизация нужна и для gifts/
+        // personalDetails — раньше синхронизировались только через отдельные
+        // addGift()/addNote(), но НЕ когда контакт создаётся СРАЗУ с уже
+        // заполненными списками (как делает импорт через ContactNoteCodec) —
+        // GiftsTab читает ГЛОБАЛЬНЫЙ AppStateStore.gifts, значит был бы виден
+        // в БД, но не на экране до перезапуска. Тот же паттерн, что уже
+        // применён в restoreContact() для notes/gifts.
+        gifts.addAll(c.gifts)
+        personalDetails.addAll(c.personalDetails)
         scope.launch { addContactDb(c) }
     }
 
@@ -225,6 +311,15 @@ object AppStateStore {
             // иначе связанный контакт не виден в компании до перезапуска
             companyRelations.removeAll { it.contactId == c.id }
             companyRelations.addAll(c.companyRelations)
+            // ФИКС (аудит 2026-08-12): тот же пробел, что и в addContact() —
+            // gifts/personalDetails тоже читаются из ГЛОБАЛЬНЫХ списков
+            // (GiftsTab: AppStateStore.gifts.filter{...}) и должны
+            // синхронизироваться при каждом updateContact(), не только через
+            // отдельные addGift()/точечные правки.
+            gifts.removeAll { it.contactId == c.id }
+            gifts.addAll(c.gifts)
+            personalDetails.removeAll { it.contactId == c.id }
+            personalDetails.addAll(c.personalDetails)
             scope.launch {
                 val db = db() ?: return@launch
                 db.contactDao().deletePhonesForContact(c.id)
@@ -260,6 +355,16 @@ object AppStateStore {
             db.addressDao().deleteAddressesForOwner(contact.id, AddressOwnerType.CONTACT.name)
             addContactDb(contact)
         }
+        // ФИКС (2026-08-12, У61-класс: addContactDb никогда не писал notes/gifts —
+        // они живут в отдельных таблицах, не в самой contact-строке, addContactDb
+        // молча их пропускал так же, как раньше пропускал notes до §44). Здесь же
+        // подстраховка на случай СТАРОГО бэкапа без плоских top-level notes/gifts
+        // (Contact.notes/gifts вложенные — они были в JSON всегда, раз Contact
+        // строится из них при каждой выгрузке): восстанавливаем через те же
+        // restoreNote/restoreGift, что и импорт плоского списка — upsert по id,
+        // повторный вызов из data.notes/data.gifts ниже безопасен (идемпотентно).
+        contact.notes.forEach { restoreNote(it) }
+        contact.gifts.forEach { restoreGift(it) }
     }
 
     /** Восстановление группы из бэкапа: upsert по id, сохраняя точные значения
@@ -1753,6 +1858,18 @@ object AppStateStore {
     // ──────────────────────────────────────────────────────────
     //  GIFTS CRUD
     // ──────────────────────────────────────────────────────────
+    /** Восстановление подарка из бэкапа — точный аналог restoreNote (upsert по id,
+     *  синхронизирует и плоский список, и вложенное Contact.gifts, и БД). */
+    fun restoreGift(gift: GiftIdea) {
+        val idx = gifts.indexOfFirst { it.id == gift.id }
+        if (idx >= 0) gifts[idx] = gift else gifts.add(gift)
+        val cidx = contacts.indexOfFirst { it.id == gift.contactId }
+        if (cidx >= 0) contacts[cidx] = contacts[cidx].copy(
+            gifts = contacts[cidx].gifts.filter { it.id != gift.id } + gift
+        )
+        scope.launch { db()?.giftDao()?.insertGifts(listOf(gift.toEntity())) }
+    }
+
     fun addGift(gift: GiftIdea) {
         gifts.add(gift)
         val idx = contacts.indexOfFirst { it.id == gift.contactId }

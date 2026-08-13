@@ -641,11 +641,12 @@
     <string name="priv_biometric_title">Biometrics for “Protected”</string>
     <string name="priv_biometric_sub">Fingerprint or device code to reveal protected records</string>
     <string name="priv_biometric_unavailable">Biometrics or screen lock are not set up on this device</string>
+    <string name="priv_biometric_needs_pin">Set a PIN code first — it\'s the backup if biometrics ever fails</string>
     <string name="bio_prompt_title">Show protected records</string>
     <string name="lock_app_section">App lock</string>
     <string name="lock_app_title">Lock the app</string>
     <string name="lock_app_sub">Require PIN or biometrics on open</string>
-    <string name="lock_app_needs_method">Set a PIN code or enable biometrics first</string>
+    <string name="lock_app_needs_method">Set a PIN code first — it\'s the backup if biometrics ever fails</string>
     <string name="lock_pin_title">PIN code</string>
     <string name="lock_pin_set">Set PIN code</string>
     <string name="lock_pin_change">Change PIN code</string>
@@ -989,7 +990,7 @@
     <string name="lbl_note_type_general">General</string>
     <string name="lbl_note_type_important_to_remember">Important to remember</string>
     <string name="lbl_note_type_work">Work</string>
-    <string name="lbl_note_type_personal_detail">Personal detail</string>
+    <string name="lbl_note_type_personal_detail">Goal / dream</string>
     <string name="lbl_note_type_gift">Gift</string>
     <string name="lbl_note_type_date_event">Date/event</string>
     <string name="lbl_gift_status_idea">Idea</string>

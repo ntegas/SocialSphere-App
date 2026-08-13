@@ -144,7 +144,7 @@ class ExportManagerTest {
     @Test
     fun roundTrip_fullBackup_preservesEveryField() {
         val original = BackupData(
-            version = 5,
+            version = 6,
             exportedAt = "2026-07-04T10:00",
             contacts = listOf(fullContact("c1"), fullContact("c2")),
             companies = listOf(company("co1")),
@@ -155,7 +155,10 @@ class ExportManagerTest {
             // Заметка контакта (уже дублирована внутри fullContact.notes) +
             // заметка компании — top-level notes это ОТДЕЛЬНЫЙ источник истины
             // (как AppStateStore.notes), не производный от Contact.notes.
-            notes = listOf(fullContact("c1").notes.single(), companyNote("cn1"))
+            notes = listOf(fullContact("c1").notes.single(), companyNote("cn1")),
+            // ФИКС (2026-08-12): подарки — тот же класс, что notes выше, top-level
+            // gifts это отдельный источник истины (как AppStateStore.gifts).
+            gifts = listOf(fullContact("c1").gifts.single())
         )
 
         val json = ExportManager.backupAdapter.toJson(original)
@@ -182,6 +185,22 @@ class ExportManagerTest {
         val note = restored!!.notes.single()
         assertNull(note.contactId)
         assertEquals("co1", note.companyId)
+    }
+
+    // ФИКС (2026-08-12): подарки не имели top-level поля в BackupData вообще —
+    // addContactDb/restoreContact никогда не писали их в giftDao, поэтому не
+    // переживали переустановку, хотя JSON-экспорт формально включал их как
+    // вложенное Contact.gifts. Регрессия на находку — как companyOwnedNote выше.
+    @Test
+    fun roundTrip_topLevelGifts_survivesBackup() {
+        val gift = fullContact("c1").gifts.single()
+        val original = BackupData(companies = emptyList(), gifts = listOf(gift))
+
+        val json = ExportManager.backupAdapter.toJson(original)
+        val restored = ExportManager.parseJsonBackup(json)
+
+        assertEquals(original, restored)
+        assertEquals("c1", restored!!.gifts.single().contactId)
     }
 
     // Частичный бэкап (owner: «сохранить/восстановить отдельно заметки/

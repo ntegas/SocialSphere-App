@@ -27,7 +27,6 @@ import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
 import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel
-import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaSerif
 import com.aistudio.socialsphere.crmlxb.ui.theme.aureliaPress
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.*
@@ -304,7 +303,7 @@ fun MonthGridView(
         ) {
             Text(
                 "${monthNames[month.monthValue - 1]} ${month.year}",
-                fontFamily = AureliaSerif,
+                fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(monthNames[month.monthValue - 1]),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.W700,
                 color = AppleTheme.colors.label
@@ -493,7 +492,7 @@ fun WeekStripView(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(rangeLabel, fontFamily = AureliaSerif, fontWeight = FontWeight.W700,
+            Text(rangeLabel, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(rangeLabel), fontWeight = FontWeight.W700,
                 fontSize = 16.sp, color = AppleTheme.colors.label)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Default.ChevronLeft, stringResource(R.string.cal_prev_month),
