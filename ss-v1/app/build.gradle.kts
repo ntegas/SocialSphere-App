@@ -136,6 +136,8 @@ dependencies {
   // Биометрия/код устройства для «Защищено» (тянет androidx.fragment —
   // MainActivity переведена на FragmentActivity, требование BiometricPrompt)
   implementation(libs.androidx.biometric)
+  // Freemium/подписка Pro+ (2026-08) — Play Billing Library.
+  implementation(libs.billing.ktx)
   implementation(libs.converter.moshi)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)

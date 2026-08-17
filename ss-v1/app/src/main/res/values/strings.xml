@@ -409,6 +409,8 @@
     <string name="dup_pick_title">Merge contacts</string>
     <string name="dup_pick_hint">Select 2 to 3 contacts to merge</string>
     <string name="dup_hint_pairs_title">Possible duplicates</string>
+    <string name="dup_merge_all_cta">Merge all %1$d in one tap (Pro)</string>
+    <string name="dup_merged_all_toast">Merged %1$d duplicate pair(s)</string>
     <string name="dup_selected_count">Selected: %1$d</string>
     <string name="dup_next">Next</string>
     <string name="dup_max_reached">Maximum 3 contacts at a time</string>
@@ -889,6 +891,7 @@
     <string name="imp_done">Import complete</string>
     <string name="imp_results">Import results</string>
     <string name="imp_contacts_imported">Contacts imported</string>
+    <string name="imp_skipped_quota">Not imported — monthly free limit (Pro removes it)</string>
     <string name="imp_companies_created">Companies created</string>
     <string name="imp_phones_added">Phones added</string>
     <string name="imp_emails_added">Emails added</string>
@@ -1259,4 +1262,33 @@
     <string name="srch_field_description">Description</string>
     <string name="srch_field_website">Website</string>
     <string name="srch_field_employee">Employee</string>
+
+    <!-- Socialsphere Pro — subscription only (2026-08) -->
+    <string name="paywall_title">This is a Pro feature</string>
+    <string name="paywall_subtitle">Free plan: 4 card scans a month, 5 contacts shown on the map, 3 new contacts with a phone number a month. Socialsphere Pro removes all three limits.</string>
+    <string name="paywall_bullet_unlimited_scans">Unlimited business-card scans</string>
+    <string name="paywall_bullet_unlimited_map">See every contact on the map</string>
+    <string name="paywall_bullet_unlimited_contacts">Unlimited new contacts</string>
+    <string name="paywall_bullet_bulk_merge">Merge all duplicates in one tap</string>
+    <string name="paywall_monthly_price">€9 / month</string>
+    <string name="paywall_annual_price">€7 / month, billed yearly</string>
+    <string name="paywall_annual_badge">Best value</string>
+    <string name="paywall_monthly_cta">Subscribe monthly</string>
+    <string name="paywall_annual_cta">Subscribe yearly</string>
+    <string name="paywall_dismiss">Not now</string>
+    <string name="settings_pro_row_title">Socialsphere Pro</string>
+    <string name="settings_pro_row_sub_free">Free plan</string>
+    <string name="settings_pro_row_sub_active">Pro active</string>
+    <string name="sub_screen_title">Socialsphere Pro</string>
+    <string name="sub_status_free">Free plan</string>
+    <string name="sub_status_active">Pro active — thank you!</string>
+    <string name="sub_scans_remaining">%1$d of %2$d free scans left this month</string>
+    <string name="sub_contacts_remaining">%1$d of %2$d free new contacts left this month</string>
+    <string name="sub_map_limit">Map shows %1$d of your contacts on the free plan</string>
+    <string name="sub_unlimited">Unlimited</string>
+    <string name="sub_manage_subscription">Manage subscription in Google Play</string>
+    <string name="paywall_map_title">See everyone on the map</string>
+    <string name="paywall_map_subtitle">Free plan shows 5 contacts on the map. Subscribe to Socialsphere Pro to see all of them.</string>
+    <string name="paywall_contacts_title">Monthly limit reached</string>
+    <string name="paywall_contacts_subtitle">3 new contacts with a phone number a month are free. Subscribe to Socialsphere Pro for unlimited contacts.</string>
 </resources>

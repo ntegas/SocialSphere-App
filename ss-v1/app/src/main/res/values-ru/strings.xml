@@ -409,6 +409,8 @@
     <string name="dup_pick_title">Объединить контакты</string>
     <string name="dup_pick_hint">Выберите от 2 до 3 контактов для объединения</string>
     <string name="dup_hint_pairs_title">Возможно, дубли</string>
+    <string name="dup_merge_all_cta">Слить все %1$d одним тапом (Pro)</string>
+    <string name="dup_merged_all_toast">Слито пар дублей: %1$d</string>
     <string name="dup_selected_count">Выбрано: %1$d</string>
     <string name="dup_next">Далее</string>
     <string name="dup_max_reached">Максимум 3 контакта за раз</string>
@@ -889,6 +891,7 @@
     <string name="imp_done">Импорт завершен</string>
     <string name="imp_results">Результаты импорта</string>
     <string name="imp_contacts_imported">Контактов импортировано</string>
+    <string name="imp_skipped_quota">Не импортировано — месячный бесплатный лимит (снимается Pro)</string>
     <string name="imp_companies_created">Компаний создано</string>
     <string name="imp_phones_added">Телефонов добавлено</string>
     <string name="imp_emails_added">Email добавлено</string>
@@ -1259,4 +1262,33 @@
     <string name="srch_field_description">Описание</string>
     <string name="srch_field_website">Сайт</string>
     <string name="srch_field_employee">Сотрудник</string>
+
+    <!-- Socialsphere Pro — только подписка (2026-08) -->
+    <string name="paywall_title">Это Pro-функция</string>
+    <string name="paywall_subtitle">Бесплатный тариф: 4 скана визиток в месяц, 5 контактов на карте, 3 новых контакта с телефоном в месяц. Socialsphere Pro снимает все три ограничения.</string>
+    <string name="paywall_bullet_unlimited_scans">Безлимитный скан визиток</string>
+    <string name="paywall_bullet_unlimited_map">Все контакты на карте</string>
+    <string name="paywall_bullet_unlimited_contacts">Безлимит новых контактов</string>
+    <string name="paywall_bullet_bulk_merge">Слияние всех дублей одним тапом</string>
+    <string name="paywall_monthly_price">9 € / месяц</string>
+    <string name="paywall_annual_price">7 € / месяц при годовой оплате</string>
+    <string name="paywall_annual_badge">Выгоднее</string>
+    <string name="paywall_monthly_cta">Оформить помесячно</string>
+    <string name="paywall_annual_cta">Оформить на год</string>
+    <string name="paywall_dismiss">Не сейчас</string>
+    <string name="settings_pro_row_title">Socialsphere Pro</string>
+    <string name="settings_pro_row_sub_free">Бесплатный тариф</string>
+    <string name="settings_pro_row_sub_active">Pro активна</string>
+    <string name="sub_screen_title">Socialsphere Pro</string>
+    <string name="sub_status_free">Бесплатный тариф</string>
+    <string name="sub_status_active">Pro активна — спасибо!</string>
+    <string name="sub_scans_remaining">Осталось %1$d из %2$d бесплатных сканов в этом месяце</string>
+    <string name="sub_contacts_remaining">Осталось %1$d из %2$d бесплатных новых контактов в этом месяце</string>
+    <string name="sub_map_limit">На бесплатном тарифе карта показывает %1$d контактов</string>
+    <string name="sub_unlimited">Безлимит</string>
+    <string name="sub_manage_subscription">Управлять подпиской в Google Play</string>
+    <string name="paywall_map_title">Увидь всех на карте</string>
+    <string name="paywall_map_subtitle">На бесплатном тарифе карта показывает 5 контактов. Оформи Socialsphere Pro, чтобы увидеть всех.</string>
+    <string name="paywall_contacts_title">Месячный лимит исчерпан</string>
+    <string name="paywall_contacts_subtitle">3 новых контакта с телефоном в месяц — бесплатно. Оформи Socialsphere Pro для безлимита.</string>
 </resources>

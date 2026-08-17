@@ -56,6 +56,10 @@ fun ScanCardScreen(
     // равно распознаём (лучше нечёткий результат, чем ничего), но явно говорим
     // владельцу, почему могло получиться плохо, вместо тихой билиберды без причины.
     var blurryWarning by remember { mutableStateOf(false) }
+    // Freemium (2026-08): сохранение отсканированного контакта с телефоном
+    // упёрлось в отдельный месячный лимит «3 новых контакта с телефоном»
+    // (независимый от лимита самих сканов выше).
+    var showSaveQuotaPaywall by remember { mutableStateOf(false) }
 
     var firstName by remember { mutableStateOf("") }
     var lastName  by remember { mutableStateOf("") }
@@ -104,22 +108,51 @@ fun ScanCardScreen(
             phones.isNotEmpty() || emails.isNotEmpty()) reviewed = true
     }
 
+    // ── Freemium (2026-08): гейт на бесплатную квоту сканов ──
+    // См. AppSettings.scansRemainingThisMonth()/entitlementResolved. Проверка —
+    // ДО открытия камеры (иначе пользователь тратит время на кадр, а потом
+    // видит paywall вместо результата — путающий UX); списание квоты — ниже,
+    // прямо перед запуском OCR, а не здесь и не после распознавания.
+    val entitlementResolved by AppSettings.entitlementResolved
+    val quotaAvailable = AppSettings.scansRemainingThisMonth() > 0
+
     // ── Камера → кадр → Tesseract-OCR (eng+rus+ell) → разбор в поля ──
     if (showCamera) {
-        CardCameraScanner(
-            onClose = { showCamera = false },
-            onCaptured = { bmp ->
-                showCamera = false
-                ocrRunning = true
-                blurryWarning = com.aistudio.socialsphere.crmlxb.utils.BusinessCardOcr.isBlurry(bmp)
-                scope.launch {
-                    val text = com.aistudio.socialsphere.crmlxb.utils.BusinessCardOcr.recognize(ctx, bmp)
-                    if (text.isNotBlank()) { rawText = text; applyParsed(text) }
-                    ocrRunning = false
+        when {
+            quotaAvailable -> CardCameraScanner(
+                onClose = { showCamera = false },
+                onCaptured = { bmp ->
+                    showCamera = false
+                    ocrRunning = true
+                    // Списываем ДО запуска OCR (не после) — распознавание занимает
+                    // несколько секунд, списание по завершении позволило бы получить
+                    // бесплатный скан, убив процесс приложения посреди распознавания.
+                    AppSettings.recordScanUsed()
+                    blurryWarning = com.aistudio.socialsphere.crmlxb.utils.BusinessCardOcr.isBlurry(bmp)
+                    scope.launch {
+                        val text = com.aistudio.socialsphere.crmlxb.utils.BusinessCardOcr.recognize(ctx, bmp)
+                        if (text.isNotBlank()) { rawText = text; applyParsed(text) }
+                        ocrRunning = false
+                    }
                 }
+            )
+            // Статус покупок ещё не восстановлен (доля секунды после холодного
+            // старта/переустановки) — не показываем paywall раньше времени
+            // легитимному Pro/Pro+ пользователю, ждём.
+            !entitlementResolved -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AppleTheme.colors.brand)
             }
-        )
+            else -> PaywallSheet(onDismiss = { showCamera = false; onNavigateBack() })
+        }
         return
+    }
+
+    if (showSaveQuotaPaywall) {
+        PaywallSheet(
+            onDismiss = { showSaveQuotaPaywall = false },
+            titleRes = R.string.paywall_contacts_title,
+            subtitleRes = R.string.paywall_contacts_subtitle,
+        )
     }
 
     Scaffold(
@@ -388,7 +421,14 @@ fun ScanCardScreen(
                         val before = AppStateStore.contacts.map { it.id }.toSet()
                         performImport(listOf(candidate), ctx)
                         val newId = AppStateStore.contacts.map { it.id }.firstOrNull { it !in before }
-                        if (newId != null) onCreated(newId) else onNavigateBack()
+                        when {
+                            newId != null -> onCreated(newId)
+                            // Freemium (2026-08): контакт с телефоном не создался
+                            // из-за месячного лимита (см. performImport) — молча
+                            // уйти назад значило бы «визитка потерялась без причины».
+                            ImportResultStats.skippedDueToQuota > 0 -> showSaveQuotaPaywall = true
+                            else -> onNavigateBack()
+                        }
                     },
                     enabled = canSave,
                     modifier = Modifier.fillMaxWidth(),

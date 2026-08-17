@@ -412,6 +412,138 @@ object AppSettings {
     fun appLockEnabledSafe(): Boolean =
         try { appLockEnabled.value } catch (e: Exception) { false }
 
+    // ── Freemium / подписка Socialsphere Pro (2026-08) ────────
+    // Модель по прямому решению владельца (2026-08-16): ТОЛЬКО подписка, без
+    // разовой покупки (более ранний вариант с раздельными Pro/Pro+ отменён).
+    // 9€/мес или 7€/мес при годовой оплате. Статус читает BillingManager
+    // (utils/BillingManager.kt) после покупки или queryPurchasesAsync() при
+    // холодном старте — сам AppSettings ничего не знает о BillingClient,
+    // только хранит итоговый флаг (тот же принцип, что и остальные настройки
+    // в этом файле).
+
+    /** Активная подписка Socialsphere Pro — снимает все 3 лимита ниже. */
+    val subscriptionActive: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "subscription_active", default = false,
+            serialize = { it.toString() }, deserialize = { it == "true" }
+        )
+    }
+
+    /** Epoch millis окончания текущего периода подписки — для отображения даты
+     *  продления/грейс-периода. 0 = нет активной подписки. */
+    val subscriptionExpiryEpoch: MutableState<Long> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "subscription_expiry", default = 0L,
+            serialize = { it.toString() }, deserialize = { it.toLongOrNull() ?: 0L }
+        )
+    }
+
+    /** Пока BillingManager.restorePurchases() ещё не ответил (например, только
+     *  что холодный старт после переустановки) — НЕ считаем пользователя
+     *  бесплатным по умолчанию: легитимный подписчик иначе на долю секунды
+     *  увидел бы paywall и мог бы зря потратить единицу из бесплатной квоты,
+     *  пока статус ещё не восстановлен. Экраны-гейты должны ждать true здесь
+     *  перед тем, как решать, показывать ли PaywallSheet. НЕ персистентно —
+     *  сбрасывается в false при каждом старте процесса намеренно.
+     *  ФИКС (2026-08-16, риск найден при планировании freemium): гонка
+     *  восстановления покупок при холодном старте. */
+    var entitlementResolved: MutableState<Boolean> = mutableStateOf(false)
+
+    fun isPremium(): Boolean = subscriptionActive.value
+
+    // Общий приём для обоих месячных лимитов ниже: лениво сбрасываемый по
+    // календарному месяцу счётчик (не AlarmManager/WorkManager — в проекте
+    // нет готовой инфраструктуры периодических задач, изобретать её ради
+    // счётчиков избыточно). В отличие от pinLockedUntil
+    // (SystemClock.elapsedRealtime(), не подвержено переводу даты) — здесь
+    // обычные календарные месяцы; перевод даты назад технически даёт лишние
+    // бесплатные единицы. Осознанный компромисс: цена ошибки низкая,
+    // сложность защиты (серверное время) не оправдана.
+    // ВАЖНО: used/monthKey передаются как УЖЕ СУЩЕСТВУЮЩИЕ lazy-инстансы
+    // PersistedMutableState (а не создаются заново из ключей внутри) — иначе
+    // Compose не подхватит recomposition: новый PersistedMutableState на
+    // каждый вызов означает новый State-инстанс, на который никто не
+    // подписан, и экран не перерисуется, когда квота изменится.
+    // internal (не private) — виден AppSettingsSubscriptionTest напрямую, с
+    // локально сконструированными mutableStateOf вместо кэшированных lazy-полей
+    // AppSettings: PersistedMutableState читает SharedPreferences ОДИН раз при
+    // конструировании (см. класс выше) и никогда не перечитывает на value-гет —
+    // подменить сохранённый месяц «под капотом» у уже сконструированного
+    // AppSettings.scanQuotaMonthKey из теста невозможно (это не баг прод-кода,
+    // это следствие того, что реальный rollover происходит между ЗАПУСКАМИ
+    // процесса, а не в рамках одного). Тестируем эту функцию саму по себе.
+    internal fun monthlyRemaining(used: MutableState<Int>, monthKey: MutableState<String>, quota: Int): Int {
+        if (isPremium()) return Int.MAX_VALUE
+        val nowKey = java.time.YearMonth.now().toString()
+        if (monthKey.value != nowKey) { monthKey.value = nowKey; used.value = 0 }
+        return (quota - used.value).coerceAtLeast(0)
+    }
+
+    internal fun monthlyRecordUsed(used: MutableState<Int>, monthKey: MutableState<String>, quota: Int) {
+        if (isPremium()) return
+        monthlyRemaining(used, monthKey, quota) // форсирует rollover, если новый месяц
+        used.value += 1
+    }
+
+    private const val FREE_SCAN_QUOTA = 4
+    private val scansUsedThisMonth: MutableState<Int> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "scans_used_month", default = 0,
+            serialize = { it.toString() }, deserialize = { it.toIntOrNull() ?: 0 }
+        )
+    }
+    private val scanQuotaMonthKey: MutableState<String> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "scan_quota_month_key", default = "",
+            serialize = { it }, deserialize = { it }
+        )
+    }
+
+    /** Сколько сканов визитки осталось в текущем календарном месяце у
+     *  бесплатного пользователя. */
+    fun scansRemainingThisMonth(): Int =
+        monthlyRemaining(scansUsedThisMonth, scanQuotaMonthKey, FREE_SCAN_QUOTA)
+
+    /** Списывает один скан из бесплатной квоты. Звать ДО запуска OCR
+     *  (оптимистично), не после — распознавание занимает несколько секунд,
+     *  и списание по завершении позволило бы получить бесплатный скан,
+     *  убив процесс приложения посреди распознавания. Для подписчиков — no-op. */
+    fun recordScanUsed() = monthlyRecordUsed(scansUsedThisMonth, scanQuotaMonthKey, FREE_SCAN_QUOTA)
+
+    private const val FREE_CONTACT_WITH_PHONE_QUOTA = 3
+    private val contactsWithPhoneUsedThisMonth: MutableState<Int> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "contacts_with_phone_used_month", default = 0,
+            serialize = { it.toString() }, deserialize = { it.toIntOrNull() ?: 0 }
+        )
+    }
+    private val contactsWithPhoneMonthKey: MutableState<String> by lazy {
+        PersistedMutableState(
+            prefs = getPrefs(), key = "contacts_with_phone_month_key", default = "",
+            serialize = { it }, deserialize = { it }
+        )
+    }
+
+    /** Сколько новых контактов С ТЕЛЕФОНОМ ещё можно сохранить в этом месяце
+     *  бесплатно (владелец, 2026-08-16: «сохранение контакта с телефоном —
+     *  3 бесплатных в месяц»). Контакты без единого номера телефона в квоту
+     *  не входят — гейт только на «контакт с телефоном» буквально. */
+    fun contactsWithPhoneRemainingThisMonth(): Int =
+        monthlyRemaining(contactsWithPhoneUsedThisMonth, contactsWithPhoneMonthKey, FREE_CONTACT_WITH_PHONE_QUOTA)
+
+    /** Списывает один контакт из бесплатной квоты. Звать при КАЖДОМ успешном
+     *  создании контакта с непустым списком телефонов — вручную (ContactEditScreen)
+     *  или через любой из путей импорта (ImportScreens.performImport/mergeCandidate),
+     *  все они делят одну и ту же квоту. */
+    fun recordContactWithPhoneUsed() =
+        monthlyRecordUsed(contactsWithPhoneUsedThisMonth, contactsWithPhoneMonthKey, FREE_CONTACT_WITH_PHONE_QUOTA)
+
+    /** Карта (владелец, 2026-08-16: «карта 5 точек бесплатно») — НЕ месячная
+     *  квота, а постоянный потолок числа меток для бесплатного тарифа: видно
+     *  первые 5 контактов на карте, остальное — за подпиской. Простой предел,
+     *  без rollover-логики. */
+    const val FREE_MAP_MARKER_LIMIT = 5
+
     /** Ежедневное напоминание «пора связаться» (по ритму общения). Персистентно. */
     val remindStaleContacts: MutableState<Boolean> by lazy {
         PersistedMutableState(

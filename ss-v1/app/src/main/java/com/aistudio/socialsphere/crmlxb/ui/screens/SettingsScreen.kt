@@ -41,6 +41,7 @@ fun SettingsScreen(
     onNavigateToDuplicates: () -> Unit = {},
     onNavigateToCompanyDuplicates: () -> Unit = {},
     onNavigateToContactDisplay: () -> Unit = {},
+    onNavigateToSubscription: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -81,6 +82,16 @@ fun SettingsScreen(
             }
 
             InsetGroup {
+                // Freemium (2026-08): вход в статус/покупку подписки — первой
+                // строкой, самый заметный пункт списка настроек.
+                val isPremiumRow = AppSettings.isPremium()
+                SettingsRow(
+                    AppleTheme.colors.brand, Icons.Default.WorkspacePremium,
+                    stringResource(R.string.settings_pro_row_title),
+                    stringResource(if (isPremiumRow) R.string.settings_pro_row_sub_active else R.string.settings_pro_row_sub_free),
+                    "setting_subscription", onNavigateToSubscription
+                )
+                AppleDivider()
                 SettingsRow(cAppearance, Icons.Default.Palette, stringResource(R.string.settings_appearance), stringResource(R.string.settings_appearance_sub), "setting_appearance", onNavigateToAppearance)
                 AppleDivider()
                 SettingsRow(cNotif, Icons.Default.Notifications, stringResource(R.string.settings_notifications), stringResource(R.string.settings_notifications_sub), "setting_notif", onNavigateToNotifications)

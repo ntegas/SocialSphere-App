@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,6 +60,8 @@ fun CompanyDuplicatesScreen(
     var cityFilter        by remember { mutableStateOf("") }
     var showFilterSheet   by remember { mutableStateOf(false) }
     var selected          by remember { mutableStateOf(setOf<String>()) }
+    // Freemium (2026-08): «слить все дубли одним тапом» — Pro.
+    var showBulkMergePaywall by remember { mutableStateOf(false) }
 
     val hasActiveFilters = filterIndustries.isNotEmpty() || cityFilter.isNotBlank()
 
@@ -114,6 +117,10 @@ fun CompanyDuplicatesScreen(
                 Button(onClick = { showFilterSheet = false }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.common_apply)) }
             }
         }
+    }
+
+    if (showBulkMergePaywall) {
+        PaywallSheet(onDismiss = { showBulkMergePaywall = false })
     }
 
     Scaffold(containerColor = AppleTheme.colors.groupedBackground) { paddingValues ->
@@ -183,6 +190,27 @@ fun CompanyDuplicatesScreen(
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
+                }
+                // Freemium (2026-08): «слить все дубли одним тапом» — Pro.
+                // Зеркало DuplicatesScreen.kt — поштучный выбор пары выше
+                // остаётся бесплатным и нетронутым, это кнопка-сосед.
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = {
+                        if (AppSettings.isPremium()) {
+                            val n = AppStateStore.mergeAllCompanyDuplicates()
+                            android.widget.Toast.makeText(
+                                ctxLabel, ctxLabel.getString(R.string.dup_merged_all_toast, n), android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            showBulkMergePaywall = true
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 10.dp)
+                ) {
+                    Icon(Icons.Default.WorkspacePremium, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.dup_merge_all_cta, autoPairs.size))
                 }
             }
 

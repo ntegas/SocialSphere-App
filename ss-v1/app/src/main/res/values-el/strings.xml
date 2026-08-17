@@ -409,6 +409,8 @@
     <string name="dup_pick_title">Συγχώνευση επαφών</string>
     <string name="dup_pick_hint">Επιλέξτε 2 έως 3 επαφές για συγχώνευση</string>
     <string name="dup_hint_pairs_title">Πιθανά διπλότυπα</string>
+    <string name="dup_merge_all_cta">Συγχώνευση όλων (%1$d) με ένα πάτημα (Pro)</string>
+    <string name="dup_merged_all_toast">Συγχωνεύτηκαν %1$d ζεύγη διπλότυπων</string>
     <string name="dup_selected_count">Επιλέχθηκαν: %1$d</string>
     <string name="dup_next">Επόμενο</string>
     <string name="dup_max_reached">Έως 3 επαφές τη φορά</string>
@@ -889,6 +891,7 @@
     <string name="imp_done">Η εισαγωγή ολοκληρώθηκε</string>
     <string name="imp_results">Αποτελέσματα εισαγωγής</string>
     <string name="imp_contacts_imported">Επαφές εισήχθησαν</string>
+    <string name="imp_skipped_quota">Δεν εισήχθησαν — μηνιαίο δωρεάν όριο (το Pro το αφαιρεί)</string>
     <string name="imp_companies_created">Εταιρείες δημιουργήθηκαν</string>
     <string name="imp_phones_added">Τηλέφωνα προστέθηκαν</string>
     <string name="imp_emails_added">Email προστέθηκαν</string>
@@ -1259,4 +1262,33 @@
     <string name="srch_field_description">Περιγραφή</string>
     <string name="srch_field_website">Ιστότοπος</string>
     <string name="srch_field_employee">Υπάλληλος</string>
+
+    <!-- Socialsphere Pro — μόνο συνδρομή (2026-08) -->
+    <string name="paywall_title">Αυτό είναι λειτουργία Pro</string>
+    <string name="paywall_subtitle">Δωρεάν πλάνο: 4 σαρώσεις καρτών τον μήνα, 5 επαφές στον χάρτη, 3 νέες επαφές με τηλέφωνο τον μήνα. Το Socialsphere Pro αφαιρεί και τους τρεις περιορισμούς.</string>
+    <string name="paywall_bullet_unlimited_scans">Απεριόριστες σαρώσεις καρτών</string>
+    <string name="paywall_bullet_unlimited_map">Όλες οι επαφές στον χάρτη</string>
+    <string name="paywall_bullet_unlimited_contacts">Απεριόριστες νέες επαφές</string>
+    <string name="paywall_bullet_bulk_merge">Συγχώνευση όλων των διπλότυπων με ένα πάτημα</string>
+    <string name="paywall_monthly_price">9 € / μήνα</string>
+    <string name="paywall_annual_price">7 € / μήνα με ετήσια χρέωση</string>
+    <string name="paywall_annual_badge">Καλύτερη αξία</string>
+    <string name="paywall_monthly_cta">Μηνιαία συνδρομή</string>
+    <string name="paywall_annual_cta">Ετήσια συνδρομή</string>
+    <string name="paywall_dismiss">Όχι τώρα</string>
+    <string name="settings_pro_row_title">Socialsphere Pro</string>
+    <string name="settings_pro_row_sub_free">Δωρεάν πλάνο</string>
+    <string name="settings_pro_row_sub_active">Το Pro είναι ενεργό</string>
+    <string name="sub_screen_title">Socialsphere Pro</string>
+    <string name="sub_status_free">Δωρεάν πλάνο</string>
+    <string name="sub_status_active">Το Pro είναι ενεργό — ευχαριστούμε!</string>
+    <string name="sub_scans_remaining">Απομένουν %1$d από %2$d δωρεάν σαρώσεις αυτόν τον μήνα</string>
+    <string name="sub_contacts_remaining">Απομένουν %1$d από %2$d δωρεάν νέες επαφές αυτόν τον μήνα</string>
+    <string name="sub_map_limit">Στο δωρεάν πλάνο ο χάρτης δείχνει %1$d επαφές</string>
+    <string name="sub_unlimited">Απεριόριστο</string>
+    <string name="sub_manage_subscription">Διαχείριση συνδρομής στο Google Play</string>
+    <string name="paywall_map_title">Δες τους όλους στον χάρτη</string>
+    <string name="paywall_map_subtitle">Στο δωρεάν πλάνο ο χάρτης δείχνει 5 επαφές. Ενεργοποίησε το Socialsphere Pro για να τις δεις όλες.</string>
+    <string name="paywall_contacts_title">Το μηνιαίο όριο εξαντλήθηκε</string>
+    <string name="paywall_contacts_subtitle">3 νέες επαφές με τηλέφωνο τον μήνα είναι δωρεάν. Ενεργοποίησε το Socialsphere Pro για απεριόριστες επαφές.</string>
 </resources>

@@ -680,8 +680,20 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
     var emailsAdded = 0
     var addressesAdded = 0
     var birthdaysCreated = 0
+    var skippedDueToQuota = 0
 
     selected.forEach { candidate ->
+        // Freemium (2026-08, владелец: «сохранение контакта с телефоном — 3
+        // бесплатных в месяц»): та же общая квота, что и ручное создание в
+        // ContactEditScreen.kt — делится между ВСЕМИ путями создания
+        // контакта. Кандидат БЕЗ телефона в квоту не входит и импортируется
+        // как обычно. Пропускаем целиком (не «импорт без телефона») — иначе
+        // владелец решит, что телефон потерялся, а не что контакт не попал
+        // в лимит.
+        if (candidate.phones.isNotEmpty() && AppSettings.contactsWithPhoneRemainingThisMonth() <= 0) {
+            skippedDueToQuota++
+            return@forEach
+        }
         val contactId = java.util.UUID.randomUUID().toString()
         // ФИКС (фидбэк владельца 2026-08-11: «чтобы приложение определяло, что
         // и куда добавить» при обратном импорте из контактов телефона) —
@@ -737,6 +749,7 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
             updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         )
         AppStateStore.addContact(newContact)
+        if (newContact.phones.isNotEmpty()) AppSettings.recordContactWithPhoneUsed()
         contactsImported++
         phonesAdded += newContact.phones.size
         emailsAdded += newContact.emails.size
@@ -846,6 +859,7 @@ fun performImport(selected: List<ImportContactCandidate>, context: android.conte
     ImportResultStats.emailsAdded = emailsAdded
     ImportResultStats.addressesAdded = addressesAdded
     ImportResultStats.birthdaysCreated = birthdaysCreated
+    ImportResultStats.skippedDueToQuota = skippedDueToQuota
 }
 
 object ImportResultStats {
@@ -856,6 +870,9 @@ object ImportResultStats {
     var addressesAdded = 0
     var birthdaysCreated = 0
     var duplicatesSkipped = 0
+    /** Freemium (2026-08): сколько кандидатов с телефоном НЕ импортированы —
+     *  упёрлись в месячный лимит бесплатного тарифа (см. performImport). */
+    var skippedDueToQuota = 0
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1185,7 +1202,35 @@ fun ImportResultScreen(
                     ResultRow(stringResource(R.string.imp_events_n), ImportResultStats.birthdaysCreated)
                 }
             }
-            
+
+            // Freemium (2026-08): часть кандидатов с телефоном не попала в
+            // импорт — упёрлись в месячный лимит бесплатного тарифа.
+            if (ImportResultStats.skippedDueToQuota > 0) {
+                var showImportQuotaPaywall by remember { mutableStateOf(false) }
+                if (showImportQuotaPaywall) {
+                    PaywallSheet(
+                        onDismiss = { showImportQuotaPaywall = false },
+                        titleRes = R.string.paywall_contacts_title,
+                        subtitleRes = R.string.paywall_contacts_subtitle,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13)
+                        .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                        .clickable { showImportQuotaPaywall = true }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.WorkspacePremium, null, tint = AppleTheme.colors.brand, modifier = Modifier.size(18.dp))
+                    Text(
+                        "${ImportResultStats.skippedDueToQuota} · " + stringResource(R.string.imp_skipped_quota),
+                        fontSize = 13.sp, color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.weight(1f))
             
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

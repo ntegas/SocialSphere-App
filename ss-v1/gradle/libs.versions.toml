@@ -43,6 +43,7 @@ desugarJdkLibs = "2.0.4"
 tesseract4android = "4.9.0"
 fragmentKtx = "1.6.2"
 appcompat = "1.7.0"
+billing = "8.0.0"
 
 [libraries]
 android-tools-desugar = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
@@ -100,6 +101,14 @@ tesseract4android = { group = "cz.adaptech.tesseract4android", name = "tesseract
 # (registerForActivityResult в MainActivity + древний транзитивный fragment)
 androidx-fragment-ktx = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "fragmentKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+# Play Billing (Socialsphere Pro, подписка, 2026-08) — Google требует v8+ для
+# новых апдейтов с 31.08.2026. Актуальная v9.1.0 собрана более новым Kotlin
+# (metadata 2.3.0) и не читается зафиксированным в проекте Kotlin 2.0.21
+# («e: ...incompatible version of Kotlin»); v8.0.0 — минимально достаточная
+# по требованию Google версия, компилируется чисто на текущем пине. НЕ двигать
+# Kotlin-пин ради более новой billing — см. правило проекта («не двигать
+# AGP/Kotlin пин без необходимости, проверять aar-metadata зависимости»).
+billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

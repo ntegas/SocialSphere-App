@@ -916,6 +916,36 @@ object AppStateStore {
         return snapshot
     }
 
+    /** Freemium (2026-08, Pro/Pro+): «слить все дубли одним тапом». НЕ меняет
+     *  и не обходит cap в mergeContacts() (2-3 id — это часть модели
+     *  разрешения конфликтов, не UI-ограничение) — просто вызывает её в цикле
+     *  парами, как и обычное ручное слияние по одной паре.
+     *  Транзитивные цепочки (A дублирует B, B дублирует C, но не A~C напрямую)
+     *  решаются за НЕСКОЛЬКО проходов, не ручной кластеризацией: после
+     *  слияния A+B «уцелевший» контакт наследует ВСЕ телефоны/email обеих
+     *  сторон (см. mergedPhones/mergedEmails выше), поэтому findDuplicatePairs()
+     *  на следующем проходе САМ находит его как дубль C, если раньше C
+     *  дублировал именно те данные, что были у B. Останавливаемся, когда
+     *  проход не даёт ни одного слияния, либо на предохранителе 20 проходов.
+     *  @return сколько пар успешно слито. */
+    fun mergeAllDuplicates(): Int {
+        var totalMerged = 0
+        repeat(20) {
+            val pairs = findDuplicatePairs()
+            if (pairs.isEmpty()) return totalMerged
+            var mergedThisPass = 0
+            pairs.forEach { pair ->
+                // getContact() внутри mergeContacts безопасно вернёт null и
+                // пропустит пару, если один из id уже поглощён более ранним
+                // слиянием в ЭТОМ ЖЕ проходе — не крашит, не дублирует.
+                if (mergeContacts(listOf(pair.a.id, pair.b.id)) != null) mergedThisPass++
+            }
+            totalMerged += mergedThisPass
+            if (mergedThisPass == 0) return totalMerged
+        }
+        return totalMerged
+    }
+
     /** Отмена слияния по снимку (Snackbar «Объединено · Отменить», ~10 сек).
      *  Переиспользует существующие безопасные методы restoreContact/updateNote
      *  и т.п. — не единая транзакция (это уже путь восстановления, а не
@@ -1619,6 +1649,24 @@ object AppStateStore {
         }
 
         return snapshot
+    }
+
+    /** Freemium (2026-08, Pro/Pro+) — зеркало mergeAllDuplicates() для компаний,
+     *  та же логика: цикл по findCompanyDuplicatePairs(), несколько проходов
+     *  до фикс-точки, cap 2-3 id в mergeCompanies() не трогаем. */
+    fun mergeAllCompanyDuplicates(): Int {
+        var totalMerged = 0
+        repeat(20) {
+            val pairs = findCompanyDuplicatePairs()
+            if (pairs.isEmpty()) return totalMerged
+            var mergedThisPass = 0
+            pairs.forEach { pair ->
+                if (mergeCompanies(listOf(pair.a.id, pair.b.id)) != null) mergedThisPass++
+            }
+            totalMerged += mergedThisPass
+            if (mergedThisPass == 0) return totalMerged
+        }
+        return totalMerged
     }
 
     /** Отмена слияния компаний по снимку (аналог undoMerge для контактов) —

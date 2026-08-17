@@ -87,6 +87,8 @@ fun MapScreen(
     var locationPermGranted by remember { mutableStateOf(false) }
     var mapLoadError by remember { mutableStateOf<String?>(null) }
     var mapTilesLoaded by remember { mutableStateOf(false) }
+    // Freemium (2026-08): «карта 5 точек бесплатно» — см. geoItems ниже.
+    var showMapPaywall by remember { mutableStateOf(false) }
 
     // Диагностика «синего экрана»: если тайлы не пришли за 8 сек —
     // почти наверняка проблема API-ключа (Maps SDK for Android не включён
@@ -257,9 +259,16 @@ fun MapScreen(
         }
     }
 
-    val geoItems by remember {
+    // Freemium (2026-08, владелец: «карта 5 точек бесплатно») — постоянный
+    // потолок числа меток на бесплатном тарифе, не месячная квота (см.
+    // AppSettings.FREE_MAP_MARKER_LIMIT). Фильтры/поиск применяются как
+    // обычно, лимит режет уже отфильтрованный и отсортированный результат.
+    val geoItemsAll by remember {
         derivedStateOf { filteredList.filter { coordsOf(it) != null } }
     }
+    val mapIsPremium = AppSettings.isPremium()
+    val geoItems = if (mapIsPremium) geoItemsAll else geoItemsAll.take(AppSettings.FREE_MAP_MARKER_LIMIT)
+    val hiddenByFreeLimit = (geoItemsAll.size - geoItems.size).coerceAtLeast(0)
 
     // Фоновый геокодинг адресов без координат (Android Geocoder, без API-ключа).
     // Берём ВСЕ адреса без координат (раньше только 15 → дальние точки пропадали
@@ -377,6 +386,14 @@ fun MapScreen(
                 // Карта ещё инициализируется — игнорируем
             }
         }
+    }
+
+    if (showMapPaywall) {
+        PaywallSheet(
+            onDismiss = { showMapPaywall = false },
+            titleRes = R.string.paywall_map_title,
+            subtitleRes = R.string.paywall_map_subtitle,
+        )
     }
 
     Scaffold(
@@ -683,6 +700,27 @@ fun MapScreen(
                         ) {
                             Text(title, fontSize = 13.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold, color = if (active) Color.White else AppleTheme.colors.label)
                         }
+                    }
+                }
+                // Freemium (2026-08): подсказка, что часть контактов скрыта
+                // бесплатным лимитом карты — видна, только когда реально
+                // что-то скрыто (не мусорим баннером, если контактов ≤5).
+                if (hiddenByFreeLimit > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13)
+                            .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                            .clickable { showMapPaywall = true }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.WorkspacePremium, null, Modifier.size(16.dp), tint = AppleTheme.colors.brand)
+                        Text(
+                            stringResource(R.string.sub_map_limit, AppSettings.FREE_MAP_MARKER_LIMIT),
+                            fontSize = 12.sp, color = AppleTheme.colors.brand, fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
                 // ── Фильтр отношений ОДНОЙ кнопкой-списком (фидбэк владельца

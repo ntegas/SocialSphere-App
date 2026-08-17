@@ -64,6 +64,10 @@ class MainActivity : androidx.appcompat.app.AppCompatActivity() {
 
         val db = SocialsphereDatabase.getDatabase(applicationContext)
         AppStateStore.initialize(applicationContext, db)
+        // Freemium/Pro+ (2026-08) — подключение к Play Billing + восстановление
+        // статуса покупок. После AppStateStore (никакой зависимости по порядку
+        // от локали, в отличие от AppSettings.init() выше — можно после super.onCreate()).
+        com.aistudio.socialsphere.crmlxb.utils.BillingManager.init(applicationContext)
         // Ежедневное «пора связаться» (по ритму общения)
         com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
             .scheduleStaleCheck(applicationContext)
@@ -356,8 +360,12 @@ fun SocialsphereApp() {
                     onNavigateToPrivacy = { navController.navigate("settings_privacy") },
                     onNavigateToDuplicates = { navController.navigate("settings_duplicates") },
                     onNavigateToCompanyDuplicates = { navController.navigate("company_duplicates") },
-                    onNavigateToContactDisplay = { navController.navigate("settings_contact_display") }
+                    onNavigateToContactDisplay = { navController.navigate("settings_contact_display") },
+                    onNavigateToSubscription = { navController.navigate("settings_subscription") }
                 )
+            }
+            composable("settings_subscription") {
+                SubscriptionSettingsScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable("settings_duplicates") {
                 DuplicatesScreen(

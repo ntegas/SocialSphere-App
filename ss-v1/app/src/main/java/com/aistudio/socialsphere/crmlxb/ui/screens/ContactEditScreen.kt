@@ -179,6 +179,10 @@ fun ContactEditScreen(
     var tags            by remember { mutableStateOf(originalContact?.tags ?: emptyList<String>()) }
     var newTagText      by remember { mutableStateOf("") }
 
+    // Freemium (2026-08): «сохранение контакта с телефоном — 3 бесплатных
+    // в месяц» — см. buildAndSave() ниже.
+    var showContactQuotaPaywall by remember { mutableStateOf(false) }
+
     // Add phone dialog state
     var showAddPhone    by remember { mutableStateOf(false) }
     var newPhone        by remember { mutableStateOf("") }
@@ -288,8 +292,23 @@ fun ContactEditScreen(
             createdAt        = originalContact?.createdAt ?: nowIso(),
             updatedAt        = nowIso()
         )
+        // Freemium (2026-08, владелец: «сохранение контакта с телефоном — 3
+        // бесплатных в месяц»): гейт только на СОЗДАНИЕ нового контакта с
+        // непустым списком телефонов — правка уже существующих контактов не
+        // ограничена (иначе владелец не смог бы редактировать свои старые
+        // записи, что абсурдно). Блокируем сохранение целиком, а не
+        // пропускаем молча — иначе владелец решит, что контакт сохранился,
+        // хотя его данные потеряны.
+        if (!isEditMode && newContact.phones.isNotEmpty() &&
+            AppSettings.contactsWithPhoneRemainingThisMonth() <= 0) {
+            showContactQuotaPaywall = true
+            return
+        }
         if (isEditMode) AppStateStore.updateContact(newContact)
-        else            AppStateStore.addContact(newContact)
+        else {
+            AppStateStore.addContact(newContact)
+            if (newContact.phones.isNotEmpty()) AppSettings.recordContactWithPhoneUsed()
+        }
 
         // Связи (семья): применяем разницу только при сохранении
         val keptIds = contactRelationsDraft.map { it.id }.toSet()
@@ -303,6 +322,13 @@ fun ContactEditScreen(
     }
 
     // ── Dialogs ──────────────────────────────────────────────────────
+    if (showContactQuotaPaywall) {
+        PaywallSheet(
+            onDismiss = { showContactQuotaPaywall = false },
+            titleRes = R.string.paywall_contacts_title,
+            subtitleRes = R.string.paywall_contacts_subtitle,
+        )
+    }
     if (showAddRelation) {
         val relationRoles = listOf("Жена", "Муж", "Партнёр", "Мать", "Отец",
             "Сын", "Дочь", "Брат", "Сестра", "Родственник", "Друг", "Коллега")
