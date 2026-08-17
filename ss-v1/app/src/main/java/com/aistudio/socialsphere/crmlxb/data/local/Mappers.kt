@@ -219,7 +219,13 @@ fun GiftIdea.toEntity(): GiftIdeaEntity = GiftIdeaEntity(
     note = note,
     link = link,
     date = date,
-    reminderId = reminderId,
+    // ФИКС (2026-08-17, задача #113 — мёртвое поле): reminderId никогда не
+    // заполнялся ни одним UI (не было экрана, который создавал бы напоминание
+    // для подарка и записывал его id сюда) и нигде не читался для отмены
+    // будильника при удалении. Убрано из домена GiftIdea целиком — колонка в
+    // Entity/БД оставлена как есть (не трогаем схему/миграции ради мёртвого
+    // поля, которое и так всегда было null), просто больше не заполняется.
+    reminderId = null,
     status = status.name
 )
 
@@ -432,7 +438,6 @@ fun GiftIdeaEntity.toDomain(): GiftIdea = GiftIdea(
     note = note,
     link = link,
     date = date,
-    reminderId = reminderId,
     status = safeEnum(status, GiftStatus.IDEA)
 )
 

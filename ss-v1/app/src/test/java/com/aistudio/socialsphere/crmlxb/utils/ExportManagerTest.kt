@@ -73,7 +73,7 @@ class ExportManagerTest {
         ),
         gifts = listOf(
             GiftIdea(id = "g1", contactId = id, title = "Книга", note = "Фантастика", link = "https://example.com",
-                date = "2026-12-25", reminderId = null, status = GiftStatus.IDEA)
+                date = "2026-12-25", status = GiftStatus.IDEA)
         ),
         sizeInfo = SizeInfo(id = "s1", contactId = id, clothingSize = "L", shoeSize = "42", ringSize = null, other = "Кепка 58"),
         personalDetails = listOf(

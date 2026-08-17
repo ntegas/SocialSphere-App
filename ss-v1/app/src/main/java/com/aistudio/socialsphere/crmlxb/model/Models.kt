@@ -282,7 +282,6 @@ data class GiftIdea(
     val note: String? = null,
     val link: String? = null,
     val date: String? = null,
-    val reminderId: String? = null,
     val status: GiftStatus
 )
 

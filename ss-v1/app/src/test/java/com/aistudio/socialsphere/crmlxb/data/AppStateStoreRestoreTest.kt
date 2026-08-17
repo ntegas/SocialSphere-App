@@ -94,7 +94,7 @@ class AppStateStoreRestoreTest {
 
     private fun gift(id: String, contactId: String) = GiftIdea(
         id = id, contactId = contactId, title = "Книга", note = "Фантастика",
-        link = null, date = "2026-12-25", reminderId = null, status = GiftStatus.IDEA
+        link = null, date = "2026-12-25", status = GiftStatus.IDEA
     )
 
     /** Опрашивает БД, пока не появятся ожидаемые записи или не истечёт таймаут —
