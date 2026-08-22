@@ -8,6 +8,12 @@ import com.aistudio.socialsphere.crmlxb.model.*
 inline fun <reified T : Enum<T>> safeEnum(value: String?, default: T): T =
     value?.let { runCatching { enumValueOf<T>(it) }.getOrNull() } ?: default
 
+// ФИКС (аудит 2026-08-18): Contact.tags раньше join/split-ился по "," — обычная
+// запятая печатается с клавиатуры, так что тег "Boston, MA" молча превращался
+// в два тега при следующей загрузке из БД. "###" — маловероятная в обычном
+// теге, но безопасная по кодировке (обычный ASCII, не control-символ) замена.
+private const val TAG_DELIMITER = "###"
+
 fun Contact.toEntity(): ContactEntity = ContactEntity(
     id                = id,
     firstName         = firstName,
@@ -33,7 +39,7 @@ fun Contact.toEntity(): ContactEntity = ContactEntity(
     nextStep          = nextStep,
     familyNote        = familyNote,
     profession        = profession,
-    tags              = if (tags.isEmpty()) null else tags.joinToString(","),
+    tags              = if (tags.isEmpty()) null else tags.joinToString(TAG_DELIMITER),
     canHelpWith       = canHelpWith,
     iCanHelpWith      = iCanHelpWith,
     talkingPoints     = talkingPoints,
@@ -275,7 +281,14 @@ fun ContactEntity.toDomain(): Contact = Contact(
     nextStep            = nextStep,
     familyNote          = familyNote,
     profession          = profession,
-    tags                = tags?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+    // Обратная совместимость: старые записи (до фикса TAG_DELIMITER) сохранены
+    // через запятую — если нового разделителя в строке нет, парсим как раньше,
+    // иначе существующие контакты с 2+ тегами схлопнулись бы в один тег.
+    tags                = when {
+        tags.isNullOrBlank() -> emptyList()
+        tags.contains(TAG_DELIMITER) -> tags.split(TAG_DELIMITER).filter { it.isNotBlank() }
+        else -> tags.split(",").filter { it.isNotBlank() }
+    },
     canHelpWith         = canHelpWith,
     iCanHelpWith        = iCanHelpWith,
     talkingPoints       = talkingPoints,

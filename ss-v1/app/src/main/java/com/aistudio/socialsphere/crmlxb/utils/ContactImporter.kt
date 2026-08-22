@@ -331,6 +331,23 @@ private fun vUnescape(s: String): String = s
     .replace("\\;", ";")
     .replace("\\\\", "\\")
 
+/** ФИКС (аудит 2026-08-18): plain String.split(delim) режет и по ЭКРАНИРОВАННОМУ
+ *  разделителю ("\;") — ExportManager.vEsc экранирует ";"/","/"\\" в компонентах
+ *  N:-поля, поэтому фамилия вроде "Иванов\;сын" сдвигала бы все следующие
+ *  компоненты (имя/отчество/префикс/суффикс). Разбивает по delim, ПРОПУСКАЯ
+ *  экранированные вхождения (не разбирает их — просто не режет по ним). */
+private fun vSplit(s: String, delim: Char): List<String> {
+    val out = mutableListOf(StringBuilder())
+    var i = 0
+    while (i < s.length) {
+        val c = s[i]
+        if (c == '\\' && i + 1 < s.length) { out.last().append(c).append(s[i + 1]); i += 2 }
+        else if (c == delim) { out.add(StringBuilder()); i++ }
+        else { out.last().append(c); i++ }
+    }
+    return out.map { it.toString() }
+}
+
 // ─── vCard (.vcf) parser ──────────────────────────────────────
 fun parseVCard(content: String): List<ImportContactCandidate> {
     val results = mutableListOf<ImportContactCandidate>()
@@ -361,7 +378,7 @@ fun parseVCard(content: String): List<ImportContactCandidate> {
                 // структуру (v13: хранятся отдельно, как в Android-контактах).
                 // Матчим и «N;CHARSET=…:».
                 line.startsWith("N:") || line.startsWith("N;") -> {
-                    val parts = line.substringAfter(":", "").split(";")
+                    val parts = vSplit(line.substringAfter(":", ""), ';').map { vUnescape(it) }
                     lastName  = parts.getOrElse(0) { "" }.trim()
                     firstName = parts.getOrElse(1) { "" }.trim()
                     middleName = parts.getOrElse(2) { "" }.trim()

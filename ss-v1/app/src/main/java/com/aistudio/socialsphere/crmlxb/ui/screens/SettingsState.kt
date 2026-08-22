@@ -169,6 +169,22 @@ object AppSettings {
         )
     }
 
+    /** Разовая миграция легаси Contact.tags (свободный текст) в управляемую
+     *  систему Tag/tagMembers — см. AppStateStore.migrateLegacyContactTagsIfNeeded()
+     *  (аудит 2026-08-18: форма редактирования контакта editировала легаси-поле,
+     *  которое ни карточка контакта, ни новые фильтры больше не показывают —
+     *  владелец вводил тег и не видел его нигде). Ровно один раз за всю жизнь
+     *  установки, тем же паттерном, что defaultTagsSeeded. */
+    val legacyContactTagsMigrated: MutableState<Boolean> by lazy {
+        PersistedMutableState(
+            prefs       = getPrefs(),
+            key         = "legacy_contact_tags_migrated",
+            default     = false,
+            serialize   = { it.toString() },
+            deserialize = { it == "true" }
+        )
+    }
+
     // Раньше это были простые mutableStateOf — не персистились, и выключенное
     // «Включить уведомления» молча возвращалось в true после перезапуска
     // процесса/перезагрузки телефона (BootReceiver.rescheduleAll() ре-армил

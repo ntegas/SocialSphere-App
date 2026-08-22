@@ -1057,19 +1057,10 @@ fun ContactHeader(contact: Contact, onNavigateToCheatSheet: () -> Unit = {}, onN
     val city     = address?.city ?: ""
     // Полное имя с отчеством (как в телефонной книге), порядок слов — по
     // настройке «Формат отображения» (ContactDisplayPreferences, DISPLAY_ORDER
-    // как в Android-контактах): имя-первое или фамилия-первое.
-    val name = when (AppSettings.contactNameFormat.value) {
-        ContactNameFormat.FIRST_NAME_FIRST -> listOfNotNull(
-            contact.firstName.takeIf { it.isNotBlank() },
-            contact.middleName?.takeIf { it.isNotBlank() },
-            contact.lastName.takeIf { it.isNotBlank() }
-        )
-        ContactNameFormat.LAST_NAME_FIRST -> listOfNotNull(
-            contact.lastName.takeIf { it.isNotBlank() },
-            contact.firstName.takeIf { it.isNotBlank() },
-            contact.middleName?.takeIf { it.isNotBlank() }
-        )
-    }.joinToString(" ")
+    // как в Android-контактах): имя-первое или фамилия-первое. Общая функция
+    // (не инлайн-дубликат — аудит 2026-08-18 нашёл несколько мест в приложении
+    // с независимо переписанной версией этой же логики, разошедшихся между собой).
+    val name = formatContactName(contact, AppSettings.contactNameFormat.value)
 
     // Last contact — most recent note/event
     val lastNoteDate = AppStateStore.notes

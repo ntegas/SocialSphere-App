@@ -583,7 +583,7 @@ private fun WeekEventRow(event: CalendarItem, onClick: () -> Unit) {
     val time = event.startTime.orEmpty()
     val names = event.links.mapNotNull { link ->
         when (link.targetType) {
-            CalendarTargetType.CONTACT -> AppStateStore.getContact(link.targetId)?.let { "${it.firstName} ${it.lastName}".trim() }
+            CalendarTargetType.CONTACT -> AppStateStore.getContact(link.targetId)?.let { formatContactName(it, AppSettings.contactNameFormat.value) }
             CalendarTargetType.COMPANY -> AppStateStore.getCompany(link.targetId)?.name
             else -> null
         }
@@ -629,7 +629,7 @@ fun CalendarEventItem(
     }
     val relatedText = event.links.mapNotNull { link ->
         when (link.targetType) {
-            CalendarTargetType.CONTACT -> AppStateStore.getContact(link.targetId)?.let { "${it.firstName} ${it.lastName}" }
+            CalendarTargetType.CONTACT -> AppStateStore.getContact(link.targetId)?.let { formatContactName(it, AppSettings.contactNameFormat.value) }
             CalendarTargetType.COMPANY -> AppStateStore.getCompany(link.targetId)?.name
             else -> null
         }
@@ -679,7 +679,7 @@ fun CalendarTimelineRow(event: CalendarItem, isLast: Boolean, isToday: Boolean =
         ?.let { AppStateStore.getContact(it.targetId) }
     val personName = event.links.mapNotNull { link ->
         when (link.targetType) {
-            CalendarTargetType.CONTACT -> AppStateStore.getContact(link.targetId)?.let { "${it.firstName} ${it.lastName}".trim() }
+            CalendarTargetType.CONTACT -> AppStateStore.getContact(link.targetId)?.let { formatContactName(it, AppSettings.contactNameFormat.value) }
             CalendarTargetType.COMPANY -> AppStateStore.getCompany(link.targetId)?.name
             else -> null
         }
@@ -736,8 +736,8 @@ fun CalendarTimelineRow(event: CalendarItem, isLast: Boolean, isToday: Boolean =
                             Box(Modifier.size(24.dp).clip(CircleShape)
                                 .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(firstContact.id)),
                                 contentAlignment = Alignment.Center) {
-                                Text((firstContact.firstName.firstOrNull()?.toString() ?: "") +
-                                     (firstContact.lastName.firstOrNull()?.toString() ?: ""),
+                                Text(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.initials(
+                                        formatContactName(firstContact, AppSettings.contactNameFormat.value)),
                                     fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }

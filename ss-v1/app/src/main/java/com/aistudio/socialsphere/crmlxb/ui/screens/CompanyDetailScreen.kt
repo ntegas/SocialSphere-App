@@ -303,7 +303,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(
                         .map { c ->
                             com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
                                 id = c.id,
-                                title = "${c.firstName} ${c.lastName}".trim(),
+                                title = formatContactName(c, AppSettings.contactNameFormat.value),
                                 subtitle = c.companyRelations.firstOrNull()?.position
                             )
                         },
@@ -315,7 +315,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.companyPeopleTab(
             } else selected?.let { sel ->
                 // Шаг 2: должность
                 com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
-                    title = "${sel.firstName} ${sel.lastName}".trim(),
+                    title = formatContactName(sel, AppSettings.contactNameFormat.value),
                     onDismiss = { showAdd = false; selected = null; position = "" },
                     confirmText = stringResource(R.string.common_add),
                     onConfirm = {
@@ -438,7 +438,7 @@ private fun CompanyPersonRow(contact: Contact, rel: ContactCompanyRelation, onCl
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text("${contact.firstName} ${contact.lastName}".trim(), fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            Text(formatContactName(contact, AppSettings.contactNameFormat.value), fontSize = 15.sp, fontWeight = FontWeight.Bold,
                 color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub.isNotEmpty())
                 Text(sub, fontSize = 12.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)

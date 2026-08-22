@@ -32,7 +32,7 @@ data class ContactEntity(
     val nextStep: String? = null,
     val familyNote: String? = null,
     val profession: String? = null,
-    val tags: String? = null,          // JSON array stored as string
+    val tags: String? = null,          // delimiter-joined string (TAG_DELIMITER в Mappers.kt), не JSON
     val canHelpWith: String? = null,
     val iCanHelpWith: String? = null,
     val talkingPoints: String? = null,

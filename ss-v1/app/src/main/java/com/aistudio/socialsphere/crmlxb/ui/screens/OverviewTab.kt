@@ -299,7 +299,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     // Роль ДРУГОГО человека (например, «Жена» рядом с именем жены)
                     val role      = if (isFirst) rel.secondRole else rel.firstRole
                     val other     = AppStateStore.getContact(otherId)
-                    val otherName = other?.let { "${it.firstName} ${it.lastName}".trim() }
+                    val otherName = other?.let { formatContactName(it, AppSettings.contactNameFormat.value) }
                         ?: stringResource(R.string.cd_deleted)
                     Row(
                         modifier = Modifier
@@ -412,7 +412,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         .map { c ->
                             com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
                                 id = c.id,
-                                title = "${c.firstName} ${c.lastName}".trim(),
+                                title = formatContactName(c, AppSettings.contactNameFormat.value),
                                 subtitle = c.customRelationshipType?.takeIf { it.isNotBlank() }
                                     ?: c.relationshipType.label(ctxLabel)
                             )
@@ -431,17 +431,17 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                             com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatar(
-                                sel.id, "${sel.firstName} ${sel.lastName}".trim(), size = 38.dp, fontSize = 14.sp)
+                                sel.id, formatContactName(sel, AppSettings.contactNameFormat.value), size = 38.dp, fontSize = 14.sp)
                             Text(
-                                "${sel.firstName} ${sel.lastName}".trim(),
+                                formatContactName(sel, AppSettings.contactNameFormat.value),
                                 fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor("${sel.firstName} ${sel.lastName}"),
                                 fontSize = 20.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label
                             )
                         }
                         // ФИКС (2026-07-12): подписи с явными именами вместо двусмысленного
                         // «я» + авто-инверсия второй роли (пользователь может поправить).
-                        val famSelName = "${sel.firstName} ${sel.lastName}".trim()
-                        val famOwnName = "${contact.firstName} ${contact.lastName}".trim()
+                        val famSelName = formatContactName(sel, AppSettings.contactNameFormat.value)
+                        val famOwnName = formatContactName(contact, AppSettings.contactNameFormat.value)
                         DropdownField(roleOfLabel(ctxLabel, famSelName, famOwnName), relationRoleLabel(ctxLabel, famOtherRole), famRoles.map { relationRoleLabel(ctxLabel, it) }) { v ->
                             famOtherRole = famRoles.firstOrNull { relationRoleLabel(ctxLabel, it) == v } ?: famOtherRole
                             if (!famMyRoleTouched) famMyRole = inverseRelationRole(famOtherRole)
@@ -1114,7 +1114,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     // Роль ДРУГОГО человека
                     val theirRole = if (isFirst) rel.secondRole else rel.firstRole
                     val other     = AppStateStore.getContact(otherId)
-                    val otherName = other?.let { "${it.firstName} ${it.lastName}".trim() } ?: stringResource(R.string.common_unknown)
+                    val otherName = other?.let { formatContactName(it, AppSettings.contactNameFormat.value) } ?: stringResource(R.string.common_unknown)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1174,7 +1174,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                         .map { c ->
                             com.aistudio.socialsphere.crmlxb.ui.theme.AureliaPickItem(
                                 id = c.id,
-                                title = "${c.firstName} ${c.lastName}".trim(),
+                                title = formatContactName(c, AppSettings.contactNameFormat.value),
                                 subtitle = c.customRelationshipType?.takeIf { it.isNotBlank() }
                                     ?: c.relationshipType.label(ctxLabel)
                             )
@@ -1187,7 +1187,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
             } else relSelected?.let { sel ->
                 // Шаг 2: роли связи
                 com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
-                    title = "${sel.firstName} ${sel.lastName}".trim(),
+                    title = formatContactName(sel, AppSettings.contactNameFormat.value),
                     onDismiss = { showAddRelated = false; relSelected = null },
                     confirmText = stringResource(R.string.common_add),
                     onConfirm = {
@@ -1204,8 +1204,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.overviewTab(
                     onSecondary = { relSelected = null }
                 ) {
                     // ФИКС (2026-07-12): подписи с явными именами вместо «я» + авто-инверсия.
-                    val relSelName = "${sel.firstName} ${sel.lastName}".trim()
-                    val relOwnName = "${contact.firstName} ${contact.lastName}".trim()
+                    val relSelName = formatContactName(sel, AppSettings.contactNameFormat.value)
+                    val relOwnName = formatContactName(contact, AppSettings.contactNameFormat.value)
                     DropdownField(roleOfLabel(ctxLabel, relSelName, relOwnName), relationRoleLabel(ctxLabel, relOtherRole), relRoles.map { relationRoleLabel(ctxLabel, it) }) { v ->
                         relOtherRole = relRoles.firstOrNull { relationRoleLabel(ctxLabel, it) == v } ?: relOtherRole
                         if (!relMyRoleTouched) relMyRole = inverseRelationRole(relOtherRole)

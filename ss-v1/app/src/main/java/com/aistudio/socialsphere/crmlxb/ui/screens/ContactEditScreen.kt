@@ -175,10 +175,6 @@ fun ContactEditScreen(
     var meetContext     by remember { mutableStateOf(originalContact?.meetContext ?: "") }
     var meetDate        by remember { mutableStateOf(originalContact?.meetDate ?: "") }
 
-    // Tags
-    var tags            by remember { mutableStateOf(originalContact?.tags ?: emptyList<String>()) }
-    var newTagText      by remember { mutableStateOf("") }
-
     // Freemium (2026-08): «сохранение контакта с телефоном — 3 бесплатных
     // в месяц» — см. buildAndSave() ниже.
     var showContactQuotaPaywall by remember { mutableStateOf(false) }
@@ -280,7 +276,13 @@ fun ContactEditScreen(
             talkingPoints    = talkingPoints.trim().ifBlank { null },
             meetContext      = meetContext.trim().ifBlank { null },
             meetDate         = meetDate.trim().ifBlank { null },
-            tags             = tags,
+            // Легаси-поле (2026-08-18, аудит): форма редактирования больше не
+            // показывает/не правит его — единственная точка входа тегов теперь
+            // управляемая система AppStateStore.tags/tagMembers (OverviewTab,
+            // решение владельца 2026-07-28). Значение только сохраняется как
+            // есть, чтобы уже введённые владельцем легаси-теги не терялись —
+            // см. migrateLegacyContactTagsIfNeeded() для их переноса в новую систему.
+            tags             = originalContact?.tags ?: emptyList(),
             photoUri         = photoUri,
             // Поля, не редактируемые этой формой, ОБЯЗАНЫ проноситься из оригинала —
             // иначе каждое сохранение молча стирало их (реальный баг: lastContactDate
@@ -1209,92 +1211,6 @@ fun ContactEditScreen(
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.ce_add_person))
                 }
-            }
-
-            // ── Теги ──────────────────────────────────────────────────
-            SectionCard(stringResource(R.string.ce_tags)) {
-                if (tags.isNotEmpty()) {
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement   = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        tags.forEach { tag ->
-                            InputChip(
-                                selected = true,
-                                onClick  = { tags = tags - tag },
-                                label    = { Text(tag) },
-                                trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(14.dp)) },
-                                shape = SocialShape.Full
-                            )
-                        }
-                    }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value         = newTagText,
-                        onValueChange = { newTagText = it },
-                        label         = { Text(stringResource(R.string.ce_new_tag)) },
-                        modifier      = Modifier.weight(1f),
-                        singleLine    = true,
-                        shape         = SocialShape.Small,
-                        placeholder   = { Text(stringResource(R.string.ce_tag_hint)) }
-                    )
-                    IconButton(
-                        onClick = {
-                            // ФИКС (2026-07-11, фидбэк владельца): сравнение было
-                            // только с тегами ЭТОГО контакта и регистрозависимым —
-                            // «Друг»/«друг» заводились как разные теги базы. Теперь
-                            // ищем совпадение по ВСЕЙ базе (AppStateStore.allTags())
-                            // без учёта регистра и добавляем существующее написание,
-                            // а не новый вариант с другим регистром.
-                            val typed = newTagText.trim()
-                            if (typed.isNotBlank()) {
-                                val existing = AppStateStore.allTags().firstOrNull { it.equals(typed, ignoreCase = true) }
-                                val tag = existing ?: typed
-                                if (tag !in tags) tags = tags + tag
-                                newTagText = ""
-                            }
-                        },
-                        enabled = newTagText.isNotBlank()
-                    ) {
-                        Icon(Icons.Default.Add, null, tint = AppleTheme.colors.brand)
-                    }
-                }
-                // Подсказки существующих тегов по мере ввода (паттерн Gmail/Notion) —
-                // раньше автокомплита не было вообще, дубли-опечатки было не видно.
-                val tagSuggestions = remember(newTagText) {
-                    val q = newTagText.trim()
-                    if (q.isBlank()) emptyList()
-                    else AppStateStore.allTags()
-                        .filter { it.contains(q, ignoreCase = true) && it !in tags }
-                        .take(6)
-                }
-                if (tagSuggestions.isNotEmpty()) {
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement   = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        tagSuggestions.forEach { suggestion ->
-                            AssistChip(
-                                onClick = { tags = tags + suggestion; newTagText = "" },
-                                label   = { Text(suggestion, style = MaterialTheme.typography.labelSmall) },
-                                shape   = SocialShape.Full
-                            )
-                        }
-                    }
-                }
-                Text(
-                    stringResource(R.string.ce_remove_tag_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppleTheme.colors.separator
-                )
             }
 
             // ── Где познакомились ─────────────────────────────────────

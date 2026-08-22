@@ -58,7 +58,7 @@ fun CheatSheetScreen(
         return
     }
 
-    val name       = "${contact.firstName} ${contact.lastName}".trim()
+    val name       = formatContactName(contact, AppSettings.contactNameFormat.value)
     val compRel    = contact.companyRelations.firstOrNull { it.isPrimary }
         ?: contact.companyRelations.firstOrNull()
     val company    = compRel?.companyId?.let { AppStateStore.getCompany(it)?.name } ?: ""
@@ -231,7 +231,7 @@ fun CheatSheetScreen(
                         val otherId   = if (isFirst) rel.secondContactId else rel.firstContactId
                         val role      = if (isFirst) rel.secondRole else rel.firstRole
                         val otherName = AppStateStore.getContact(otherId)
-                            ?.let { "${it.firstName} ${it.lastName}".trim() } ?: "—"
+                            ?.let { formatContactName(it, AppSettings.contactNameFormat.value) } ?: "—"
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), Arrangement.SpaceBetween) {
                             Text(role?.let { relationRoleLabel(ctxLabel, it) } ?: "", fontSize = 13.sp, color = CsMuted, modifier = Modifier.weight(0.4f))
                             Text(otherName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = CsTx,

@@ -16,6 +16,7 @@ data class ParsedEmail(val email: String, val type: EmailType)
  *  не терять ни фразы»). */
 data class ParsedCard(
     val firstName: String = "",
+    val middleName: String = "",
     val lastName: String = "",
     val phones: List<ParsedPhone> = emptyList(),
     val emails: List<ParsedEmail> = emptyList(),
@@ -223,8 +224,14 @@ object BusinessCardParser {
 
         val addresses = lines.filter { ADDRESS_MARKER.containsMatchIn(it) }.distinct()
 
+        // ФИКС (аудит 2026-08-18): раньше ВСЁ после первого слова уходило в
+        // lastName — трёхсловное ФИО («Иван Петрович Сидоров») склеивало
+        // отчество с фамилией. Модель Contact.middleName уже существует и
+        // используется остальным приложением (ContactImporter и т.д.) — тот же
+        // разбор «первое слово / средние слова / последнее слово».
         val firstName = nameWords.getOrNull(0).orEmpty()
-        val lastName = nameWords.drop(1).joinToString(" ")
+        val middleName = if (nameWords.size >= 3) nameWords.subList(1, nameWords.size - 1).joinToString(" ") else ""
+        val lastName = if (nameWords.size >= 2) nameWords.last() else ""
 
         // Сеть безопасности: всё, что не ушло ни в одно структурное поле, —
         // в unmatched, чтобы вызывающий код мог сохранить это заметкой.
@@ -235,8 +242,9 @@ object BusinessCardParser {
         }
 
         return ParsedCard(
-            firstName = firstName,
-            lastName  = lastName,
+            firstName  = firstName,
+            middleName = middleName,
+            lastName   = lastName,
             phones    = phones,
             emails    = emails,
             website   = website,

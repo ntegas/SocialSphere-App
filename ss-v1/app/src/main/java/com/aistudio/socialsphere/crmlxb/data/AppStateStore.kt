@@ -106,6 +106,10 @@ object AppStateStore {
             // проверился бы раньше, чем список реально загружен, и сидирование
             // срабатывало бы на каждом холодном старте заново.
             appContext?.let { seedDefaultTagsIfNeeded(it) }
+            // Миграция легаси Contact.tags → управляемая система (аудит
+            // 2026-08-18) — тоже ПОСЛЕ reloadFromDb, читает уже загруженные
+            // contacts/tags.
+            migrateLegacyContactTagsIfNeeded()
             // ФИКС (2026-08-12, §52 KNOWLEDGE.md): самовосстановление связи
             // дата-событие→контакт по имени из заголовка — ПОСЛЕ reloadFromDb,
             // т.к. работает по уже загруженным calendarItems/contacts.
@@ -792,7 +796,10 @@ object AppStateStore {
             meetContext = text("meetContext") { it.meetContext },
             familyNote = text("familyNote") { it.familyNote },
             lastContactDate = allPairs.mapNotNull { it.second.lastContactDate }.maxOrNull(),
-            tags = allPairs.flatMap { it.second.tags }.distinct(),
+            // ФИКС (аудит 2026-08-18): distinct() было регистрозависимым — «Друг»
+            // и «друг» с двух сливаемых контактов выживали оба, как раз тот
+            // дубль, который фикс 2026-07-11 должен был устранить.
+            tags = allPairs.flatMap { it.second.tags }.distinctBy { it.trim().lowercase() },
             phones = mergedPhones, emails = mergedEmails, messengers = mergedMessengers,
             companyRelations = mergedCompRels, addresses = mergedAddresses, personalDetails = mergedPd,
             sizeInfo = mergedSizeInfo
@@ -1173,12 +1180,35 @@ object AppStateStore {
         contacts.mapNotNull { it.customRelationshipType?.trim()?.takeIf { s -> s.isNotBlank() } }
             .distinct().sortedBy { it.lowercase() }
 
-    /** Все теги, реально используемые хотя бы одним контактом — единое место
-     *  истины для автодополнения (раньше каждый экран считал свою локальную
-     *  копию, ContactEditScreen её вообще не видел — теги-дубли с опечаткой/
-     *  другим регистром заводились незаметно, фидбэк владельца 2026-07-11). */
+    /** Легаси-функция (2026-07-11) — Contact.tags свободного текста. С
+     *  2026-08-18 форма редактирования контакта больше не пишет в это поле
+     *  (см. migrateLegacyContactTagsIfNeeded), новые теги идут только через
+     *  управляемую систему ниже (distinctCategories/tagsOfContact). Оставлена
+     *  только для чтения уже существующих значений во время миграции. */
     fun allTags(): List<String> =
         contacts.flatMap { it.tags }.distinct().sortedBy { it.lowercase() }
+
+    /** Разовая миграция легаси Contact.tags (свободный текст, поле больше не
+     *  редактируется никаким UI) в управляемую систему Tag/tagMembers — иначе
+     *  теги, которые владелец успел ввести ДО фикса 2026-08-18, остались бы
+     *  навсегда невидимыми (данные в БД есть, но ни одна экран их не показывает).
+     *  Каждое уникальное значение (без учёта регистра) становится одним Tag,
+     *  каждый контакт с этим значением получает членство — как ручное
+     *  добавление тега через "+ Тег", просто одним проходом при первом запуске
+     *  после обновления. */
+    fun migrateLegacyContactTagsIfNeeded() {
+        if (AppSettings.legacyContactTagsMigrated.value) return
+        contacts.forEach { c ->
+            if (c.tags.isEmpty()) return@forEach
+            val currentIds = tagsOfContact(c.id).map { it.id }.toMutableSet()
+            c.tags.forEach { legacyName ->
+                val tag = addTag(legacyName) ?: return@forEach
+                currentIds += tag.id
+            }
+            setContactTags(c.id, currentIds)
+        }
+        AppSettings.legacyContactTagsMigrated.value = true
+    }
 
     /** Переименовать свой тип отношений ВЕЗДЕ, где он используется (все контакты разом). */
     fun renameCustomRelationshipType(oldName: String, newName: String) {

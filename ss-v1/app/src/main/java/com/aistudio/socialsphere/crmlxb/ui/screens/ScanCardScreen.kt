@@ -61,8 +61,9 @@ fun ScanCardScreen(
     // (независимый от лимита самих сканов выше).
     var showSaveQuotaPaywall by remember { mutableStateOf(false) }
 
-    var firstName by remember { mutableStateOf("") }
-    var lastName  by remember { mutableStateOf("") }
+    var firstName  by remember { mutableStateOf("") }
+    var middleName by remember { mutableStateOf("") }
+    var lastName   by remember { mutableStateOf("") }
     var phones    by remember { mutableStateOf<List<ContactPhone>>(emptyList()) }
     var emails    by remember { mutableStateOf<List<ContactEmail>>(emptyList()) }
     var website   by remember { mutableStateOf("") }
@@ -88,8 +89,9 @@ fun ScanCardScreen(
     // редактируемые поля шага 2 (см. reviewed-ветку ниже).
     fun applyParsed(text: String) {
         val p = BusinessCardParser.parse(text)
-        firstName = p.firstName
-        lastName  = p.lastName
+        firstName  = p.firstName
+        middleName = p.middleName
+        lastName   = p.lastName
         phones = p.phones.mapIndexed { i, pp ->
             ContactPhone(UUID.randomUUID().toString(), "", pp.number, pp.type, i == 0)
         }
@@ -281,6 +283,11 @@ fun ScanCardScreen(
                     OutlinedTextField(lastName, { lastName = it }, Modifier.weight(1f),
                         label = { Text(stringResource(R.string.scan_last_name)) }, singleLine = true)
                 }
+                // ФИКС (аудит 2026-08-18): у визитки с 3-словным ФИО парсер теперь
+                // отдельно распознаёт отчество (BusinessCardParser.middleName) —
+                // раньше оно молча склеивалось с фамилией без возможности поправить.
+                OutlinedTextField(middleName, { middleName = it }, Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.ce_middle_name)) }, singleLine = true)
                 // ── Телефоны — все найденные, не только первый ──────────────
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
@@ -408,8 +415,9 @@ fun ScanCardScreen(
                         noteParts += ctx.getString(R.string.scan_raw_text_note, rawText)
 
                         val candidate = ImportContactCandidate(
-                            firstName = firstName.trim(),
-                            lastName  = lastName.trim(),
+                            firstName  = firstName.trim(),
+                            middleName = middleName.trim(),
+                            lastName   = lastName.trim(),
                             phones = phones,
                             emails = emails,
                             companyName = company.trim().ifBlank { null },

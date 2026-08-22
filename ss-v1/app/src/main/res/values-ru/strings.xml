@@ -405,7 +405,7 @@
     <string name="cds_name_format">Формат имени</string>
     <string name="cds_name_format_first">Имя Фамилия</string>
     <string name="cds_name_format_last">Фамилия Имя</string>
-    <string name="cds_name_format_hint">Влияет на порядок слов в списке контактов и на карточке. Сортировка списка настраивается отдельно, выше.</string>
+    <string name="cds_name_format_hint">Влияет на порядок слов в списке контактов и на карточке (отчество идёт после имени; при выборе «Фамилия Имя» оно переносится в конец). Сортировка списка настраивается отдельно, выше.</string>
     <string name="dup_pick_title">Объединить контакты</string>
     <string name="dup_pick_hint">Выберите от 2 до 3 контактов для объединения</string>
     <string name="dup_hint_pairs_title">Возможно, дубли</string>

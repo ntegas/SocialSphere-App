@@ -405,7 +405,7 @@
     <string name="cds_name_format">Μορφή ονόματος</string>
     <string name="cds_name_format_first">Όνομα Επώνυμο</string>
     <string name="cds_name_format_last">Επώνυμο Όνομα</string>
-    <string name="cds_name_format_hint">Επηρεάζει τη σειρά λέξεων στη λίστα επαφών και στην κάρτα επαφής. Η ταξινόμηση της λίστας ρυθμίζεται ξεχωριστά παραπάνω.</string>
+    <string name="cds_name_format_hint">Επηρεάζει τη σειρά λέξεων στη λίστα επαφών και στην κάρτα επαφής (το μεσαίο όνομα/πατρώνυμο ακολουθεί το μικρό όνομα· μετακινείται στο τέλος όταν εμφανίζεται πρώτα το επώνυμο). Η ταξινόμηση της λίστας ρυθμίζεται ξεχωριστά παραπάνω.</string>
     <string name="dup_pick_title">Συγχώνευση επαφών</string>
     <string name="dup_pick_hint">Επιλέξτε 2 έως 3 επαφές για συγχώνευση</string>
     <string name="dup_hint_pairs_title">Πιθανά διπλότυπα</string>

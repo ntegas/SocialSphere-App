@@ -159,8 +159,8 @@ fun DuplicatesScreen(
                 ) {
                     items(autoPairs.size, key = { autoPairs[it].a.id + "_" + autoPairs[it].b.id }) { i ->
                         val pair = autoPairs[i]
-                        val label = "${pair.a.firstName} ${pair.a.lastName}".trim() + " + " +
-                            "${pair.b.firstName} ${pair.b.lastName}".trim()
+                        val label = formatContactName(pair.a, AppSettings.contactNameFormat.value) + " + " +
+                            formatContactName(pair.b, AppSettings.contactNameFormat.value)
                         Row(
                             modifier = Modifier
                                 .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13)
@@ -228,9 +228,9 @@ fun DuplicatesScreen(
                                 selected = if (isSelected) selected - c.id else selected + c.id
                             })
                             com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatar(
-                                c.id, "${c.firstName} ${c.lastName}".trim(), size = 38.dp, fontSize = 14.sp)
+                                c.id, formatContactName(c, AppSettings.contactNameFormat.value), size = 38.dp, fontSize = 14.sp)
                             Column(Modifier.weight(1f)) {
-                                Text("${c.firstName} ${c.lastName}".trim(),
+                                Text(formatContactName(c, AppSettings.contactNameFormat.value),
                                     fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 val sub = contactSubtitle(c)

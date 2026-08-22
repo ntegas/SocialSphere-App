@@ -161,7 +161,7 @@ fun MapScreen(
     val industryCtx = androidx.compose.ui.platform.LocalContext.current
     val industryLabels = Industry.entries.associateWith { it.label(industryCtx) }
     // Build map objects from addresses
-    val mapObjects by remember(addrLabels, industryLabels) {
+    val mapObjects by remember(addrLabels, industryLabels, AppSettings.contactNameFormat.value) {
         derivedStateOf {
             AppStateStore.addresses.mapNotNull { address ->
                 when (address.ownerType) {
@@ -177,7 +177,7 @@ fun MapScreen(
                             addressId   = address.id,
                             ownerType   = address.ownerType,
                             ownerId     = address.ownerId,
-                            title       = "${contact.firstName} ${contact.lastName}".trim(),
+                            title       = formatContactName(contact, AppSettings.contactNameFormat.value),
                             subtitle    = listOfNotNull(
                                 address.addressType.mapLabel(addrLabels),
                                 companyName,

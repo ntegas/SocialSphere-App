@@ -507,7 +507,7 @@ fun ImportPreviewScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "${candidate.firstName} ${candidate.lastName}".trim().takeIf { it.isNotBlank() } ?: stringResource(R.string.imp_no_name), fontWeight = FontWeight.Bold)
+                            Text(text = listOfNotNull(candidate.firstName.trim(), candidate.middleName.trim().takeIf { it.isNotBlank() }, candidate.lastName.trim()).filter { it.isNotBlank() }.joinToString(" ").takeIf { it.isNotBlank() } ?: stringResource(R.string.imp_no_name), fontWeight = FontWeight.Bold)
                             if (candidate.companyName != null || candidate.jobTitle != null) {
                                 Text(text = listOfNotNull(candidate.jobTitle, candidate.companyName).joinToString(stringResource(R.string.imp_job_at)), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand)
                             }
@@ -925,7 +925,8 @@ fun ImportDuplicatesScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "${candidate.firstName} ${candidate.lastName}".trim()
+                            text = listOfNotNull(candidate.firstName.trim(), candidate.middleName.trim().takeIf { it.isNotBlank() }, candidate.lastName.trim())
+                                .filter { it.isNotBlank() }.joinToString(" ")
                                 .takeIf { it.isNotBlank() } ?: stringResource(R.string.imp_no_name),
                             fontWeight = FontWeight.Bold
                         )

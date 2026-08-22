@@ -21,7 +21,12 @@ android {
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.aistudio.socialsphere.crmlxb"
+    // Play Console: приложение создано с пакетом com.ntega.socialSphere (владелец
+    // задал вручную при создании приложения в консоли, до этого applicationId и
+    // namespace совпадали) — applicationId обязан совпадать с ним посимвольно,
+    // иначе загрузка AAB отклоняется. namespace НЕ трогаем, он не участвует в
+    // проверке Play и переименование задело бы весь пакет исходников.
+    applicationId = "com.ntega.socialSphere"
     minSdk = 24
     targetSdk = 36
     versionCode = 12

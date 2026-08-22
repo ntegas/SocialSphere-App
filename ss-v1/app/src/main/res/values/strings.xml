@@ -405,7 +405,7 @@
     <string name="cds_name_format">Name format</string>
     <string name="cds_name_format_first">First name first</string>
     <string name="cds_name_format_last">Last name first</string>
-    <string name="cds_name_format_hint">Affects word order in the contact list and on the contact card. List sorting is set separately above.</string>
+    <string name="cds_name_format_hint">Affects word order in the contact list and on the contact card (a middle name/patronymic follows the first name; it moves to the end when last name is shown first). List sorting is set separately above.</string>
     <string name="dup_pick_title">Merge contacts</string>
     <string name="dup_pick_hint">Select 2 to 3 contacts to merge</string>
     <string name="dup_hint_pairs_title">Possible duplicates</string>
