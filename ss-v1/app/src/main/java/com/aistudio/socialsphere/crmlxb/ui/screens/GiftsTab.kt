@@ -1,0 +1,328 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
+package com.aistudio.socialsphere.crmlxb.ui.screens
+
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.aistudio.socialsphere.crmlxb.data.AppStateStore
+import com.aistudio.socialsphere.crmlxb.R
+import androidx.compose.ui.res.stringResource
+import com.aistudio.socialsphere.crmlxb.ui.components.DatePickerField
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import com.aistudio.socialsphere.crmlxb.ui.theme.AureliaTheme
+import com.aistudio.socialsphere.crmlxb.model.*
+import com.aistudio.socialsphere.crmlxb.utils.*
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 3 — ПОДАРКИ
+// ═══════════════════════════════════════════════════════════════
+fun androidx.compose.foundation.lazy.LazyListScope.giftsTab(
+    contact: Contact,
+    onNavigateToCalendarItem: (String) -> Unit,
+    onAddGift: () -> Unit = {},
+    onEditGift: (GiftIdea) -> Unit = {},
+    onDeleteGift: (GiftIdea) -> Unit = {},
+    onEditSizes: () -> Unit = {},
+    onAddPref: () -> Unit = {},
+    onEditPref: (PersonalDetail) -> Unit = {},
+    onDeletePref: (PersonalDetail) -> Unit = {}
+, ctxLabel: android.content.Context) {
+    // ── Важные даты вверху: общий блок (тот же код, что на вкладке «Обзор») ──
+    contactImportantDatesItem(contact, onNavigateToCalendarItem)
+
+    // ── Добавить важную дату / праздник с напоминанием: общий шит (тот же, что в форме контакта) ──
+    item {
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        var showAddDate by remember { mutableStateOf(false) }
+        TextButton(onClick = { showAddDate = true }, modifier = Modifier.padding(bottom = 12.dp)) {
+            Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
+            Text(stringResource(R.string.cd_add_important_date))
+        }
+        if (showAddDate) {
+            ContactDateSheet(
+                onDismiss = { showAddDate = false },
+                onAdd = { d -> addContactDate(ctx, contact.id, d); showAddDate = false },
+            )
+        }
+    }
+
+    // ── Подарки с 3 статусами ────────────────────────────────
+    item {
+        val gifts = AppStateStore.gifts.filter { it.contactId == contact.id }
+        val ideas  = gifts.filter { it.status == GiftStatus.IDEA }
+        val bought = gifts.filter { it.status == GiftStatus.BOUGHT }
+        val given  = gifts.filter { it.status == GiftStatus.GIVEN }
+
+        // Идеи
+        TextButton(onClick = onAddGift, modifier = Modifier.padding(bottom = 4.dp)) {
+            Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(R.string.cd_gift_idea))
+        }
+        CardBlock(title = stringResource(R.string.cd_gift_ideas)) {
+            if (ideas.isEmpty()) {
+                Text(
+                    stringResource(R.string.cd_gift_ideas_none),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppleTheme.colors.secondaryLabel
+                )
+            } else {
+                ideas.forEachIndexed { i, gift ->
+                    GiftRow(
+                        gift = gift,
+                        onStatusChange = { newStatus -> AppStateStore.updateGift(gift.copy(status = newStatus)) },
+                        onEdit = { onEditGift(gift) },
+                        onDelete = { onDeleteGift(gift) }
+                    )
+                    if (i < ideas.lastIndex) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                }
+            }
+        }
+
+        // Куплено
+        if (bought.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            CardBlock(title = stringResource(R.string.cd_gift_bought)) {
+                bought.forEachIndexed { i, gift ->
+                    GiftRow(
+                        gift = gift,
+                        onStatusChange = { newStatus -> AppStateStore.updateGift(gift.copy(status = newStatus)) },
+                        onEdit = { onEditGift(gift) },
+                        onDelete = { onDeleteGift(gift) }
+                    )
+                    if (i < bought.lastIndex) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                }
+            }
+        }
+
+        // Подарено
+        if (given.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            CardBlock(title = stringResource(R.string.cd_gift_given_before)) {
+                given.forEachIndexed { i, gift ->
+                    GiftRow(
+                        gift = gift,
+                        onStatusChange = null,
+                        onEdit = { onEditGift(gift) },
+                        onDelete = { onDeleteGift(gift) }
+                    )
+                    if (i < given.lastIndex) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                }
+            }
+        }
+
+        // Подарки, поставленные в Календаре (событие типа «Подарок» со связью на контакт): раньше были
+        // видны только там и нигде на карточке (жалоба владельца 2026-10-10).
+        val giftEvents = contactCardGiftEvents(AppStateStore.calendarItems, contact.id)
+        if (giftEvents.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            CardBlock(title = stringResource(R.string.cd_gift_events)) {
+                giftEvents.forEachIndexed { i, ev ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToCalendarItem(ev.id) }
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text("🎁", fontSize = 16.sp)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                calendarDisplayTitle(ev.title, ev.type, androidx.compose.ui.platform.LocalContext.current),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                ev.startDate,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleTheme.colors.secondaryLabel,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        if (ev.status == CalendarItemStatus.COMPLETED) {
+                            Text(
+                                stringResource(R.string.common_done),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleTheme.colors.secondaryLabel
+                            )
+                        }
+                    }
+                    if (i < giftEvents.lastIndex) HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
+                }
+            }
+        }
+    }
+
+    // ── Предпочтения ─────────────────────────────────────────
+    item {
+        val size = AppStateStore.sizeInfos.find { it.contactId == contact.id }
+        val prefCats = listOf(
+            PersonalDetailCategory.FOOD, PersonalDetailCategory.DRINKS,
+            PersonalDetailCategory.LIKES, PersonalDetailCategory.DISLIKES,
+            PersonalDetailCategory.ALLERGIES, PersonalDetailCategory.RESTRICTIONS
+        )
+        val prefs = contact.personalDetails.filter { it.category in prefCats }
+
+        // Блок виден всегда: раньше при пустых данных добавить размеры
+        // и предпочтения из вкладки было негде в принципе
+        run {
+            CardBlock(title = stringResource(R.string.cd_prefs_sizes)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Кнопка «+ Размеры» — только когда размеров ещё нет. Если они
+                    // заданы, редактирование вынесено к самой секции «Размеры» ниже
+                    // (иконка-карандаш), иначе слово «Размеры» дублировалось.
+                    if (size == null) {
+                        TextButton(onClick = onEditSizes, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                            Icon(Icons.Default.Add, null, Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.cd_sizes), fontSize = 12.sp)
+                        }
+                    }
+                    TextButton(onClick = onAddPref, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Default.Add, null, Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.cd_preference), fontSize = 12.sp)
+                    }
+                }
+                if (size != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.cd_sizes),
+                            style      = MaterialTheme.typography.labelSmall,
+                            color      = AppleTheme.colors.brand,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        IconButton(onClick = onEditSizes, modifier = Modifier.size(18.dp)) {
+                            Icon(Icons.Default.Edit, stringResource(R.string.cd_sizes),
+                                Modifier.size(13.dp), tint = AppleTheme.colors.brand)
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement   = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (!size.clothingSize.isNullOrBlank()) SizeChip(stringResource(R.string.cd_clothes), size.clothingSize)
+                        if (!size.shoeSize.isNullOrBlank())    SizeChip(stringResource(R.string.cd_shoes),   size.shoeSize)
+                        if (!size.ringSize.isNullOrBlank())    SizeChip(stringResource(R.string.cd_ring),  size.ringSize)
+                        if (!size.other.isNullOrBlank())       SizeChip(stringResource(R.string.common_other),  size.other)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                if (prefs.isNotEmpty()) {
+                    prefs.groupBy { it.category }.forEach { (cat, items) ->
+                        Text(
+                            cat.label(ctxLabel),
+                            style      = MaterialTheme.typography.labelSmall,
+                            color      = if (cat == PersonalDetailCategory.ALLERGIES || cat == PersonalDetailCategory.RESTRICTIONS) AppleTheme.colors.red else AppleTheme.colors.brand,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        items.forEach { pref ->
+                            Row(
+                                // Тап по строке — правка предпочтения (раньше только удаление)
+                                modifier = Modifier.fillMaxWidth().clickable { onEditPref(pref) },
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("• ${pref.value}", style = MaterialTheme.typography.bodySmall, color = if (cat == PersonalDetailCategory.ALLERGIES || cat == PersonalDetailCategory.RESTRICTIONS) AppleTheme.colors.red else AppleTheme.colors.label, modifier = Modifier.weight(1f))
+                                IconButton(onClick = { onDeletePref(pref) }, modifier = Modifier.size(20.dp)) {
+                                    Icon(Icons.Default.Close, stringResource(R.string.common_delete),
+                                        Modifier.size(12.dp),
+                                        tint = AppleTheme.colors.secondaryLabel)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                    }
+                } else if (size == null) {
+                    Text(
+                        stringResource(R.string.cd_hint_sizes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppleTheme.colors.secondaryLabel
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GiftRow(
+    gift: GiftIdea,
+    onStatusChange: ((GiftStatus) -> Unit)?,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val nextStatus = when (gift.status) {
+        GiftStatus.IDEA   -> GiftStatus.BOUGHT
+        GiftStatus.BOUGHT -> GiftStatus.GIVEN
+        GiftStatus.GIVEN  -> GiftStatus.GIVEN
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium)
+                .background(AureliaTheme.colors.gold.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.CardGiftcard, null, Modifier.size(20.dp), tint = AureliaTheme.colors.gold)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(gift.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            if (!gift.note.isNullOrBlank())
+                Text(gift.note, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+            else if (!gift.link.isNullOrBlank())
+                Text(gift.link, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand)
+            else if (!gift.date.isNullOrBlank())
+                Text(gift.date, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
+        }
+        GiftStatusPill(
+            status = gift.status,
+            onClick = onStatusChange?.let { change -> { change(nextStatus) } }
+        )
+        GiftMenu(onEdit = onEdit, onDelete = onDelete)
+    }
+}
+
+@Composable
+private fun GiftStatusPill(status: GiftStatus, onClick: (() -> Unit)? = null) {
+    val ctx = LocalContext.current
+    val (bg, fg) = when (status) {
+        GiftStatus.IDEA   -> AureliaTheme.colors.gold.copy(alpha = 0.14f) to AureliaTheme.colors.gold
+        GiftStatus.BOUGHT -> AppleTheme.colors.brand.copy(alpha = 0.12f) to AppleTheme.colors.brand
+        GiftStatus.GIVEN  -> AppleTheme.colors.fill to AppleTheme.colors.secondaryLabel
+    }
+    Box(
+        modifier = Modifier
+            .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .background(bg)
+            .padding(horizontal = 11.dp, vertical = 4.dp)
+    ) {
+        Text(status.label(ctx), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = fg)
+    }
+}

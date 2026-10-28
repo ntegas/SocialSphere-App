@@ -2,6 +2,9 @@ package com.aistudio.socialsphere.crmlxb.utils
 
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.R
+// AppLanguage — канонический реестр языков приложения (тот же пакет, что и
+// AppSettings, который utils уже импортирует в NotificationScheduler/StaleContactsReceiver).
+import com.aistudio.socialsphere.crmlxb.ui.screens.AppLanguage
 
 fun RelationshipType.label(context: android.content.Context): String = when (this) {
     RelationshipType.FAMILY -> context.getString(R.string.lbl_relationship_type_family)
@@ -81,6 +84,7 @@ fun SocialRole.labelKey(): String = when (this) {
 
 fun CommunicationRhythm.label(context: android.content.Context): String = when (this) {
     CommunicationRhythm.NOT_TRACKED -> context.getString(R.string.lbl_communication_rhythm_not_tracked)
+    CommunicationRhythm.NO_SCHEDULE -> context.getString(R.string.lbl_communication_rhythm_no_schedule)
     CommunicationRhythm.WEEKLY -> context.getString(R.string.lbl_communication_rhythm_weekly)
     CommunicationRhythm.MONTHLY -> context.getString(R.string.lbl_communication_rhythm_monthly)
     CommunicationRhythm.EVERY_3_MONTHS -> context.getString(R.string.lbl_communication_rhythm_every_3_months)
@@ -91,6 +95,7 @@ fun CommunicationRhythm.label(context: android.content.Context): String = when (
 
 fun CommunicationRhythm.labelKey(): String = when (this) {
     CommunicationRhythm.NOT_TRACKED -> "Не отслеживать"
+    CommunicationRhythm.NO_SCHEDULE -> "Без расписания"
     CommunicationRhythm.WEEKLY -> "Раз в неделю"
     CommunicationRhythm.MONTHLY -> "Раз в месяц"
     CommunicationRhythm.EVERY_3_MONTHS -> "Раз в 3 мес."
@@ -111,23 +116,50 @@ fun EmploymentStatus.labelKey(): String = when (this) {
     EmploymentStatus.UNKNOWN -> "Неизвестно"
 }
 
-fun CalendarItemType.label(context: android.content.Context): String = when (this) {
-    CalendarItemType.BIRTHDAY -> context.getString(R.string.lbl_calendar_item_type_birthday)
-    CalendarItemType.ANNIVERSARY -> context.getString(R.string.lbl_calendar_item_type_anniversary)
-    CalendarItemType.IMPORTANT_DATE -> context.getString(R.string.lbl_calendar_item_type_important_date)
-    CalendarItemType.MEETING -> context.getString(R.string.lbl_calendar_item_type_meeting)
-    CalendarItemType.CALL -> context.getString(R.string.lbl_calendar_item_type_call)
-    CalendarItemType.MESSAGE -> context.getString(R.string.lbl_calendar_item_type_message)
-    CalendarItemType.GIFT -> context.getString(R.string.lbl_calendar_item_type_gift)
-    CalendarItemType.TASK -> context.getString(R.string.lbl_calendar_item_type_task)
-    CalendarItemType.NOTE -> context.getString(R.string.lbl_calendar_item_type_note)
-    CalendarItemType.COMPANY_EVENT -> context.getString(R.string.lbl_calendar_item_type_company_event)
-    CalendarItemType.CUSTOM -> context.getString(R.string.lbl_calendar_item_type_custom)
+fun CalendarItemType.labelResId(): Int = when (this) {
+    CalendarItemType.BIRTHDAY -> R.string.lbl_calendar_item_type_birthday
+    CalendarItemType.ANNIVERSARY -> R.string.lbl_calendar_item_type_anniversary
+    CalendarItemType.NAMEDAY -> R.string.lbl_calendar_item_type_nameday
+    CalendarItemType.IMPORTANT_DATE -> R.string.lbl_calendar_item_type_important_date
+    CalendarItemType.MEETING -> R.string.lbl_calendar_item_type_meeting
+    CalendarItemType.CALL -> R.string.lbl_calendar_item_type_call
+    CalendarItemType.MESSAGE -> R.string.lbl_calendar_item_type_message
+    CalendarItemType.GIFT -> R.string.lbl_calendar_item_type_gift
+    CalendarItemType.TASK -> R.string.lbl_calendar_item_type_task
+    CalendarItemType.NOTE -> R.string.lbl_calendar_item_type_note
+    CalendarItemType.COMPANY_EVENT -> R.string.lbl_calendar_item_type_company_event
+    CalendarItemType.CUSTOM -> R.string.lbl_calendar_item_type_custom
 }
+
+fun CalendarItemType.label(context: android.content.Context): String =
+    context.getString(labelResId())
+
+/** Строка ресурса во ВСЕХ языках приложения, без дублей.
+ *
+ *  Список языков НЕ хранится здесь отдельной копией: он берётся из
+ *  AppLanguage — канонического реестра языков приложения (им же управляется
+ *  экран выбора языка). Раньше рядом жил свой APP_LANGS, и добавление
+ *  AppLanguage.FRENCH + values-fr/strings.xml без правки того списка дало бы
+ *  приложение, которое поддерживает французский, а распознавание
+ *  «запечённых» значений — нет. Теперь новый язык добавляется в одном месте.
+ *
+ *  internal (не private) — переиспользуется AppStateStore для cross-locale
+ *  идентичности встроенных seed-тегов в addTag()/restoreBackup() (тот же
+ *  класс задачи: узнать «запечённое» значение независимо от текущей локали
+ *  устройства). */
+internal fun localizedVariants(context: android.content.Context, resId: Int): List<String> =
+    AppLanguage.values().mapNotNull { lang ->
+        try {
+            val conf = android.content.res.Configuration(context.resources.configuration)
+            conf.setLocale(java.util.Locale(lang.code))
+            context.createConfigurationContext(conf).getString(resId)
+        } catch (e: Exception) { null }
+    }.distinct()
 
 fun CalendarItemType.labelKey(): String = when (this) {
     CalendarItemType.BIRTHDAY -> "День рождения"
     CalendarItemType.ANNIVERSARY -> "Годовщина"
+    CalendarItemType.NAMEDAY -> "Именины"
     CalendarItemType.IMPORTANT_DATE -> "Важная дата"
     CalendarItemType.MEETING -> "Встреча"
     CalendarItemType.CALL -> "Звонок"
@@ -139,6 +171,112 @@ fun CalendarItemType.labelKey(): String = when (this) {
     CalendarItemType.CUSTOM -> "Другое"
 }
 
+/**
+ * Заголовок события для показа. Если в title лежит generic-имя типа
+ * (например «День рождения» == BIRTHDAY.labelKey()), показываем
+ * локализованную метку типа; пользовательские заголовки (встречи, задачи)
+ * остаются как есть. Так авто-события переводятся при смене языка, а
+ * введённые пользователем тексты не подменяются.
+ */
+fun calendarDisplayTitle(
+    title: String,
+    type: CalendarItemType,
+    context: android.content.Context
+): String {
+    val t = title.trim()
+    if (t.isEmpty()) return type.label(context)
+    // Название типа во ВСЕХ языках приложения + русский ключ модели: заголовки,
+    // «запечённые» импортом в чужой локали (телефон был на греческом →
+    // «Γενέθλια: Имя» навсегда в БД), нормализуются к текущему языку.
+    val keys = (localizedVariants(context, type.labelResId()) + type.labelKey())
+        .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    for (key in keys) {
+        when {
+            // Заголовок = название типа целиком — переводим целиком.
+            t.equals(key, ignoreCase = true) -> return type.label(context)
+            // Название типа + разделитель/имя («Γενέθλια: Имя», «Встреча · Бюджет») —
+            // переводим только префикс, остальное (имя/детали) как есть.
+            t.startsWith(key, ignoreCase = true) &&
+                t.length > key.length &&
+                !t[key.length].isLetterOrDigit() ->
+                return type.label(context) + t.substring(key.length)
+        }
+    }
+    // Пользовательский заголовок — не трогаем.
+    return title
+}
+
+/**
+ * Обратная операция к [calendarDisplayTitle]: если заголовок начинается с
+ * названия типа (в любой локали приложения) — возвращает то, что записано
+ * ПОСЛЕ разделителя («День рождения: Иван Петров» → «Иван Петров»). null,
+ * если заголовок не в этом формате (пользовательский текст, где имени может
+ * не быть вообще).
+ *
+ * Используется для самовосстановления связи «дата-событие → контакт» (см.
+ * §52 SOCIALSPHERE_KNOWLEDGE.md, 2026-08-12): владелец указал, что имя УЖЕ
+ * видно в Календаре текстом — эта функция и есть то самое чтение имени
+ * обратно, которого раньше не было нигде.
+ */
+fun extractNameFromDateTitle(
+    title: String,
+    type: CalendarItemType,
+    context: android.content.Context
+): String? {
+    val t = title.trim()
+    if (t.isEmpty()) return null
+    val keys = (localizedVariants(context, type.labelResId()) + type.labelKey())
+        .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    for (key in keys) {
+        if (t.startsWith(key, ignoreCase = true) &&
+            t.length > key.length &&
+            !t[key.length].isLetterOrDigit()
+        ) {
+            return t.substring(key.length).trimStart(':', '·', '-', ' ').trim().ifBlank { null }
+        }
+    }
+    return null
+}
+
+fun com.aistudio.socialsphere.crmlxb.model.CalendarItem.displayTitle(
+    context: android.content.Context
+): String = calendarDisplayTitle(title, type, context)
+
+// Шаблоны, которыми ImportScreens.kt запекает текст заметки при импорте
+// («Должность при импорте: X», «Заметка из импорта: X») — в языке, который был
+// активен НА МОМЕНТ импорта, не текущем. Тот же класс бага, что и заголовки
+// календаря (см. calendarDisplayTitle) — только для Note.text, у которого нет
+// enum-типа, только шаблонный префикс с плейсхолдером.
+private val IMPORTED_NOTE_TEMPLATES = listOf(
+    R.string.imp_job_on_import,
+    R.string.imp_note_from_import,
+    R.string.imp_relation_from_phone,
+)
+
+/**
+ * Нормализует префикс заметки, запечённый при импорте, к ТЕКУЩЕМУ языку —
+ * само значение после префикса (должность/текст заметки) не трогается.
+ * Данные в БД не меняются, только показ.
+ */
+fun normalizeImportedNoteText(text: String, context: android.content.Context): String {
+    for (templateResId in IMPORTED_NOTE_TEMPLATES) {
+        val currentPrefix = context.getString(templateResId, "")
+        if (currentPrefix.isBlank()) continue
+        if (text.startsWith(currentPrefix)) return text // уже на текущем языке
+        for (lang in AppLanguage.values()) {
+            val localizedPrefix = try {
+                val conf = android.content.res.Configuration(context.resources.configuration)
+                conf.setLocale(java.util.Locale(lang.code))
+                context.createConfigurationContext(conf).getString(templateResId, "")
+            } catch (e: Exception) { null } ?: continue
+            if (localizedPrefix.isNotBlank() && text.startsWith(localizedPrefix)) {
+                return currentPrefix + text.substring(localizedPrefix.length)
+            }
+        }
+    }
+    return text
+}
+
 fun NoteType.label(context: android.content.Context): String = when (this) {
     NoteType.GENERAL -> context.getString(R.string.lbl_note_type_general)
     NoteType.IMPORTANT_TO_REMEMBER -> context.getString(R.string.lbl_note_type_important_to_remember)
@@ -148,11 +286,16 @@ fun NoteType.label(context: android.content.Context): String = when (this) {
     NoteType.DATE_EVENT -> context.getString(R.string.lbl_note_type_date_event)
 }
 
+// ФИКС (2026-08-12): было "Личная деталь" — путалось с СОВСЕМ другой моделью
+// PersonalDetail/personalDetails (Нравится/Аллергии/Привычки и т.д.), хотя
+// NoteType.PERSONAL_DETAIL на деле рисует раздел «Мечты и цели» (cd_goals_dreams).
+// Имя константы enum'а НЕ трогаем (хранится как строка в БД/JSON — переименование
+// сломало бы старые записи), меняем только видимый текст/vCard-тег.
 fun NoteType.labelKey(): String = when (this) {
     NoteType.GENERAL -> "Общая"
     NoteType.IMPORTANT_TO_REMEMBER -> "Важно помнить"
     NoteType.WORK -> "Рабочая"
-    NoteType.PERSONAL_DETAIL -> "Личная деталь"
+    NoteType.PERSONAL_DETAIL -> "Цель/мечта"
     NoteType.GIFT -> "Подарок"
     NoteType.DATE_EVENT -> "Дата/событие"
 }
@@ -190,6 +333,18 @@ fun Industry.label(context: android.content.Context): String = when (this) {
     Industry.REAL_ESTATE -> context.getString(R.string.lbl_industry_real_estate)
     Industry.RETAIL -> context.getString(R.string.lbl_industry_retail)
     Industry.GOVERNMENT -> context.getString(R.string.lbl_industry_government)
+    Industry.CONSTRUCTION -> context.getString(R.string.lbl_industry_construction)
+    Industry.LOGISTICS -> context.getString(R.string.lbl_industry_logistics)
+    Industry.MANUFACTURING -> context.getString(R.string.lbl_industry_manufacturing)
+    Industry.HORECA -> context.getString(R.string.lbl_industry_horeca)
+    Industry.LEGAL -> context.getString(R.string.lbl_industry_legal)
+    Industry.MARKETING -> context.getString(R.string.lbl_industry_marketing)
+    Industry.MEDIA -> context.getString(R.string.lbl_industry_media)
+    Industry.BEAUTY -> context.getString(R.string.lbl_industry_beauty)
+    Industry.SPORT -> context.getString(R.string.lbl_industry_sport)
+    Industry.TOURISM -> context.getString(R.string.lbl_industry_tourism)
+    Industry.ENERGY -> context.getString(R.string.lbl_industry_energy)
+    Industry.AGRICULTURE -> context.getString(R.string.lbl_industry_agriculture)
     Industry.OTHER -> context.getString(R.string.lbl_industry_other)
 }
 
@@ -202,6 +357,18 @@ fun Industry.labelKey(): String = when (this) {
     Industry.REAL_ESTATE -> "Недвижимость"
     Industry.RETAIL -> "Розница"
     Industry.GOVERNMENT -> "Государство"
+    Industry.CONSTRUCTION -> "Строительство"
+    Industry.LOGISTICS -> "Логистика"
+    Industry.MANUFACTURING -> "Производство"
+    Industry.HORECA -> "Рестораны и отели"
+    Industry.LEGAL -> "Юриспруденция"
+    Industry.MARKETING -> "Маркетинг"
+    Industry.MEDIA -> "Медиа"
+    Industry.BEAUTY -> "Красота и мода"
+    Industry.SPORT -> "Спорт"
+    Industry.TOURISM -> "Туризм"
+    Industry.ENERGY -> "Энергетика"
+    Industry.AGRICULTURE -> "Сельское хозяйство"
     Industry.OTHER -> "Другое"
 }
 
@@ -253,6 +420,11 @@ fun MessengerType.label(context: android.content.Context): String = when (this) 
     MessengerType.SIGNAL -> context.getString(R.string.lbl_messenger_type_signal)
     MessengerType.VIBER -> context.getString(R.string.lbl_messenger_type_viber)
     MessengerType.MESSENGER -> context.getString(R.string.lbl_messenger_type_messenger)
+    MessengerType.INSTAGRAM -> context.getString(R.string.lbl_messenger_type_instagram)
+    MessengerType.FACEBOOK -> context.getString(R.string.lbl_messenger_type_facebook)
+    MessengerType.VK -> context.getString(R.string.lbl_messenger_type_vk)
+    MessengerType.LINKEDIN -> context.getString(R.string.lbl_messenger_type_linkedin)
+    MessengerType.X -> context.getString(R.string.lbl_messenger_type_x)
     MessengerType.OTHER -> context.getString(R.string.lbl_messenger_type_other)
 }
 
@@ -262,6 +434,11 @@ fun MessengerType.labelKey(): String = when (this) {
     MessengerType.SIGNAL -> "Signal"
     MessengerType.VIBER -> "Viber"
     MessengerType.MESSENGER -> "Messenger"
+    MessengerType.INSTAGRAM -> "Instagram"
+    MessengerType.FACEBOOK -> "Facebook"
+    MessengerType.VK -> "VK"
+    MessengerType.LINKEDIN -> "LinkedIn"
+    MessengerType.X -> "X"
     MessengerType.OTHER -> "Другое"
 }
 
@@ -296,6 +473,9 @@ fun ContactStatus.label(context: android.content.Context): String = when (this) 
     ContactStatus.ACTIVE -> context.getString(R.string.lbl_contact_status_active)
     ContactStatus.MAINTAIN -> context.getString(R.string.lbl_contact_status_maintain)
     ContactStatus.ARCHIVED -> context.getString(R.string.lbl_contact_status_archived)
+    // Объединённый статус: Близкий/Слабый пришли из ConnectionLevel — строки те же
+    ContactStatus.CLOSE -> context.getString(R.string.lbl_connection_level_close)
+    ContactStatus.WEAK -> context.getString(R.string.lbl_connection_level_weak)
 }
 
 fun ContactStatus.labelKey(): String = when (this) {
@@ -303,6 +483,8 @@ fun ContactStatus.labelKey(): String = when (this) {
     ContactStatus.ACTIVE -> "Активный"
     ContactStatus.MAINTAIN -> "Поддерживать"
     ContactStatus.ARCHIVED -> "Архив"
+    ContactStatus.CLOSE -> "Близкий"
+    ContactStatus.WEAK -> "Слабый"
 }
 
 fun AddressType.label(context: android.content.Context): String = when (this) {

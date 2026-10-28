@@ -1,7 +1,10 @@
 package com.aistudio.socialsphere.crmlxb.model
 
+// Объединённый статус (решение владельца 2026-07-02): прежние ContactStatus
+// (Новый/Активный/Поддерживать/Архив) + Близкий/Слабый из ConnectionLevel.
+// ConnectionLevel как отдельное поле из UI убран (колонка в БД остаётся).
 enum class ContactStatus {
-    NEW, ACTIVE, MAINTAIN, ARCHIVED
+    NEW, ACTIVE, MAINTAIN, ARCHIVED, CLOSE, WEAK
 }
 
 enum class RelationshipType {
@@ -16,8 +19,17 @@ enum class ImportanceLevel {
 enum class SocialRole {
     REGULAR, CONNECTOR, KNOWS_MANY_PEOPLE, CAN_INTRODUCE, EXPERT, ADVISOR, LOCAL_CONTACT
 }
+/**
+ * «Поддерживать связь»: 2026-10-02, найденный пробел верификации V2.2 —
+ * NOT_TRACKED (= Выкл) и «Вкл, без расписания» схлопывались в одно и то же
+ * persisted-значение. NO_SCHEDULE — минимальное добавление (text-колонка +
+ * safeEnum-фолбэк, тот же паттерн, что Industry/MessengerType — миграция не
+ * нужна): «поддерживать связь ВКЛЮЧЕНО, но без периодичности» — отличается от
+ * NOT_TRACKED по смыслу, но, как и NOT_TRACKED, НЕ имеет интервала просрочки
+ * (StaleContacts.rhythmDays возвращает null для обоих).
+ */
 enum class CommunicationRhythm {
-    NOT_TRACKED, WEEKLY, MONTHLY, EVERY_3_MONTHS, EVERY_6_MONTHS, YEARLY, CUSTOM
+    NOT_TRACKED, NO_SCHEDULE, WEEKLY, MONTHLY, EVERY_3_MONTHS, EVERY_6_MONTHS, YEARLY, CUSTOM
 }
 enum class PhoneType {
     MOBILE, WORK, HOME, OTHER
@@ -26,10 +38,20 @@ enum class EmailType {
     PERSONAL, WORK, OTHER
 }
 enum class MessengerType {
-    TELEGRAM, WHATSAPP, VIBER, SIGNAL, MESSENGER, OTHER
+    TELEGRAM, WHATSAPP, VIBER, SIGNAL, MESSENGER,
+    // Соцсети (2026-07-12, фидбэк владельца: «добавить соцсети» — не были
+    // видны как канал связи вообще). Хранится name-строкой в БД, безопасное
+    // добавление значений без миграции — тот же паттерн, что у Industry ниже.
+    INSTAGRAM, FACEBOOK, VK, LINKEDIN, X,
+    OTHER
 }
 enum class Industry {
-    IT, AUTO, FINANCE, MEDICINE, EDUCATION, REAL_ESTATE, RETAIL, GOVERNMENT, OTHER
+    // Расширено 2026-07-02 по фидбэку владельца (хранится name-строкой,
+    // safeEnum-фолбэк — добавление значений безопасно, миграция не нужна).
+    IT, AUTO, FINANCE, MEDICINE, EDUCATION, REAL_ESTATE, RETAIL, GOVERNMENT,
+    CONSTRUCTION, LOGISTICS, MANUFACTURING, HORECA, LEGAL, MARKETING,
+    MEDIA, BEAUTY, SPORT, TOURISM, ENERGY, AGRICULTURE,
+    OTHER
 }
 enum class EmploymentStatus {
     CURRENT, FORMER, UNKNOWN
@@ -41,7 +63,7 @@ enum class AddressType {
     HOME, WORK, OFFICE, BRANCH, LEGAL, OTHER
 }
 enum class CalendarItemType {
-    BIRTHDAY, ANNIVERSARY, IMPORTANT_DATE, MEETING, CALL, MESSAGE, GIFT, TASK, NOTE, COMPANY_EVENT, CUSTOM
+    BIRTHDAY, ANNIVERSARY, NAMEDAY, IMPORTANT_DATE, MEETING, CALL, MESSAGE, GIFT, TASK, NOTE, COMPANY_EVENT, CUSTOM
 }
 enum class CalendarItemStatus {
     ACTIVE, COMPLETED, POSTPONED, CANCELLED
@@ -50,7 +72,9 @@ enum class CalendarTargetType {
     CONTACT, COMPANY, GIFT, NOTE, ADDRESS
 }
 enum class CalendarViewMode {
-    TODAY, LIST, WEEK, MONTH
+    // «Лента» (LIST) / «Неделя» (WEEK) / «Месяц» (MONTH) — по макету Aurelia.
+    // Легаси-значение TODAY убрано: миграция в AppSettings.calendarDefaultMode.
+    LIST, WEEK, MONTH
 }
 enum class CalendarEventFilter {
     ALL, BIRTHDAYS, CALLS, MEETINGS, GIFTS, IMPORTANT
@@ -91,6 +115,23 @@ enum class NoteType {
 }
 enum class GiftStatus {
     IDEA, BOUGHT, GIVEN
+}
+/**
+ * EXPLICIT RECOVERY PACK (2026-09-22): типы сущностей, для которых ведётся история удаления (tombstone).
+ * Ровно те пять, у которых есть независимое пользовательское действие «Удалить» с устойчивым id и
+ * собственным местом в BackupData — контакт/компания/событие календаря top-level, заметка/подарок —
+ * явно названные «Notes, Gifts, Contacts и поддерживаемые дочерние сущности» в задаче пакета. Слияние
+ * дублей (mergeContacts/mergeCompanies) НЕ тombstonéится — это консолидация данных, не удаление: данные
+ * поглощённого контакта живут в контакте-получателе, а не пропадают.
+ */
+enum class TombstoneEntityType {
+    CONTACT, COMPANY, NOTE, GIFT, CALENDAR_ITEM,
+    /** RESTORE BATCH DEPENDENCIES & STANDALONE GROUPS MICROFIX (2026-09-24): используется ТОЛЬКО как
+     *  RestorePreviewGroup.ownerType/RestoreDifference.entityType для standalone-восстанавливаемой Group
+     *  (backup Group без единого membership) — НЕ добавлен в Tombstone-поток (группы, как и раньше,
+     *  осознанно вне tombstone-истории, requirement 16 исходного Restore Preview Pack). TEXT-колонка
+     *  Room не типизирована по этому enum на уровне схемы — миграция не требуется. */
+    GROUP
 }
 enum class PersonalDetailCategory {
     LIKES, DISLIKES, INTERESTS, FOOD, DRINKS, BRANDS, ALLERGIES, RESTRICTIONS, COMMUNICATION_STYLE, HABITS, OTHER

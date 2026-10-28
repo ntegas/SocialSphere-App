@@ -1,25 +1,84 @@
 package com.aistudio.socialsphere.crmlxb.model
 
+// ФИКС (2026-07-11, найдено на первом релизе в Play Console): бэкап/восстановление
+// (ExportManager.kt) сериализует эти классы через Moshi. Раньше — только
+// рефлексией (KotlinJsonAdapterFactory): под R8 в release-сборке имена/метаданные
+// конструктора иногда теряются, а Moshi-рефлексия под R8 также способна тихо
+// подставить null в поле с типом List<T> без "?" вместо значения по умолчанию
+// (emptyList()) — импорт падал с NPE на .forEach где-то в глубине дерева контакта,
+// без внятной причины. @JsonClass(generateAdapter = true) — генерирует адаптер
+// на этапе компиляции (KSP moshi-kotlin-codegen уже подключен в build.gradle.kts),
+// не зависит от рефлексии/R8 вообще и корректно проверяет default-значения.
+import com.squareup.moshi.JsonClass
+
+@JsonClass(generateAdapter = true)
 data class Contact(
     val id: String,
     val firstName: String,
     val lastName: String,
+    /** Отчество / среднее имя (как в телефонной книге) — раньше терялось при импорте. */
+    val middleName: String? = null,
     val nickname: String? = null,
+    /** Структура имени как в Android-контактах (v13): приставка (Dr./г-н),
+     *  суффикс (мл./ст.), фонетические имя/фамилия (для языков вроде японского,
+     *  где произношение не следует из письменной формы). Раньше префикс/суффикс
+     *  при импорте молча склеивались в middleName — терялась структура. */
+    val namePrefix: String? = null,
+    val nameSuffix: String? = null,
+    val phoneticFirstName: String? = null,
+    val phoneticMiddleName: String? = null,
+    val phoneticLastName: String? = null,
     val photoUri: String?,
     val relationshipType: RelationshipType,
+    /** Свой тип отношений («Кум», «Тренер»…) — если задан, показывается вместо
+     *  relationshipType. Стандартный выбор из пикера очищает это поле.
+     *  TODO (2026-07-11, план+критика воркфлоу): владелец хочет НЕСКОЛЬКО типов
+     *  одновременно (список вместо одного значения) — не взаимоисключающие
+     *  отношения («и друг, и коллега»). Спроектировано (relationshipTypes:
+     *  List<RelationshipType>, паттерн как tags — без Room-миграции), но
+     *  сознательно отложено отдельным заходом: критик нашёл, что mergeContacts()/
+     *  renameCustomRelationshipType()/deleteCustomRelationshipType() в
+     *  AppStateStore.kt построены вокруг одиночной строки и требуют аккуратной
+     *  переработки семантики слияния списков — риск потери данных при спешке. */
+    val customRelationshipType: String? = null,
+    /** Второстепенные типы отношений (v17, решение владельца 2026-07-23):
+     *  relationshipType остаётся ЕДИНСТВЕННЫМ главным типом, это поле —
+     *  произвольное число дополнительных, не взаимоисключающих («и друг,
+     *  и коллега»). Паттерн сериализации — как у tags (comma-joined string). */
+    val secondaryRelationshipTypes: List<RelationshipType> = emptyList(),
+    /** LEGACY: уровень связи слит в ContactStatus (CLOSE/WEAK). Поле осталось
+     *  в БД/модели ради сохранности данных, UI его больше не показывает. */
     val connectionLevel: ConnectionLevel,
     val importanceLevel: ImportanceLevel,
     val socialRole: SocialRole,
     val communicationRhythm: CommunicationRhythm,
+    /** Число дней для CommunicationRhythm.CUSTOM («раз в N дней») — v17,
+     *  решение владельца 2026-07-23. Используется только когда
+     *  communicationRhythm == CUSTOM; иначе игнорируется. */
+    val customRhythmDays: Int? = null,
     val contactStatus: ContactStatus = ContactStatus.ACTIVE,
     val lastContactDate: String? = null,
     val nextStep: String? = null,
+    /** Свободный текст о семье БЕЗ карточек контактов («сын Петя, 2019 г.р.») —
+     *  показывается в блоке F (Семья) под списком связанных членов семьи. */
+    val familyNote: String? = null,
+    /** Профессия БЕЗ привязки к компании («электрик», «нотариус») — v12.
+     *  Должность в конкретной компании живёт в ContactCompanyRelation.position. */
+    val profession: String? = null,
     val tags: List<String> = emptyList(),
     val canHelpWith: String? = null,
     val iCanHelpWith: String? = null,
     val talkingPoints: String? = null,
     val meetContext: String? = null,
     val meetDate: String? = null,
+    /** Связь с контактом телефонной книги (id вида device_contact_<CONTACT_ID>)
+     *  для синхронизации «обновить из телефона». null — не связан. */
+    val deviceContactId: String? = null,
+    /** PHONE PACK #4: устойчивая связь с контактом телефонной книги — ContactsContract LOOKUP_KEY.
+     *  deviceContactId («device_contact_<Contacts._ID>») остаётся кэшем/фолбэком для старых связей:
+     *  _ID меняется при переагрегации/синхронизации, LOOKUP_KEY — нет. null у связей, созданных до v21;
+     *  заполняется при первом успешном resolve. НИКОГДА не имя/номер/email как идентичность. */
+    val deviceLookupKey: String? = null,
     val companyRelations: List<ContactCompanyRelation> = emptyList(),
     val phones: List<ContactPhone> = emptyList(),
     val emails: List<ContactEmail> = emptyList(),
@@ -33,6 +92,7 @@ data class Contact(
     val updatedAt: String
 )
 
+@JsonClass(generateAdapter = true)
 data class ContactPhone(
     val id: String,
     val contactId: String,
@@ -42,6 +102,7 @@ data class ContactPhone(
     val comment: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class ContactEmail(
     val id: String,
     val contactId: String,
@@ -51,6 +112,7 @@ data class ContactEmail(
     val comment: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class Messenger(
     val id: String,
     val contactId: String,
@@ -61,6 +123,7 @@ data class Messenger(
     val comment: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class Company(
     val id: String,
     val name: String,
@@ -75,6 +138,7 @@ data class Company(
     val updatedAt: String
 )
 
+@JsonClass(generateAdapter = true)
 data class ContactCompanyRelation(
     val id: String,
     val contactId: String,
@@ -92,6 +156,7 @@ data class ContactCompanyRelation(
     val isPrimary: Boolean
 )
 
+@JsonClass(generateAdapter = true)
 data class ContactRelation(
     val id: String,
     val firstContactId: String,
@@ -101,6 +166,43 @@ data class ContactRelation(
     val note: String? = null
 )
 
+/** Группа контактов (как группы в телефонной книге): «Клиенты», «Футбол»… */
+@JsonClass(generateAdapter = true)
+data class ContactGroup(
+    val id: String,
+    val name: String,
+    val createdAt: String,
+    val updatedAt: String
+)
+
+/** Членство контакта в группе (многие-ко-многим). */
+@JsonClass(generateAdapter = true)
+data class ContactGroupMember(
+    val id: String,
+    val groupId: String,
+    val contactId: String
+)
+
+/** Тег контакта — плоский управляемый список (в отличие от Contact.tags,
+ *  легаси-поля со свободным текстом). Опциональная категория для группировки. */
+@JsonClass(generateAdapter = true)
+data class Tag(
+    val id: String,
+    val name: String,
+    val category: String? = null,
+    val createdAt: String,
+    val updatedAt: String
+)
+
+/** Членство контакта в теге (многие-ко-многим), как ContactGroupMember. */
+@JsonClass(generateAdapter = true)
+data class ContactTagMember(
+    val id: String,
+    val tagId: String,
+    val contactId: String
+)
+
+@JsonClass(generateAdapter = true)
 data class Address(
     val id: String,
     val ownerType: AddressOwnerType,
@@ -111,9 +213,14 @@ data class Address(
     val country: String,
     val comment: String? = null,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    val postalCode: String? = null,
+    /** Район (2026-07-13) — как NEIGHBORHOOD в Android StructuredPostal /
+     *  subLocality в iOS CNPostalAddress, между улицей и городом. */
+    val district: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class CalendarItem(
     val id: String,
     val title: String,
@@ -128,12 +235,33 @@ data class CalendarItem(
     val importance: ImportanceLevel,
     val colorKey: String? = null,
     val recurrenceRule: String? = null,
+    // Room v19 / schema-foundation для будущих recurring-completion micro-fixes.
+    // ПОКА не используется ни одним production-путём (не пишется, не читается
+    // completion/scheduler/rendering) — только persistence integrity этого batch'а.
+    val lastCompletedOccurrenceDate: String? = null,
+    // true = recurrence-семантика записи создана/подтверждена современной версией
+    // приложения, ЛИБО пользователь явно изменил recurrence в редакторе. false —
+    // legacy/unset: для исторически annual типов (BIRTHDAY/ANNIVERSARY/NAMEDAY)
+    // разрешён YEARLY-fallback (effectiveRecurrenceMode). Default false — ВСЕ
+    // существующие v18-записи считаются legacy, массово не переводятся в true.
+    val recurrenceExplicitlySet: Boolean = false,
+    // Room v20 / persistence-foundation для postpone одного occurrence (2026-09-17).
+    // ПОКА не используется ни одним production-путём, читающим/пишущим runtime-
+    // поведение (pendingOccurrenceDate/CalendarCompletion/NotificationScheduler/
+    // CalendarScreen не знают об этих полях) — только persistence integrity.
+    // from = canonical occurrence исходной серии, которое перенёс пользователь;
+    // to = новая дата этого конкретного occurrence. Инвариант: либо обе заданы,
+    // либо обе null — см. CalendarUtils.hasValidPostponePair(). Тот же
+    // persisted date-format, что lastCompletedOccurrenceDate (ISO LocalDate.toString()).
+    val postponedFromOccurrenceDate: String? = null,
+    val postponedToDate: String? = null,
     val links: List<CalendarItemLink> = emptyList(),
     val reminders: List<ReminderRule> = emptyList(),
     val createdAt: String,
     val updatedAt: String
 )
 
+@JsonClass(generateAdapter = true)
 data class CalendarItemLink(
     val id: String,
     val calendarItemId: String,
@@ -141,6 +269,7 @@ data class CalendarItemLink(
     val targetId: String
 )
 
+@JsonClass(generateAdapter = true)
 data class ReminderRule(
     val id: String,
     val calendarItemId: String,
@@ -150,6 +279,7 @@ data class ReminderRule(
     val exactDateTime: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class Note(
     val id: String,
     val contactId: String? = null,
@@ -160,10 +290,28 @@ data class Note(
     val text: String,
     val date: String? = null,
     val isImportant: Boolean,
+    // Приватность записи — независимо от isImportant (важность = попадает в
+    // Обзор/Шпаргалку; isLocked = скрывается блюром при включённой «Защите
+    // записей»). Владелец решает по каждой записи отдельно, как в iOS Notes/
+    // WhatsApp Chat Lock — не автоматика по типу/вкладке.
+    val isLocked: Boolean = false,
     val createdAt: String,
     val updatedAt: String
 )
 
+/**
+ * EXPLICIT RECOVERY PACK (2026-09-22): маркер намеренного удаления — см. [TombstoneEntityType]. Часть
+ * BackupData (деление истории удалений путешествует с бэкапом, а не только живёт в локальной Room), поэтому
+ * @JsonClass, как и остальные top-level модели.
+ */
+@JsonClass(generateAdapter = true)
+data class Tombstone(
+    val entityType: TombstoneEntityType,
+    val entityId: String,
+    val deletedAt: String,
+)
+
+@JsonClass(generateAdapter = true)
 data class GiftIdea(
     val id: String,
     val contactId: String,
@@ -171,10 +319,10 @@ data class GiftIdea(
     val note: String? = null,
     val link: String? = null,
     val date: String? = null,
-    val reminderId: String? = null,
     val status: GiftStatus
 )
 
+@JsonClass(generateAdapter = true)
 data class SizeInfo(
     val id: String,
     val contactId: String,
@@ -184,6 +332,7 @@ data class SizeInfo(
     val other: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class PersonalDetail(
     val id: String,
     val contactId: String,

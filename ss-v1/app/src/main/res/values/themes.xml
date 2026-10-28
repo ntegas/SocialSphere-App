@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <!-- AppCompat-родитель обязателен для AppCompatDelegate (per-app язык,
+         2026-07-22) — контент экрана полностью на Compose, тема нужна только
+         для делегата/окна, view-инфляция AppCompat не используется. -->
+    <style name="Theme.MyApplication" parent="Theme.AppCompat.DayNight.NoActionBar" />
 </resources>

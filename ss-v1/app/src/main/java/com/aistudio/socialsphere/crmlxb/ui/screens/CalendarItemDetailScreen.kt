@@ -1,13 +1,14 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import androidx.compose.ui.graphics.Color
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.*
 import androidx.compose.ui.res.stringResource
@@ -47,139 +49,165 @@ fun CalendarItemDetailScreen(
     var showPostponeDialog by remember { mutableStateOf(false) }
     var postponeDate       by remember { mutableStateOf("") }
 
+    // requirement 1/4/5 (2026-09-17, postpone runtime semantics): non-recurring
+    // продолжает старый прямой путь (event.copy(startDate=...) ниже) — recurring
+    // идёт через canonical CalendarPostpone.postponeCurrentOccurrence(), которая
+    // переносит ТОЛЬКО текущее pending occurrence, не саму запись. pendingOccurrence()
+    // сам уже anti-drift-корректен при re-postpone (seriesDate не меняется).
+    val postponeRecurrenceMode = effectiveRecurrenceMode(event.type, event.recurrenceRule, event.recurrenceExplicitlySet)
+    val postponeIsRecurring = postponeRecurrenceMode != RecurrenceMode.NONE
+    val postponePending = if (postponeIsRecurring) event.pendingOccurrence() else null
+    // requirement 4: DAILY (и любое recurring occurrence без валидного pending)
+    // структурно не может быть перенесено текущей date-only моделью — между
+    // соседними днями нет другой даты. Действие, которое система заведомо не
+    // способна корректно выполнить, — не предлагается вовсе.
+    val postponeUnavailable = postponeIsRecurring && (postponeRecurrenceMode == RecurrenceMode.DAILY || postponePending == null)
+
     if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text(stringResource(R.string.cid_delete_event_q), fontWeight = FontWeight.Bold) },
-            text  = { Text(stringResource(R.string.cid_delete_warning, event.title)) },
-            confirmButton = {
-                Button(
-                    onClick = { showDeleteDialog = false; AppStateStore.deleteCalendarItem(calendarItemId); onNavigateBack() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text(stringResource(R.string.common_delete)) }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaConfirmDialog(
+            onDismiss = { showDeleteDialog = false },
+            icon = { Icon(Icons.Default.Delete, null, tint = AppleTheme.colors.red) },
+            title = stringResource(R.string.cid_delete_event_q),
+            text  = stringResource(R.string.cid_delete_warning, event.title),
+            confirmText = stringResource(R.string.common_delete),
+            destructive = true,
+            onConfirm = {
+                showDeleteDialog = false
+                // Будильники живут независимо от записи в БД — не отменить их
+                // здесь значит получить уведомление по уже удалённому событию.
+                com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+                    .cancelAllRemindersForCalendarItem(ctxLabel, event.reminders)
+                AppStateStore.deleteCalendarItem(calendarItemId)
+                onNavigateBack()
+            }
         )
     }
 
     // ── Postpone dialog ───────────────────────────────────────
     if (showPostponeDialog) {
-        AlertDialog(
-            onDismissRequest = { showPostponeDialog = false; postponeDate = "" },
-            title = { Text(stringResource(R.string.cid_reschedule), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        stringResource(R.string.cid_current_date, event.startDate),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    OutlinedTextField(
-                        value       = postponeDate,
-                        onValueChange = { v ->
-                            // Allow only digits and dashes, max length yyyy-MM-dd = 10
-                            val filtered = v.filter { it.isDigit() || it == '-' }.take(10)
-                            postponeDate = filtered
-                        },
-                        label       = { Text(stringResource(R.string.cid_new_date)) },
-                        placeholder = {
-                            // Suggest next week as hint
-                            val next = try {
-                                java.time.LocalDate.parse(event.startDate)
-                                    .plusWeeks(1).toString()
-                            } catch (e: Exception) {
-                                java.time.LocalDate.now().plusWeeks(1).toString()
-                            }
-                            Text(next, color = MaterialTheme.colorScheme.outlineVariant)
-                        },
-                        modifier    = Modifier.fillMaxWidth(),
-                        singleLine  = true,
-                        isError     = postponeDate.isNotBlank() && !isValidDate(postponeDate),
-                        supportingText = {
-                            if (postponeDate.isNotBlank() && !isValidDate(postponeDate))
-                                Text(stringResource(R.string.cid_date_format),
-                                    color = MaterialTheme.colorScheme.error)
-                        }
-                    )
-                    // Quick-pick buttons
-                    Text(stringResource(R.string.cid_quick_pick),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(stringResource(R.string.cid_plus_1week) to 7L, stringResource(R.string.cid_plus_2weeks) to 14L, stringResource(R.string.cid_plus_1month) to 30L)
-                            .forEach { (label, days) ->
-                                OutlinedButton(
-                                    onClick = {
-                                        postponeDate = try {
-                                            java.time.LocalDate.parse(event.startDate)
-                                                .plusDays(days).toString()
-                                        } catch (e: Exception) {
-                                            java.time.LocalDate.now().plusDays(days).toString()
-                                        }
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) { Text(label, style = MaterialTheme.typography.labelSmall) }
-                            }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val now = java.time.LocalDateTime.now()
-                            .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                        AppStateStore.updateCalendarItem(
-                            event.copy(
-                                startDate = postponeDate,
-                                status    = CalendarItemStatus.POSTPONED,
-                                updatedAt = now
-                            )
-                        )
-                        showPostponeDialog = false
-                        postponeDate = ""
-                    },
-                    enabled = isValidDate(postponeDate)
-                ) { Text(stringResource(R.string.cid_reschedule_short)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPostponeDialog = false; postponeDate = "" }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
+        // Для recurring — «текущая» дата это pending occurrence (учитывает уже
+        // активный override при re-postpone, requirement 6/7), не anchor startDate.
+        val postponeBaseDate = postponePending?.effectiveDate ?: parseFlexibleDate(event.startDate)
+        val postponeParsedTarget = if (isValidDate(postponeDate)) parseFlexibleDate(postponeDate) else null
+        // requirement 3/4: для recurring целевая дата дополнительно обязана
+        // пройти isValidPostponeTarget (occurs-on серии, после lastCompleted,
+        // строго после seriesDate и строго до следующего regular occurrence) —
+        // никакого silent success для невалидного переноса (кнопка недоступна).
+        val postponeTargetValid = !postponeIsRecurring || (
+            postponePending != null && postponeParsedTarget != null &&
+            parseFlexibleDate(event.startDate)?.let { anchor ->
+                isValidPostponeTarget(anchor, postponeRecurrenceMode, event.lastCompletedOccurrenceDate?.let { parseFlexibleDate(it) },
+                    postponePending.seriesDate, postponeParsedTarget)
+            } == true
         )
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaFormSheet(
+            title = stringResource(R.string.cid_reschedule),
+            onDismiss = { showPostponeDialog = false; postponeDate = "" },
+            confirmText = stringResource(R.string.cid_reschedule_short),
+            confirmEnabled = isValidDate(postponeDate) && postponeTargetValid,
+            onConfirm = {
+                if (postponeIsRecurring) {
+                    // requirement 5: единая canonical business-операция — не
+                    // прямой event.copy(startDate=...) для recurring (write ->
+                    // reschedule ordering — внутри самой операции).
+                    postponeParsedTarget?.let { target ->
+                        com.aistudio.socialsphere.crmlxb.utils.CalendarPostpone
+                            .postponeCurrentOccurrence(ctxLabel, event, target)
+                    }
+                } else {
+                    // Напоминания привязаны к старой дате/времени — без пересчёта
+                    // будильник продолжит стрелять по старому расписанию (баг §34).
+                    // CALENDAR DATA SAFETY PACK: правка одного поля (startDate) — 3-way updateCalendarItem, пересчёт
+                    // напоминаний ПОСЛЕ commit по итоговому состоянию (внутри rescheduleSingleEvent).
+                    com.aistudio.socialsphere.crmlxb.utils.CalendarPostpone
+                        .rescheduleSingleEvent(ctxLabel, event, postponeDate)
+                }
+                showPostponeDialog = false
+                postponeDate = ""
+            },
+            secondaryText = stringResource(R.string.common_cancel),
+            onSecondary = { showPostponeDialog = false; postponeDate = "" }
+        ) {
+            Text(
+                stringResource(R.string.cid_current_date, com.aistudio.socialsphere.crmlxb.utils.displayEventDate(postponeBaseDate?.toString() ?: event.startDate)),
+                style = MaterialTheme.typography.bodySmall,
+                color = AppleTheme.colors.secondaryLabel
+            )
+            OutlinedTextField(
+                value       = postponeDate,
+                onValueChange = { v ->
+                    // Allow only digits and dashes, max length yyyy-MM-dd = 10
+                    val filtered = v.filter { it.isDigit() || it == '-' }.take(10)
+                    postponeDate = filtered
+                },
+                label       = { Text(stringResource(R.string.cid_new_date)) },
+                placeholder = {
+                    // Suggest next week as hint
+                    val next = try {
+                        (postponeBaseDate ?: error("bad date")).plusWeeks(1).toString()
+                    } catch (e: Exception) {
+                        java.time.LocalDate.now().plusWeeks(1).toString()
+                    }
+                    Text(next, color = AppleTheme.colors.tertiaryLabel)
+                },
+                modifier    = Modifier.fillMaxWidth(),
+                singleLine  = true,
+                isError     = postponeDate.isNotBlank() && !(isValidDate(postponeDate) && postponeTargetValid),
+                supportingText = {
+                    if (postponeDate.isNotBlank() && !isValidDate(postponeDate))
+                        Text(stringResource(R.string.cid_date_format),
+                            color = AppleTheme.colors.red)
+                    else if (postponeDate.isNotBlank() && !postponeTargetValid)
+                        Text(stringResource(R.string.cid_postpone_out_of_range),
+                            color = AppleTheme.colors.red)
+                }
+            )
+            // Quick-pick buttons
+            Text(stringResource(R.string.cid_quick_pick),
+                style = MaterialTheme.typography.labelSmall,
+                color = AppleTheme.colors.secondaryLabel)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(stringResource(R.string.cid_plus_1week) to 7L, stringResource(R.string.cid_plus_2weeks) to 14L, stringResource(R.string.cid_plus_1month) to 30L)
+                    .forEach { (label, days) ->
+                        OutlinedButton(
+                            onClick = {
+                                postponeDate = try {
+                                    (postponeBaseDate ?: error("bad date")).plusDays(days).toString()
+                                } catch (e: Exception) {
+                                    java.time.LocalDate.now().plusDays(days).toString()
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) { Text(label, style = MaterialTheme.typography.labelSmall) }
+                    }
+            }
+        }
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(event.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cid_edit))
-                    }
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete), tint = MaterialTheme.colorScheme.error)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
+        containerColor = AppleTheme.colors.groupedBackground,
+        topBar = {}
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
+            contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Шапка: круглые кнопки назад / править / удалить ──
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    CircleBtn(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) { onNavigateBack() }
+                    Spacer(Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        CircleBtn(Icons.Default.Edit, stringResource(R.string.cid_edit), tinted = true) { onNavigateToEdit() }
+                        CircleBtn(Icons.Default.Delete, stringResource(R.string.common_delete), danger = true) { showDeleteDialog = true }
+                    }
+                }
+            }
             item {
                 EventHeader(event)
             }
@@ -210,7 +238,7 @@ fun CalendarItemDetailScreen(
                                 if (gift != null) {
                                     CardBlock(title = stringResource(R.string.evt_gift)) {
                                         Text(gift.title, fontWeight = FontWeight.Bold)
-                                        gift.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+                                        gift.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel) }
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
@@ -238,9 +266,11 @@ fun CalendarItemDetailScreen(
                 }
             }
 
-            item {
-                CardBlock(title = stringResource(R.string.cid_reminders)) {
-                    if (event.reminders.isNotEmpty()) {
+            // Просмотр показывает только заполненные поля (по макету) — секция
+            // напоминаний видна только если напоминания реально заданы.
+            if (event.reminders.isNotEmpty()) {
+                item {
+                    CardBlock(title = stringResource(R.string.cid_reminders)) {
                         event.reminders.forEach { reminder ->
                             val unitStr = when (reminder.offsetUnit) {
                                 ReminderOffsetUnit.MINUTES -> stringResource(R.string.unit_minutes)
@@ -255,20 +285,39 @@ fun CalendarItemDetailScreen(
                                 ReminderType.CUSTOM_DATE_TIME -> stringResource(R.string.cid_at_exact, reminder.exactDateTime ?: "")
                                 ReminderType.NONE -> stringResource(R.string.cid_status_no)
                             }
-                            // Crude status indication for visual purposes
-                            val isPastApprox = event.startDate.compareTo(java.time.LocalDate.now().toString()) < 0 && event.recurrenceRule?.contains("YEARLY") != true
-                            val statusStr = if (isPastApprox) stringResource(R.string.cid_status_past) else stringResource(R.string.cid_status_scheduled)
+                            // Статус — из ТОГО ЖЕ расчёта, что ставит будильник
+                            // (NotificationScheduler), а не по одной дате события:
+                            // раньше «за 1 час» к прошедшему утру показывал
+                            // «Запланировано», хотя будильник не регистрировался.
+                            val scheduled = com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+                                .isReminderScheduled(event, reminder)
+                            val statusStr = if (scheduled) stringResource(R.string.cid_status_scheduled) else stringResource(R.string.cid_status_past)
                             Text("• $text$statusStr", style = MaterialTheme.typography.bodyMedium)
                         }
-                    } else {
-                        Text(stringResource(R.string.cid_no_reminders), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }
                 }
             }
 
-            item {
-                CardBlock(title = stringResource(R.string.cid_recurrence)) {
-                    Text(event.recurrenceRule ?: stringResource(R.string.cid_no_recurrence), style = MaterialTheme.typography.bodyMedium)
+            // Секция повтора видна только если повтор реально задан (не NONE).
+            // effectiveRecurrenceMode() — та же compatibility policy, что и у
+            // отображения/планирования: legacy BIRTHDAY/ANNIVERSARY/NAMEDAY без
+            // recurrenceRule здесь тоже показываются как «Каждый год», а не
+            // молча как «без повтора» — иначе карточка расходилась бы с тем,
+            // что событие реально каждый год показывается в календаре.
+            if (effectiveRecurrenceMode(event.type, event.recurrenceRule, event.recurrenceExplicitlySet) != RecurrenceMode.NONE) {
+                item {
+                    CardBlock(title = stringResource(R.string.cid_recurrence)) {
+                        // Показываем человекочитаемый русский лейбл, а не сырой RRULE
+                        // («FREQ=YEARLY» выглядело как английское «frequency»).
+                        val recurText = when (effectiveRecurrenceMode(event.type, event.recurrenceRule, event.recurrenceExplicitlySet)) {
+                            RecurrenceMode.NONE    -> stringResource(R.string.cid_no_recurrence)
+                            RecurrenceMode.DAILY   -> stringResource(R.string.rec_daily)
+                            RecurrenceMode.WEEKLY  -> stringResource(R.string.rec_weekly)
+                            RecurrenceMode.MONTHLY -> stringResource(R.string.rec_monthly)
+                            RecurrenceMode.YEARLY  -> stringResource(R.string.rec_yearly)
+                        }
+                        Text(recurText, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
 
@@ -277,26 +326,31 @@ fun CalendarItemDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // ── Выполнено ──────────────────────────────
-                    Button(
+                    // ── Выполнено (скрыто для дат: ДР/годовщина/важная дата) ──
+                    // Правила видимости/доступности и само действие — общие с
+                    // кнопкой «Готово» в уведомлении (CalendarCompletion).
+                    if (com.aistudio.socialsphere.crmlxb.utils.CalendarCompletion.offersCompletion(event.type)) Button(
                         onClick = {
-                            val now = java.time.LocalDateTime.now()
-                                .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            AppStateStore.updateCalendarItem(
-                                event.copy(
-                                    status    = CalendarItemStatus.COMPLETED,
-                                    updatedAt = now
-                                )
-                            )
+                            // targetOccurrenceDate фиксируется ЗДЕСЬ, синхронно, из
+                            // текущего snapshot'а event — не внутри complete()
+                            // повторно. Двойной клик до recomposition берёт ОДИН и
+                            // тот же event -> одну и ту же дату (requirement 5).
+                            // pendingOccurrence().seriesDate (не старый
+                            // pendingOccurrenceDate()) — если occurrence сейчас
+                            // active postponed, «Готово» обязано завершить ИСХОДНОЕ
+                            // occurrence (Sep16), а не дату переноса (postpone
+                            // runtime semantics, 2026-09-17, requirement 10).
+                            val target = event.pendingOccurrence()?.seriesDate
+                            com.aistudio.socialsphere.crmlxb.utils.CalendarCompletion.complete(ctxLabel, event, target)
                             onNavigateBack()
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = event.status != CalendarItemStatus.COMPLETED,
+                        enabled = com.aistudio.socialsphere.crmlxb.utils.CalendarCompletion.canComplete(event),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor   = MaterialTheme.colorScheme.onPrimaryContainer,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContentColor   = MaterialTheme.colorScheme.outlineVariant
+                            containerColor = AppleTheme.colors.brand,
+                            contentColor   = Color.White,
+                            disabledContainerColor = AppleTheme.colors.card,
+                            disabledContentColor   = AppleTheme.colors.separator
                         )
                     ) {
                         Icon(Icons.Default.CheckCircle, null, Modifier.size(16.dp))
@@ -306,17 +360,21 @@ fun CalendarItemDetailScreen(
                                 stringResource(R.string.cid_done_check) else stringResource(R.string.cid_done)
                         )
                     }
-                    // ── Перенести ──────────────────────────────
+                    // ── Перенести (requirement 4: недоступна для DAILY recurring
+                    // и любого occurrence без валидного pending — система
+                    // заведомо не способна корректно перенести такое occurrence
+                    // текущей date-only моделью, действие не предлагается) ──
                     Button(
                         onClick = { showPostponeDialog = true },
                         modifier = Modifier.weight(1f),
+                        enabled = !postponeUnavailable,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor   = MaterialTheme.colorScheme.onSurfaceVariant
+                            containerColor = AppleTheme.colors.card,
+                            contentColor   = AppleTheme.colors.label,
+                            disabledContainerColor = AppleTheme.colors.card,
+                            disabledContentColor   = AppleTheme.colors.separator
                         )
                     ) {
-                        Icon(Icons.Default.Schedule, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.cid_reschedule_short))
                     }
                 }
@@ -327,79 +385,119 @@ fun CalendarItemDetailScreen(
 
 @Composable
 fun EventHeader(event: CalendarItem) {
-    val iconInfo = when (event.type) {
-        CalendarItemType.BIRTHDAY -> Pair(Icons.Default.Cake, MaterialTheme.colorScheme.primaryContainer)
-        CalendarItemType.CALL -> Pair(Icons.Default.Phone, MaterialTheme.colorScheme.secondaryContainer)
-        CalendarItemType.MEETING -> Pair(Icons.Default.Group, MaterialTheme.colorScheme.tertiaryContainer)
-        CalendarItemType.GIFT -> Pair(Icons.Default.CardGiftcard, MaterialTheme.colorScheme.primaryContainer)
-        else -> Pair(Icons.Default.Event, MaterialTheme.colorScheme.surfaceVariant)
+    val ctxLabel = LocalContext.current
+    val accent = eventTypeColor(event.type)
+    val icon = when (event.type) {
+        CalendarItemType.BIRTHDAY -> Icons.Default.Cake
+        CalendarItemType.CALL     -> Icons.Default.Phone
+        CalendarItemType.MEETING  -> Icons.Default.Group
+        CalendarItemType.GIFT     -> Icons.Default.CardGiftcard
+        else                      -> Icons.Default.Event
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    // По макету: левый хедер — иконка-плитка, тип-капс, Playfair-заголовок, чипы даты/времени.
+    Column(modifier = Modifier.fillMaxWidth()) {
         Box(
-            modifier = Modifier.size(64.dp).clip(CircleShape).background(iconInfo.second),
+            modifier = Modifier.size(52.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R15).background(accent.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(iconInfo.first, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurface)
+            Icon(icon, contentDescription = null, modifier = Modifier.size(26.dp), tint = accent)
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = event.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(text = event.startDate, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-        }
-
-        if (!event.startTime.isNullOrEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
-                Text(text = "${event.startTime}" + (if (!event.endTime.isNullOrEmpty()) " - ${event.endTime}" else ""), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        Text(
+            event.type.label(ctxLabel).uppercase(),
+            fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
+            color = accent, modifier = Modifier.padding(top = 14.dp)
+        )
+        Text(
+            com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel),
+            fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(
+                com.aistudio.socialsphere.crmlxb.utils.calendarDisplayTitle(event.title, event.type, ctxLabel)
+            ),
+            fontSize = 28.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DetailChip(Icons.Default.CalendarToday, com.aistudio.socialsphere.crmlxb.utils.displayEventDate(event.startDate))
+            if (!event.startTime.isNullOrEmpty()) {
+                DetailChip(Icons.Default.Schedule, event.startTime + (if (!event.endTime.isNullOrEmpty()) "–${event.endTime}" else ""))
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = {}, label = { Text(event.type.label(ctxLabel), fontSize = 12.sp) })
-            AssistChip(onClick = {}, label = { Text(event.status.label(ctxLabel), fontSize = 12.sp) })
+        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).background(AppleTheme.colors.fill).padding(horizontal = 11.dp, vertical = 5.dp)
+            ) { Text(event.status.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.secondaryLabel) }
             if (event.importance in listOf(ImportanceLevel.IMPORTANT, ImportanceLevel.KEY)) {
-                 AssistChip(
-                     onClick = {},
-                     label = { Text(event.importance.label(ctxLabel), fontSize = 12.sp) },
-                     leadingIcon = { Box(modifier = Modifier.clip(CircleShape).size(8.dp).background(MaterialTheme.colorScheme.error)) }
-                 )
+                Row(
+                    Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Medium).background(AppleTheme.colors.red.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(AppleTheme.colors.red))
+                    Text(event.importance.label(ctxLabel), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.red)
+                }
             }
         }
     }
 }
 
 @Composable
+private fun DetailChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(
+        Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R11).background(AppleTheme.colors.card).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Icon(icon, null, Modifier.size(15.dp), tint = AppleTheme.colors.brand)
+        Text(text, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AppleTheme.colors.label)
+    }
+}
+
+@Composable
+private fun CircleBtn(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    tinted: Boolean = false,
+    danger: Boolean = false,
+    onClick: () -> Unit
+) {
+    val bg = when {
+        danger -> AppleTheme.colors.red.copy(alpha = 0.12f)
+        tinted -> AppleTheme.colors.brand.copy(alpha = 0.12f)
+        else   -> AppleTheme.colors.fill
+    }
+    val tint = when {
+        danger -> AppleTheme.colors.red
+        tinted -> AppleTheme.colors.brand
+        else   -> AppleTheme.colors.label
+    }
+    Box(
+        modifier = Modifier.size(36.dp).clip(CircleShape).background(bg).clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) { Icon(icon, contentDescription, Modifier.size(18.dp), tint = tint) }
+}
+
+@Composable
 fun RelatedContactCard(contact: Contact, onClick: () -> Unit) {
+    val ctxLabel = LocalContext.current
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
+        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.brushFor(contact.id)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = contact.firstName.take(1) + contact.lastName.take(1),
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "${contact.firstName} ${contact.lastName}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                Text(text = contact.relationshipType.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
             }
         }
     }
@@ -407,25 +505,26 @@ fun RelatedContactCard(contact: Contact, onClick: () -> Unit) {
 
 @Composable
 fun RelatedCompanyCard(company: Company, onClick: () -> Unit) {
+    val ctxLabel = LocalContext.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val addresses = AppStateStore.addresses.filter { it.ownerId == company.id && it.ownerType == AddressOwnerType.COMPANY }
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        shape = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large,
+        colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
+                modifier = Modifier.size(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small).background(AppleTheme.colors.fill),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Business, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                Icon(Icons.Default.Business, contentDescription = null, tint = AppleTheme.colors.label)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = company.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = company.industry.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                Text(text = company.industry.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
             }
             if (addresses.isNotEmpty()) {
                 Spacer(modifier = Modifier.width(8.dp))
@@ -438,8 +537,8 @@ fun RelatedCompanyCard(company: Company, onClick: () -> Unit) {
                             com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.openRoute(context, "${address.addressLine}, ${address.city}, ${address.country}")
                         }
                     }
-                }, modifier = Modifier.size(32.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)) {
-                    Icon(Icons.Default.Directions, contentDescription = stringResource(R.string.cid_route), modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                }, modifier = Modifier.size(32.dp).background(AppleTheme.colors.card, CircleShape)) {
+                    Icon(Icons.Default.Directions, contentDescription = stringResource(R.string.cid_route), modifier = Modifier.size(16.dp), tint = AppleTheme.colors.brand)
                 }
             }
         }
@@ -450,7 +549,7 @@ fun RelatedCompanyCard(company: Company, onClick: () -> Unit) {
 private fun isValidDate(date: String): Boolean {
     if (date.length != 10) return false
     return try {
-        java.time.LocalDate.parse(date)
+        (parseFlexibleDate(date) ?: error("bad date"))
         true
     } catch (e: Exception) {
         false

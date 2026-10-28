@@ -1,4 +1,5 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import androidx.compose.ui.graphics.Color
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -10,9 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,11 +26,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.aistudio.socialsphere.crmlxb.data.AppStateStore
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 import com.aistudio.socialsphere.crmlxb.model.*
 import com.aistudio.socialsphere.crmlxb.utils.ContactImporter
-import com.aistudio.socialsphere.crmlxb.utils.parseVCard
+import com.aistudio.socialsphere.crmlxb.utils.ContactNoteCodec
+import com.aistudio.socialsphere.crmlxb.utils.VcfImport
 import com.aistudio.socialsphere.crmlxb.utils.parseCsv
 import com.aistudio.socialsphere.crmlxb.utils.DuplicateStatus
+import com.aistudio.socialsphere.crmlxb.utils.ImportDuplicateCheck
 import com.aistudio.socialsphere.crmlxb.utils.ImportContactCandidate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -57,9 +60,8 @@ fun ImportContactsScreen(
             permissionDenied = false
             isLoading = true
             coroutineScope.launch {
-                val contacts = withContext(Dispatchers.IO) {
-                    ContactImporter.getDeviceContacts(context)
-                }
+                val contacts = readDeviceContactsSafely(context)
+                if (contacts == null) { permissionDenied = true; isLoading = false; return@launch }
                 ImportSession.clear()
                 ImportSession.candidates.addAll(contacts)
                 isLoading = false
@@ -79,19 +81,16 @@ fun ImportContactsScreen(
         fileError = null
         coroutineScope.launch {
             try {
-                val candidates = withContext(Dispatchers.IO) {
-                    val content = context.contentResolver
-                        .openInputStream(uri)
-                        ?.bufferedReader()
-                        ?.readText() ?: ""
-                    parseVCard(content)
-                }
-                if (candidates.isEmpty()) {
-                    fileError = context.getString(R.string.imp_no_vcard_contacts)
-                } else {
-                    ImportSession.clear()
-                    ImportSession.candidates.addAll(candidates)
-                    onNavigateToPreview()
+                // PHONE / VCF PACK #4: тот же КАНОНИЧЕСКИЙ путь, что у Share из Контактов
+                // (VcfImport: ContentResolver → байты → декодирование по ENCODING/CHARSET → разбор).
+                when (val load = withContext(Dispatchers.IO) { VcfImport.load(context, uri) }) {
+                    is VcfImport.Load.Loaded -> {
+                        ImportSession.clear()
+                        ImportSession.candidates.addAll(load.candidates)
+                        onNavigateToPreview()
+                    }
+                    VcfImport.Load.Empty -> fileError = context.getString(R.string.imp_no_vcard_contacts)
+                    is VcfImport.Load.Error -> fileError = context.getString(R.string.imp_read_error, load.message)
                 }
             } catch (e: Exception) {
                 fileError = context.getString(R.string.imp_read_error, e.localizedMessage ?: "")
@@ -137,11 +136,16 @@ fun ImportContactsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.imp_contacts_title), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    Box(
+                        modifier = Modifier.padding(start = 12.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
+                            modifier = Modifier.size(20.dp), tint = AppleTheme.colors.label)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -158,7 +162,7 @@ fun ImportContactsScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.Contacts, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Contacts, contentDescription = null, modifier = Modifier.size(64.dp), tint = AppleTheme.colors.red)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(stringResource(R.string.imp_need_permission), style = MaterialTheme.typography.bodyLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Spacer(modifier = Modifier.height(24.dp))
@@ -183,9 +187,8 @@ fun ImportContactsScreen(
                         if (hasPermission) {
                             isLoading = true
                             coroutineScope.launch {
-                                val contacts = withContext(Dispatchers.IO) {
-                                    ContactImporter.getDeviceContacts(context)
-                                }
+                                val contacts = readDeviceContactsSafely(context)
+                                if (contacts == null) { permissionDenied = true; isLoading = false; return@launch }
                                 ImportSession.clear()
                                 ImportSession.candidates.addAll(contacts)
                                 isLoading = false
@@ -207,7 +210,7 @@ fun ImportContactsScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
+                            containerColor = AppleTheme.colors.red.copy(alpha = 0.12f)
                         )
                     ) {
                         Row(
@@ -216,11 +219,11 @@ fun ImportContactsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(Icons.Default.Error, null,
-                                tint = MaterialTheme.colorScheme.error)
+                                tint = AppleTheme.colors.red)
                             Text(
                                 fileError ?: "",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                                color = AppleTheme.colors.red
                             )
                         }
                     }
@@ -230,7 +233,7 @@ fun ImportContactsScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = AppleTheme.colors.card.copy(alpha = 0.5f)
                     )
                 ) {
                     Column(
@@ -242,14 +245,14 @@ fun ImportContactsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.ContactPhone, null,
-                                tint = MaterialTheme.colorScheme.primary)
+                                tint = AppleTheme.colors.brand)
                             Text(stringResource(R.string.imp_vcard_title),
                                 fontWeight = FontWeight.Bold)
                         }
                         Text(
                             stringResource(R.string.imp_vcard_desc),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = AppleTheme.colors.secondaryLabel
                         )
                         Button(
                             onClick = { vcfLauncher.launch("*/*") },
@@ -267,7 +270,7 @@ fun ImportContactsScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = AppleTheme.colors.card.copy(alpha = 0.5f)
                     )
                 ) {
                     Column(
@@ -279,14 +282,14 @@ fun ImportContactsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.TableChart, null,
-                                tint = MaterialTheme.colorScheme.primary)
+                                tint = AppleTheme.colors.brand)
                             Text(stringResource(R.string.imp_csv_title),
                                 fontWeight = FontWeight.Bold)
                         }
                         Text(
                             stringResource(R.string.imp_csv_desc),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = AppleTheme.colors.secondaryLabel
                         )
                         Button(
                             onClick = { csvLauncher.launch("*/*") },
@@ -312,38 +315,37 @@ fun ImportPreviewScreen(
     onNavigateToDuplicates: () -> Unit
 ) {
     val candidates = ImportSession.candidates
+    val ctx = LocalContext.current
     var isCheckingDuplicates by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        // Simple duplicate check on load
-        val existingContacts = AppStateStore.contacts
-        candidates.forEach { c ->
-            var matchedContact: Contact? = null
-            
-            val phoneMatch = existingContacts.find { existing -> existing.phones.any { e -> c.phones.any { cp -> e.number == cp.number } } }
-            if (phoneMatch != null) matchedContact = phoneMatch
-            else {
-                val emailMatch = existingContacts.find { existing -> existing.emails.any { e -> c.emails.any { ce -> e.email == ce.email } } }
-                if (emailMatch != null) matchedContact = emailMatch
-                else {
-                    val nameMatch = existingContacts.find { it.firstName == c.firstName && it.lastName == c.lastName && c.firstName.isNotBlank() }
-                    if (nameMatch != null) matchedContact = nameMatch
-                }
-            }
-            
-            if (matchedContact != null) {
-                c.duplicateStatus = DuplicateStatus.POSSIBLE_DUPLICATE
-                c.selectedForImport = false
-                c.matchedContactId = matchedContact?.id
-            } else {
-                c.duplicateStatus = DuplicateStatus.NEW
-                c.selectedForImport = true
+    // ФИКС (аудит 2026-08-11, жалоба владельца: «добавил контакт в телефон — сложно
+    // найти его одного в списке, нет фильтров»): при большом списке кандидатов найти
+    // ОДИН нужный (например, только что добавленный в телефон) вручную скроллом было
+    // невозможно — поиск фильтрует ТОЛЬКО отображение, чекбоксы остальных не трогает.
+    var searchQuery by remember { mutableStateOf("") }
+    // ФИКС (2026-10-28, баг эмулятора «устаревшие галочки/чипы»): раньше список строк был снимком
+    // `remember(candidates.size, searchQuery) { candidates.toList() }` — при тапе по галочке/«Выбрать все» элемент в
+    // `candidates` заменяется копией (copy), а строки держали СТАРЫЕ объекты (размер списка не менялся → снимок не
+    // пересчитывался), поэтому галочка не менялась, хотя счётчик внизу менялся. derivedStateOf читает сам список и
+    // пересчитывается при любой замене элемента.
+    val visibleCandidates by remember(searchQuery) {
+        derivedStateOf {
+            if (searchQuery.isBlank()) candidates.toList()
+            else candidates.filter { c ->
+                val q = searchQuery.trim()
+                "${c.firstName} ${c.lastName}".contains(q, ignoreCase = true) ||
+                    c.phones.any { it.number.contains(q) } ||
+                    c.emails.any { it.email.contains(q, ignoreCase = true) } ||
+                    (c.companyName?.contains(q, ignoreCase = true) == true)
             }
         }
-        // Force recomposition
-        val copy = candidates.toList()
-        candidates.clear()
-        candidates.addAll(copy)
+    }
+
+    LaunchedEffect(Unit) {
+        // Один раз на кандидата (см. ImportDuplicateCheck): повторный заход на экран — например, возврат из
+        // «Поиска дублей» — не затирает решения пользователя. Изменения — через замену элемента списка (copy),
+        // а не правку полей на месте: так экран гарантированно перерисовывается.
+        val checked = ImportDuplicateCheck.apply(candidates.toList(), AppStateStore.contacts.toList())
+        checked.forEachIndexed { i, c -> if (i < candidates.size && candidates[i].id == c.id && candidates[i] != c) candidates[i] = c }
     }
 
     Scaffold(
@@ -351,18 +353,23 @@ fun ImportPreviewScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.imp_preview), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    Box(
+                        modifier = Modifier.padding(start = 12.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
+                            modifier = Modifier.size(20.dp), tint = AppleTheme.colors.label)
                     }
                 },
                 actions = {
                     if (candidates.any { it.duplicateStatus == DuplicateStatus.POSSIBLE_DUPLICATE }) {
                         IconButton(onClick = onNavigateToDuplicates) {
-                            Icon(Icons.Default.MergeType, contentDescription = stringResource(R.string.imp_dups))
+                            Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = stringResource(R.string.imp_dups))
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         },
         bottomBar = {
@@ -370,7 +377,7 @@ fun ImportPreviewScreen(
             val scope = rememberCoroutineScope()
             var isImporting by remember { mutableStateOf(false) }
 
-            BottomAppBar(containerColor = MaterialTheme.colorScheme.surface) {
+            BottomAppBar(containerColor = AppleTheme.colors.card) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -383,7 +390,7 @@ fun ImportPreviewScreen(
                             scope.launch {
                                 // FIX: run on IO thread, not UI
                                 withContext(Dispatchers.IO) {
-                                    performImport(candidates.filter { it.selectedForImport })
+                                    performImport(candidates.filter { it.selectedForImport }, ctx)
                                 }
                                 isImporting = false
                                 onNavigateToResult()
@@ -395,7 +402,7 @@ fun ImportPreviewScreen(
                             CircularProgressIndicator(
                                 Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color = Color.White
                             )
                         } else {
                             Text(stringResource(R.string.imp_import_btn))
@@ -410,10 +417,47 @@ fun ImportPreviewScreen(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(candidates, key = { it.id }) { candidate ->
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        placeholder = { Text(stringResource(R.string.imp_search_hint)) },
+                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, null)
+                            }
+                        },
+                        singleLine = true
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Выбрать/снять — только среди ВИДИМЫХ (отфильтрованных
+                        // поиском) кандидатов, не всего списка целиком — так можно
+                        // сузить поиск до одного нового контакта и отметить только его.
+                        TextButton(onClick = {
+                            visibleCandidates.forEach { vc ->
+                                val idx = candidates.indexOfFirst { it.id == vc.id }
+                                if (idx >= 0) candidates[idx] = candidates[idx].copy(selectedForImport = true)
+                            }
+                        }) { Text(stringResource(R.string.imp_select_all)) }
+                        TextButton(onClick = {
+                            visibleCandidates.forEach { vc ->
+                                val idx = candidates.indexOfFirst { it.id == vc.id }
+                                if (idx >= 0) candidates[idx] = candidates[idx].copy(selectedForImport = false)
+                            }
+                        }) { Text(stringResource(R.string.imp_select_none)) }
+                    }
+                }
+            }
+            items(visibleCandidates, key = { it.id }) { candidate ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
                 ) {
                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
@@ -428,15 +472,15 @@ fun ImportPreviewScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "${candidate.firstName} ${candidate.lastName}".trim().takeIf { it.isNotBlank() } ?: stringResource(R.string.imp_no_name), fontWeight = FontWeight.Bold)
+                            Text(text = listOfNotNull(candidate.firstName.trim(), candidate.middleName.trim().takeIf { it.isNotBlank() }, candidate.lastName.trim()).filter { it.isNotBlank() }.joinToString(" ").takeIf { it.isNotBlank() } ?: stringResource(R.string.imp_no_name), fontWeight = FontWeight.Bold)
                             if (candidate.companyName != null || candidate.jobTitle != null) {
-                                Text(text = listOfNotNull(candidate.jobTitle, candidate.companyName).joinToString(stringResource(R.string.imp_job_at)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                Text(text = listOfNotNull(candidate.jobTitle, candidate.companyName).joinToString(stringResource(R.string.imp_job_at)), style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.brand)
                             }
                             if (candidate.phones.isNotEmpty()) {
-                                Text(text = candidate.phones.first().number, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                                Text(text = candidate.phones.first().number, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                             }
                             if (candidate.emails.isNotEmpty()) {
-                                Text(text = candidate.emails.first().email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                                Text(text = candidate.emails.first().email, style = MaterialTheme.typography.bodySmall, color = AppleTheme.colors.secondaryLabel)
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -446,8 +490,8 @@ fun ImportPreviewScreen(
                             DuplicateStatus.WILL_UPDATE -> stringResource(R.string.imp_status_update)
                             DuplicateStatus.SKIPPED -> stringResource(R.string.imp_status_skip)
                         }
-                        val statusColor = if (candidate.duplicateStatus == DuplicateStatus.NEW) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(statusColor.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                        val statusColor = if (candidate.duplicateStatus == DuplicateStatus.NEW) AppleTheme.colors.brand else AppleTheme.colors.red
+                        Box(modifier = Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small).background(statusColor.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                             Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
                         }
                     }
@@ -457,7 +501,156 @@ fun ImportPreviewScreen(
     }
 }
 
-fun performImport(selected: List<ImportContactCandidate>) {
+/** Инверсия роли для НАШЕГО контакта относительно смежного (см. androidRelationRole
+ *  в ContactImporter.kt) — большинство ролей асимметричны и требуют знания пола
+ *  нашего контакта, которого Android не даёт, поэтому безопасный дефолт — «Родственник». */
+private fun inverseImportedRole(role: String): String = when (role) {
+    "Друг" -> "Друг"
+    "Партнёр" -> "Партнёр"
+    "Коллега" -> "Коллега"
+    else -> "Родственник"
+}
+
+/** Ищет контакт приложения по полному имени из Android Relation.NAME
+ *  (не структурировано — только строка целиком). */
+private fun findContactByFullName(fullName: String): Contact? {
+    val words = fullName.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (words.isEmpty()) return null
+    return AppStateStore.contacts.find { c ->
+        val cFull = listOfNotNull(c.firstName.trim(), c.middleName?.trim(), c.lastName.trim())
+            .filter { it.isNotBlank() }.joinToString(" ")
+        cFull.equals(fullName.trim(), ignoreCase = true) ||
+            (words.size == 1 && (c.firstName.equals(words[0], ignoreCase = true) || c.lastName.equals(words[0], ignoreCase = true))) ||
+            (words.size >= 2 && c.firstName.equals(words.first(), ignoreCase = true) && c.lastName.equals(words.last(), ignoreCase = true))
+    }
+}
+
+/**
+ * Смежные контакты из телефона (фидбэк владельца 2026-07-04: «в Android есть
+ * смежные контакты — семья, друг… это должно сохраняться»). Общая функция для
+ * НОВОГО контакта и слияния — раньше такой перенос не было вообще нигде.
+ * Если есть контакт с таким именем — настоящая ContactRelation. Если нет —
+ * заметка (решение владельца: «если про текстовое поле — добавляешь в заметки»),
+ * локаль-безопасный шаблон (см. normalizeImportedNoteText/У62).
+ */
+private fun applyImportedRelations(candidate: ImportContactCandidate, contactId: String, context: android.content.Context) {
+    if (candidate.relations.isEmpty()) return
+    candidate.relations.forEach { rel ->
+        val matched = findContactByFullName(rel.name)?.takeIf { it.id != contactId }
+        if (matched != null) {
+            val alreadyLinked = AppStateStore.contactRelations.any {
+                (it.firstContactId == contactId && it.secondContactId == matched.id) ||
+                (it.firstContactId == matched.id && it.secondContactId == contactId)
+            }
+            if (!alreadyLinked) {
+                AppStateStore.addContactRelation(ContactRelation(
+                    id = java.util.UUID.randomUUID().toString(),
+                    firstContactId = contactId,
+                    secondContactId = matched.id,
+                    firstRole = inverseImportedRole(rel.role),
+                    secondRole = rel.role
+                ))
+            }
+        } else {
+            val text = context.getString(R.string.imp_relation_from_phone, "${rel.role} — ${rel.name}")
+            val current = AppStateStore.contacts.find { it.id == contactId } ?: return@forEach
+            if (current.notes.none { it.text == text }) {
+                val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                // addNote(), не updateContact(copy(notes=...)) — иначе заметка не
+                // попадает в глобальный AppStateStore.notes и невидима в UI
+                // (тот же баг, что и в performImport/mergeCandidate, см. там).
+                AppStateStore.addNote(Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    type = NoteType.GENERAL,
+                    text = text,
+                    isImportant = false,
+                    createdAt = now, updatedAt = now
+                ))
+            }
+        }
+    }
+}
+
+/**
+ * Компания/должность из телефона — ЕДИНАЯ функция для нового контакта, слияния
+ * при импорте И точечной кнопки «Обновить из телефона» (фидбэк 2026-07-04:
+ * «работу тоже подтянуть» — раньше эта логика была раздельно и почти дословно
+ * продублирована между performImport/mergeCandidate, точечная кнопка её не
+ * знала вовсе). Если есть компания — find-or-create + связь (если такой связи
+ * ещё нет — повторный вызов не плодит дубли); если только должность без
+ * компании — заметка (тоже с проверкой на дубль текста).
+ * @return true, если контакт реально изменился (для тостов/статистики).
+ */
+internal fun applyImportedCompany(
+    companyName: String?,
+    jobTitle: String?,
+    contactId: String,
+    context: android.content.Context,
+    onCompanyCreated: () -> Unit = {}
+): Boolean {
+    // Страж: компания не создаётся, если название пустое после trim
+    // или совпадает с должностью (классический симптом кривого маппинга)
+    val cleanCompanyName = companyName?.trim()
+    if (!cleanCompanyName.isNullOrBlank() && !cleanCompanyName.equals(jobTitle?.trim(), ignoreCase = true)) {
+        val current = AppStateStore.contacts.find { it.id == contactId } ?: return false
+        val hasRelation = current.companyRelations.any { relation ->
+            AppStateStore.getCompany(relation.companyId)?.name.equals(cleanCompanyName, ignoreCase = true)
+        }
+        if (hasRelation) return false
+        var company = AppStateStore.findCompanyByName(cleanCompanyName)
+        if (company == null) {
+            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            company = Company(
+                id = java.util.UUID.randomUUID().toString(), name = cleanCompanyName,
+                industry = Industry.OTHER, createdAt = now, updatedAt = now
+            )
+            AppStateStore.addCompany(company)
+            onCompanyCreated()
+        }
+        val relation = ContactCompanyRelation(
+            id = java.util.UUID.randomUUID().toString(),
+            contactId = contactId,
+            companyId = company.id,
+            position = jobTitle ?: "",
+            employmentStatus = EmploymentStatus.CURRENT,
+            isPrimary = current.companyRelations.isEmpty()
+        )
+        AppStateStore.updateContact(current, current.copy(companyRelations = current.companyRelations + relation))
+        return true
+    } else if (!jobTitle.isNullOrBlank()) {
+        // ФИКС (аудит 2026-08-11, жалоба владельца при сканировании визитки: «только
+        // компания добавилась, а там больше написано... почему не можешь сканировать»):
+        // раньше должность БЕЗ компании (визитка/CSV/vCard без явной компании) пряталась
+        // в generic-заметке — непрозрачное текстовое поле, не видна в шапке карточки,
+        // не участвует в поиске. §46 этой же сессии чинил ОТОБРАЖЕНИЕ/ПОИСК по
+        // Contact.profession — но само поле никогда не заполнялось ни одним из путей
+        // импорта (CSV/vCard/телефонная книга/сканер визитки — все идут через эту же
+        // функцию). Теперь пишем в САМ Contact.profession, а не в заметку — тот текст
+        // уже не теряется (сканер пишет ВЕСЬ сырой OCR-текст отдельной заметкой в любом
+        // случае, см. ScanCardScreen.kt scan_raw_text_note), просто структурное поле
+        // получает структурное значение вместо того, чтобы прятаться в тексте заметки.
+        val current = AppStateStore.contacts.find { it.id == contactId } ?: return false
+        if (!current.profession.isNullOrBlank()) return false
+        AppStateStore.updateContact(current, current.copy(profession = jobTitle.trim()))
+        return true
+    }
+    return false
+}
+
+/**
+ * BATCH 5 (5-003): стала suspend — после создания контактов импортированные
+ * теги приводятся к канонической управляемой системе и только после этого
+ * функция возвращает управление.
+ *
+ * Парсеры (vCard/телефонная книга/сканер визитки через ContactNoteCodec) дают
+ * теги как свободный текст, и он по-прежнему кладётся в легаси Contact.tags —
+ * это ВХОД, а не итоговое состояние: `legacy input -> reconcile -> managed`.
+ * Раньше на этом всё и заканчивалось, поэтому импортированный тег не появлялся
+ * ни на карточке контакта, ни в фильтре по тегам — их читает только
+ * управляемая система.
+ */
+suspend fun performImport(selected: List<ImportContactCandidate>, context: android.content.Context) {
     var companiesCreated = 0
     var contactsImported = 0
     var phonesAdded = 0
@@ -467,18 +660,61 @@ fun performImport(selected: List<ImportContactCandidate>) {
 
     selected.forEach { candidate ->
         val contactId = java.util.UUID.randomUUID().toString()
+        // ФИКС (фидбэк владельца 2026-08-11: «чтобы приложение определяло, что
+        // и куда добавить» при обратном импорте из контактов телефона) —
+        // candidate.notes раньше целиком уходил в ОДНУ generic-заметку (см. блок
+        // ниже). ContactNoteCodec распознаёт метки, которыми ExportManager
+        // теперь помечает каждую запись, и раскладывает их обратно по
+        // структурным полям контакта; нераспознанное (например, заметка,
+        // написанная владельцем прямо в Контактах телефона) не теряется —
+        // остаётся в decoded.fallbackText и всё равно попадает в заметку ниже.
+        val decoded = ContactNoteCodec.decode(candidate.notes)
         val newContact = Contact(
             id = contactId,
             firstName = candidate.firstName,
             lastName = candidate.lastName,
+            middleName = candidate.middleName.ifBlank { null },
+            namePrefix = candidate.namePrefix.ifBlank { null },
+            nameSuffix = candidate.nameSuffix.ifBlank { null },
+            phoneticFirstName = candidate.phoneticFirstName.ifBlank { null },
+            phoneticMiddleName = candidate.phoneticMiddleName.ifBlank { null },
+            phoneticLastName = candidate.phoneticLastName.ifBlank { null },
             photoUri = null,
             relationshipType = RelationshipType.OTHER,
             connectionLevel = ConnectionLevel.NORMAL,
             importanceLevel = ImportanceLevel.NORMAL,
             socialRole = SocialRole.REGULAR,
             communicationRhythm = CommunicationRhythm.NOT_TRACKED,
-            phones = candidate.phones.map { it.copy(contactId = contactId, id = java.util.UUID.randomUUID().toString()) },
-            emails = candidate.emails.map { it.copy(contactId = contactId, id = java.util.UUID.randomUUID().toString()) },
+            nextStep = decoded.nextStep,
+            talkingPoints = decoded.talkingPoints,
+            canHelpWith = decoded.canHelpWith,
+            iCanHelpWith = decoded.iCanHelpWith,
+            meetContext = decoded.meetContext,
+            tags = decoded.tags,
+            personalDetails = decoded.personalDetails.map {
+                PersonalDetail(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    category = it.category,
+                    value = it.value,
+                    note = it.note
+                )
+            },
+            // Связь с контактом телефона — candidate.id уже в формате
+            // "device_contact_<ID>" (см. ContactImporter.getDeviceContacts).
+            // Раньше не проставлялось — импортированные так контакты никогда
+            // не получали кнопку «Обновить из телефона» (баг найден 2026-07-04).
+            // Для CSV/vCard-импорта (не из книги устройства) candidate.id — просто
+            // случайный UUID, не совпадающий с device_contact_-форматом нигде
+            // больше, поэтому присваивать его безопасно в любом случае.
+            deviceContactId = candidate.id.takeIf { it.startsWith("device_contact_") },
+            deviceLookupKey = candidate.deviceLookupKey.takeIf { candidate.id.startsWith("device_contact_") },
+            phones = com.aistudio.socialsphere.crmlxb.data.ContactChannelDedup.dedupePhones(
+                candidate.phones.map { it.copy(contactId = contactId, id = java.util.UUID.randomUUID().toString()) }
+            ),
+            emails = com.aistudio.socialsphere.crmlxb.data.ContactChannelDedup.dedupeEmails(
+                candidate.emails.map { it.copy(contactId = contactId, id = java.util.UUID.randomUUID().toString()) }
+            ),
             createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
             updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         )
@@ -491,57 +727,19 @@ fun performImport(selected: List<ImportContactCandidate>) {
             val newAddress = addr.copy(id = java.util.UUID.randomUUID().toString(), ownerId = contactId)
             val updatedContact = AppStateStore.contacts.find { it.id == contactId }
             if (updatedContact != null) {
-                AppStateStore.updateContact(updatedContact.copy(addresses = updatedContact.addresses + newAddress))
+                AppStateStore.updateContact(updatedContact, updatedContact.copy(addresses = updatedContact.addresses + newAddress))
                 addressesAdded++
             }
         }
 
-        // Страж: компания не создаётся, если название пустое после trim
-        // или совпадает с должностью (классический симптом кривого маппинга)
-        val cleanCompanyName = candidate.companyName?.trim()
-        if (!cleanCompanyName.isNullOrBlank() &&
-            !cleanCompanyName.equals(candidate.jobTitle?.trim(), ignoreCase = true)) {
-            // Find or create company
-            var company = AppStateStore.companies.find { it.name.equals(cleanCompanyName, ignoreCase = true) }
-            if (company == null) {
-                company = Company(
-                    id = java.util.UUID.randomUUID().toString(),
-                    name = cleanCompanyName,
-                    industry = Industry.OTHER,
-                    createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                )
-                AppStateStore.addCompany(company)
-                companiesCreated++
-            }
-            val relation = ContactCompanyRelation(
-                    id = java.util.UUID.randomUUID().toString(),
-                    contactId = contactId,
-                    companyId = company.id,
-                    position = candidate.jobTitle ?: "",
-                    employmentStatus = EmploymentStatus.CURRENT,
-                    isPrimary = true
-                )
-            val contactToUpdate = AppStateStore.contacts.find { it.id == contactId }
-            if (contactToUpdate != null) {
-                AppStateStore.updateContact(contactToUpdate.copy(companyRelations = contactToUpdate.companyRelations + relation))
-            }
-        } else if (!candidate.jobTitle.isNullOrBlank()) {
-             // Job title without company, keep in note
-             val newNote = Note(
-                     id = java.util.UUID.randomUUID().toString(),
-                     contactId = contactId,
-                     type = NoteType.GENERAL,
-                     text = stringResource(R.string.imp_job_on_import, candidate.jobTitle),
-                     isImportant = false,
-                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                     updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                 )
-             val contactToUpdate = AppStateStore.contacts.find { it.id == contactId }
-             if (contactToUpdate != null) {
-                 AppStateStore.updateContact(contactToUpdate.copy(notes = contactToUpdate.notes + newNote))
-             }
+        // Группы телефонной книги (фидбэк 2026-07-04): find-or-create по имени +
+        // привязка нового контакта. addGroup сам дедуплицирует по имени без регистра.
+        if (candidate.groupNames.isNotEmpty()) {
+            val groupIds = candidate.groupNames.mapNotNull { AppStateStore.addGroup(it)?.id }.toSet()
+            if (groupIds.isNotEmpty()) AppStateStore.setContactGroups(contactId, groupIds)
         }
+
+        applyImportedCompany(candidate.companyName, candidate.jobTitle, contactId, context) { companiesCreated++ }
 
         val alreadyHasBirthday = AppStateStore.calendarItems.any {
             it.type == CalendarItemType.BIRTHDAY &&
@@ -552,13 +750,14 @@ fun performImport(selected: List<ImportContactCandidate>) {
             AppStateStore.addCalendarItem(
                 CalendarItem(
                     id = calId,
-                    title = stringResource(R.string.imp_birthday_of, "${candidate.firstName} ${candidate.lastName}"),
+                    title = context.getString(R.string.imp_birthday_of, "${candidate.firstName} ${candidate.lastName}"),
                     type = CalendarItemType.BIRTHDAY,
                     status = CalendarItemStatus.ACTIVE,
                     importance = ImportanceLevel.NORMAL,
                     startDate = candidate.birthday,
                     isAllDay = true,
                     recurrenceRule = "FREQ=YEARLY",
+                    recurrenceExplicitlySet = true,
                     reminders = emptyList(), // Can add default reminder based on settings
                     links = listOf(CalendarItemLink(id = java.util.UUID.randomUUID().toString(), calendarItemId = calId, targetType = CalendarTargetType.CONTACT, targetId = contactId)),
                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
@@ -568,23 +767,71 @@ fun performImport(selected: List<ImportContactCandidate>) {
             birthdaysCreated++
         }
         
-        if (!candidate.notes.isNullOrBlank()) {
-             val newNote = Note(
-                     id = java.util.UUID.randomUUID().toString(),
-                     contactId = contactId,
-                     type = NoteType.GENERAL,
-                     text = stringResource(R.string.imp_note_from_import, candidate.notes),
-                     isImportant = false,
-                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                     updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                 )
-             val contactToUpdate = AppStateStore.contacts.find { it.id == contactId }
-             if (contactToUpdate != null) {
-                 AppStateStore.updateContact(contactToUpdate.copy(notes = contactToUpdate.notes + newNote))
-             }
+        // Распознанные (помеченные) заметки — addNote(), канонический путь,
+        // синхронизирует и глобальный AppStateStore.notes, и встроенный
+        // contact.notes (тот же паттерн, что уже применён для addresses/
+        // companyRelations — иначе запись технически создаётся, но невидима
+        // в UI без перезапуска приложения).
+        decoded.notes.forEach { dn ->
+            AppStateStore.addNote(
+                Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    type = dn.type,
+                    text = dn.text,
+                    isImportant = false,
+                    isLocked = dn.isLocked,
+                    createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                )
+            )
         }
+        // Идеи подарков — addGift(), синхронизирует AppStateStore.gifts
+        // (читает GiftsTab) и встроенный contact.gifts.
+        decoded.gifts.forEach { dg ->
+            AppStateStore.addGift(
+                GiftIdea(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    title = dg.title,
+                    note = dg.note,
+                    link = dg.link,
+                    date = dg.date,
+                    status = dg.status
+                )
+            )
+        }
+        if (!decoded.fallbackText.isNullOrBlank()) {
+            // Нераспознанные строки поля NOTE (например, заметка, которую
+            // владелец написал прямо в Контактах телефона, а не через наш
+            // экспорт) — как раньше, одна общая заметка импорта, ничего не
+            // теряется, просто не раскладывается по структурным полям.
+            AppStateStore.addNote(
+                Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = contactId,
+                    type = NoteType.GENERAL,
+                    text = context.getString(R.string.imp_note_from_import, decoded.fallbackText),
+                    isImportant = false,
+                    createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                )
+            )
+        }
+
+        applyImportedRelations(candidate, contactId, context)
     }
-    
+
+    // BATCH 5 (5-003): импортированные легаси-теги -> управляемые Tag/членство.
+    // Один проход после всех контактов (а не по контакту), одна транзакция —
+    // дублей не создаёт, повторный импорт того же файла идемпотентен.
+    AppStateStore.reconcileLegacyTagsIntoManaged()
+    // BATCH 5B (5B-005): барьер завершения. Все записи выше поставлены в
+    // очередь без ожидания, а реконсиляция при импорте БЕЗ тегов (CSV, сканер
+    // визитки) уходит на ранний выход и не даёт ни одной точки ожидания — без
+    // барьера функция возвращала «импортировано N», пока записи ещё в очереди.
+    AppStateStore.awaitPendingWrites()
+
     // Store stats temporarily in ImportSession so Result screen can show it
     ImportResultStats.contactsImported = contactsImported
     ImportResultStats.companiesCreated = companiesCreated
@@ -612,22 +859,28 @@ fun ImportDuplicatesScreen(
 ) {
     val allCandidates = ImportSession.candidates
     val duplicateCandidates = allCandidates.filter { it.duplicateStatus == DuplicateStatus.POSSIBLE_DUPLICATE }
+    val ctx = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.imp_possible_dups), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    Box(
+                        modifier = Modifier.padding(start = 12.dp).size(36.dp).clip(CircleShape)
+                            .background(AppleTheme.colors.fill).clickable { onNavigateBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back),
+                            modifier = Modifier.size(20.dp), tint = AppleTheme.colors.label)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
         if (duplicateCandidates.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.imp_no_unresolved), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.secondary)
+                Text(stringResource(R.string.imp_no_unresolved), style = MaterialTheme.typography.bodyLarge, color = AppleTheme.colors.secondaryLabel)
             }
             return@Scaffold
         }
@@ -637,18 +890,19 @@ fun ImportDuplicatesScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-             Text(stringResource(R.string.imp_choose_dup_action), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+             Text(stringResource(R.string.imp_choose_dup_action), style = MaterialTheme.typography.bodyMedium, color = AppleTheme.colors.secondaryLabel)
             }
             items(duplicateCandidates, key = { it.id }) { candidate ->
                 val scope = rememberCoroutineScope()
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        containerColor = AppleTheme.colors.card.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "${candidate.firstName} ${candidate.lastName}".trim()
+                            text = listOfNotNull(candidate.firstName.trim(), candidate.middleName.trim().takeIf { it.isNotBlank() }, candidate.lastName.trim())
+                                .filter { it.isNotBlank() }.joinToString(" ")
                                 .takeIf { it.isNotBlank() } ?: stringResource(R.string.imp_no_name),
                             fontWeight = FontWeight.Bold
                         )
@@ -657,7 +911,7 @@ fun ImportDuplicatesScreen(
                                 onClick = {
                                     // FIX: run on IO, update by id not indexOf
                                     scope.launch {
-                                        withContext(Dispatchers.IO) { mergeCandidate(candidate) }
+                                        withContext(Dispatchers.IO) { mergeCandidate(candidate, ctx) }
                                         val idx = allCandidates.indexOfFirst { it.id == candidate.id }
                                         if (idx >= 0) allCandidates[idx] = allCandidates[idx].copy(
                                             duplicateStatus = DuplicateStatus.WILL_UPDATE,
@@ -689,59 +943,63 @@ fun ImportDuplicatesScreen(
     }
 }
 
-fun mergeCandidate(candidate: ImportContactCandidate) {
+/**
+ * BATCH 5B (5B-002): стала suspend. Это ВТОРОЙ путь импорта («Объединить» на
+ * экране дубликатов), и он тоже пишет теги в легаси-поле контакта. Batch 5
+ * добавил реконсиляцию только в performImport, из-за чего теги, влитые в уже
+ * существующий контакт, оставались легаси-только: их не было ни на карточке,
+ * ни в фильтре, ни в поиске по управляемым тегам — ровно тот класс дефекта,
+ * который Batch 5 и должен был закрыть.
+ */
+suspend fun mergeCandidate(candidate: ImportContactCandidate, context: android.content.Context) {
     val existingId = candidate.matchedContactId ?: return
     val existingContact = AppStateStore.contacts.find { it.id == existingId } ?: return
-    
-    val newPhones = candidate.phones.filter { cp -> existingContact.phones.none { it.number == cp.number } }
+    // ФИКС (Data Safety Residual Audit, TAG-1 — Legacy Tags Compatibility & Phone Sync Safety Pack,
+    // 2026-09-23): контакт УЖЕ связан с записью телефона (deviceContactId проставлен предыдущим
+    // импортом/merge) -> это ПОВТОРНЫЙ resync, не первое знакомство. managed-теги для уже связанного
+    // контакта — canonical current state; легаси [Теги] из phone/VCF источника НЕ должен обходить
+    // managed membership (снятый пользователем тег не обязан воскресать только потому, что источник
+    // его всё ещё несёт — тегов-tombstone нет и не будет, поэтому единственный безопасный выбор —
+    // вообще не трогать managed-теги при resync уже связанного контакта). Первое связывание (эта же
+    // функция — путь «Объединить» с экрана дубликатов, deviceContactId ещё null) — не затронуто,
+    // легаси-теги по-прежнему могут стать managed при первом реальном слиянии (requirement A4).
+    val alreadyLinkedToPhone = existingContact.deviceContactId != null
+
+    // Нормализованное сравнение (было — посимвольное; см. фикс в ImportPreviewScreen выше)
+    // distinctBy: сам кандидат мог нести один номер несколько раз (raw-контакты книги) — сверка
+    // только с existingContact эти внутренние повторы не ловит.
+    val newPhones = candidate.phones.filter { cp ->
+        existingContact.phones.none { AppStateStore.phoneDigits(it.number) == AppStateStore.phoneDigits(cp.number) }
+    }.distinctBy { AppStateStore.phoneDigits(it.number).ifEmpty { it.id } }
         .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = existingId) }
-    val newEmails = candidate.emails.filter { ce -> existingContact.emails.none { it.email == ce.email } }
+    val newEmails = candidate.emails.filter { ce -> existingContact.emails.none { it.email.equals(ce.email, ignoreCase = true) } }
+        .distinctBy { it.email.trim().lowercase().ifEmpty { it.id } }
         .map { it.copy(id = java.util.UUID.randomUUID().toString(), contactId = existingId) }
-    
+
+    // Связь с телефоном — если контакт слился с записью из книги устройства,
+    // а связи ещё не было, проставляем (тот же баг, что и в performImport).
+    val deviceLink = candidate.id.takeIf { it.startsWith("device_contact_") }
+    val newMiddleName = existingContact.middleName ?: candidate.middleName.ifBlank { null }
+    val newNamePrefix = existingContact.namePrefix ?: candidate.namePrefix.ifBlank { null }
+    val newNameSuffix = existingContact.nameSuffix ?: candidate.nameSuffix.ifBlank { null }
+    val newPhoneticFirst = existingContact.phoneticFirstName ?: candidate.phoneticFirstName.ifBlank { null }
+    val newPhoneticMiddle = existingContact.phoneticMiddleName ?: candidate.phoneticMiddleName.ifBlank { null }
+    val newPhoneticLast = existingContact.phoneticLastName ?: candidate.phoneticLastName.ifBlank { null }
+
     // Merge Addresses
     candidate.addresses.forEach { addr ->
         if (existingContact.addresses.none { it.addressLine == addr.addressLine }) {
             val newAddress = addr.copy(id = java.util.UUID.randomUUID().toString(), ownerId = existingId)
             val updatedContact = AppStateStore.contacts.find { it.id == existingId }
             if (updatedContact != null) {
-                AppStateStore.updateContact(updatedContact.copy(addresses = updatedContact.addresses + newAddress))
+                AppStateStore.updateContact(updatedContact, updatedContact.copy(addresses = updatedContact.addresses + newAddress))
                 ImportResultStats.addressesAdded++
             }
         }
     }
     
     // Merge company relation
-    val cleanCompanyName2 = candidate.companyName?.trim()
-    if (!cleanCompanyName2.isNullOrBlank() &&
-        !cleanCompanyName2.equals(candidate.jobTitle?.trim(), ignoreCase = true)) {
-        val hasCompanyRelation = existingContact.companyRelations.any { relation -> 
-            val comp = AppStateStore.companies.find { it.id == relation.companyId }
-            comp?.name.equals(cleanCompanyName2, ignoreCase = true)
-        }
-        if (!hasCompanyRelation) {
-            var company = AppStateStore.companies.find { it.name.equals(cleanCompanyName2, ignoreCase = true) }
-            if (company == null) {
-                company = Company(
-                    id = java.util.UUID.randomUUID().toString(),
-                    name = cleanCompanyName2,
-                    industry = Industry.OTHER,
-                    createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                    updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                )
-                AppStateStore.addCompany(company)
-                ImportResultStats.companiesCreated++
-            }
-            val relation = ContactCompanyRelation(
-                id = java.util.UUID.randomUUID().toString(),
-                contactId = existingId,
-                companyId = company.id,
-                position = candidate.jobTitle ?: "",
-                employmentStatus = EmploymentStatus.CURRENT,
-                isPrimary = existingContact.companyRelations.isEmpty()
-            )
-            AppStateStore.updateContact(existingContact.copy(companyRelations = existingContact.companyRelations + relation))
-        }
-    }
+    applyImportedCompany(candidate.companyName, candidate.jobTitle, existingId, context) { ImportResultStats.companiesCreated++ }
     
     // Merge Birthday
     if (!candidate.birthday.isNullOrBlank()) {
@@ -751,13 +1009,14 @@ fun mergeCandidate(candidate: ImportContactCandidate) {
             AppStateStore.addCalendarItem(
                 CalendarItem(
                     id = calId,
-                    title = stringResource(R.string.imp_birthday_of, "${existingContact.firstName} ${existingContact.lastName}"),
+                    title = context.getString(R.string.imp_birthday_of, "${existingContact.firstName} ${existingContact.lastName}"),
                     type = CalendarItemType.BIRTHDAY,
                     status = CalendarItemStatus.ACTIVE,
                     importance = ImportanceLevel.NORMAL,
                     startDate = candidate.birthday,
                     isAllDay = true,
                     recurrenceRule = "FREQ=YEARLY",
+                    recurrenceExplicitlySet = true,
                     reminders = emptyList(),
                     links = listOf(CalendarItemLink(id = java.util.UUID.randomUUID().toString(), calendarItemId = calId, targetType = CalendarTargetType.CONTACT, targetId = existingId)),
                     createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME),
@@ -768,17 +1027,156 @@ fun mergeCandidate(candidate: ImportContactCandidate) {
         }
     }
     
-    if (newPhones.isNotEmpty() || newEmails.isNotEmpty()) {
+    // Заметка/группы телефона — раньше переносились ТОЛЬКО при создании нового
+    // контакта; при слиянии с существующим (этот путь) молча терялись, хотя
+    // ContactImporter их уже распарсил (найдено при разборе жалобы 2026-07-04).
+    // ФИКС (фидбэк владельца 2026-08-11: «чтобы приложение определяло, что и
+    // куда добавить») — та же логика, что и в performImport выше: помеченные
+    // записи раскладываются по структурным полям, а не в одну generic-заметку.
+    // При слиянии НЕ перезаписываем уже заполненные скалярные поля (nextStep
+    // и т.д.) импортированными — только дополняем пустые, тот же принцип,
+    // что уже применён в applyImportedCompany (не затирать данные владельца).
+    val decoded = ContactNoteCodec.decode(candidate.notes)
+
+    decoded.notes.forEach { dn ->
+        val already = existingContact.notes.any { it.type == dn.type && it.text == dn.text }
+        if (!already) {
+            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            AppStateStore.addNote(
+                Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = existingId,
+                    type = dn.type,
+                    text = dn.text,
+                    isImportant = false,
+                    isLocked = dn.isLocked,
+                    createdAt = now, updatedAt = now
+                )
+            )
+        }
+    }
+    decoded.gifts.forEach { dg ->
+        val already = existingContact.gifts.any { it.title == dg.title && it.status == dg.status }
+        if (!already) {
+            AppStateStore.addGift(
+                GiftIdea(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = existingId,
+                    title = dg.title,
+                    note = dg.note,
+                    link = dg.link,
+                    date = dg.date,
+                    status = dg.status
+                )
+            )
+        }
+    }
+    if (!decoded.fallbackText.isNullOrBlank()) {
+        val hasImportedNote = existingContact.notes.any {
+            it.text == context.getString(R.string.imp_note_from_import, decoded.fallbackText)
+        }
+        if (!hasImportedNote) {
+            val now = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            // См. фикс выше (новый контакт) — addNote() вместо updateContact(copy),
+            // иначе заметка невидима во вкладке «Заметки» без перезапуска.
+            AppStateStore.addNote(
+                Note(
+                    id = java.util.UUID.randomUUID().toString(),
+                    contactId = existingId,
+                    type = NoteType.GENERAL,
+                    text = context.getString(R.string.imp_note_from_import, decoded.fallbackText),
+                    isImportant = false,
+                    createdAt = now, updatedAt = now
+                )
+            )
+        }
+    }
+    val newPersonalDetails = decoded.personalDetails.filter { d ->
+        existingContact.personalDetails.none { it.category == d.category && it.value == d.value }
+    }
+    val scalarFieldsChanged = newPersonalDetails.isNotEmpty() ||
+        (existingContact.nextStep.isNullOrBlank() && !decoded.nextStep.isNullOrBlank()) ||
+        (existingContact.talkingPoints.isNullOrBlank() && !decoded.talkingPoints.isNullOrBlank()) ||
+        (existingContact.canHelpWith.isNullOrBlank() && !decoded.canHelpWith.isNullOrBlank()) ||
+        (existingContact.iCanHelpWith.isNullOrBlank() && !decoded.iCanHelpWith.isNullOrBlank()) ||
+        (existingContact.meetContext.isNullOrBlank() && !decoded.meetContext.isNullOrBlank()) ||
+        (!alreadyLinkedToPhone && decoded.tags.any { it !in existingContact.tags })
+    if (scalarFieldsChanged) {
+        // Свежая выборка, а не «existingContact» из начала функции — иначе
+        // перезаписали бы адреса, добавленные чуть выше этим же слиянием
+        // (тот же приём, что и в блоке адресов).
+        val fresh = AppStateStore.contacts.find { it.id == existingId } ?: existingContact
+        AppStateStore.updateContact(
+            fresh, fresh.copy(
+                nextStep = fresh.nextStep ?: decoded.nextStep,
+                talkingPoints = fresh.talkingPoints ?: decoded.talkingPoints,
+                canHelpWith = fresh.canHelpWith ?: decoded.canHelpWith,
+                iCanHelpWith = fresh.iCanHelpWith ?: decoded.iCanHelpWith,
+                meetContext = fresh.meetContext ?: decoded.meetContext,
+                // Уже связанный контакт (resync) — легаси-поле НЕ трогаем вовсе (TAG-1); при первом
+                // связывании (alreadyLinkedToPhone=false) — прежнее поведение, legacy ingress разрешён.
+                tags = if (alreadyLinkedToPhone) fresh.tags else (fresh.tags + decoded.tags).distinct(),
+                personalDetails = fresh.personalDetails + newPersonalDetails.map {
+                    PersonalDetail(
+                        id = java.util.UUID.randomUUID().toString(),
+                        contactId = existingId,
+                        category = it.category,
+                        value = it.value,
+                        note = it.note
+                    )
+                }
+            )
+        )
+    }
+    if (candidate.groupNames.isNotEmpty()) {
+        val groupIds = candidate.groupNames.mapNotNull { AppStateStore.addGroup(it)?.id }.toSet()
+        if (groupIds.isNotEmpty()) {
+            val current = AppStateStore.groupsOfContact(existingId).map { it.id }.toSet()
+            AppStateStore.setContactGroups(existingId, current + groupIds)
+        }
+    }
+
+    val nameFieldsChanged = newMiddleName != existingContact.middleName ||
+        newNamePrefix != existingContact.namePrefix ||
+        newNameSuffix != existingContact.nameSuffix ||
+        newPhoneticFirst != existingContact.phoneticFirstName ||
+        newPhoneticMiddle != existingContact.phoneticMiddleName ||
+        newPhoneticLast != existingContact.phoneticLastName
+    if (newPhones.isNotEmpty() || newEmails.isNotEmpty() || deviceLink != null || nameFieldsChanged) {
         val freshExisting = AppStateStore.contacts.find { it.id == existingId } ?: existingContact
-        AppStateStore.updateContact(freshExisting.copy(
+        AppStateStore.updateContact(freshExisting, freshExisting.copy(
             phones = freshExisting.phones + newPhones,
             emails = freshExisting.emails + newEmails,
+            middleName = newMiddleName,
+            namePrefix = newNamePrefix,
+            nameSuffix = newNameSuffix,
+            phoneticFirstName = newPhoneticFirst,
+            phoneticMiddleName = newPhoneticMiddle,
+            phoneticLastName = newPhoneticLast,
+            // Связь с телефоном проставляем, только если её ещё не было —
+            // не затираем существующую (контакт мог быть связан вручную с
+            // ДРУГОЙ карточкой телефона, это выбор владельца).
+            deviceContactId = freshExisting.deviceContactId ?: deviceLink,
+            // LOOKUP_KEY идёт ТОЛЬКО в паре со своим deviceContactId: новая связь — берём ключ кандидата,
+            // та же связь без ключа (старая) — дополняем ключом, чужая связь остаётся как есть.
+            deviceLookupKey = when {
+                freshExisting.deviceContactId == null -> candidate.deviceLookupKey.takeIf { deviceLink != null }
+                freshExisting.deviceContactId == deviceLink -> freshExisting.deviceLookupKey ?: candidate.deviceLookupKey
+                else -> freshExisting.deviceLookupKey
+            },
             updatedAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         ))
         ImportResultStats.phonesAdded += newPhones.size
         ImportResultStats.emailsAdded += newEmails.size
     }
+    applyImportedRelations(candidate, existingId, context)
     ImportResultStats.duplicatesSkipped++
+    // BATCH 5B (5B-002): влитые теги приводим к управляемой системе, как это
+    // делает performImport. Реконсиляция сама await'ит свой коммит; барьер
+    // ниже нужен на случай, когда тегов не было и она ушла на ранний выход —
+    // тогда без него функция вернулась бы с записями ещё в очереди.
+    AppStateStore.reconcileLegacyTagsIntoManaged()
+    AppStateStore.awaitPendingWrites()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -797,7 +1195,7 @@ fun ImportResultScreen(
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.imp_close))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
         }
     ) { paddingValues ->
@@ -806,10 +1204,10 @@ fun ImportResultScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.imp_success), modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(stringResource(R.string.imp_done), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.imp_success), modifier = Modifier.size(64.dp), tint = AppleTheme.colors.brand)
+            Text(stringResource(R.string.imp_done), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.imp_done)))
             
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppleTheme.colors.card.copy(alpha = 0.3f))) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ResultRow(stringResource(R.string.imp_contacts_imported), ImportResultStats.contactsImported)
                     ResultRow(stringResource(R.string.imp_companies_created), ImportResultStats.companiesCreated)
@@ -819,7 +1217,7 @@ fun ImportResultScreen(
                     ResultRow(stringResource(R.string.imp_events_n), ImportResultStats.birthdaysCreated)
                 }
             }
-            
+
             Spacer(modifier = Modifier.weight(1f))
             
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -840,7 +1238,20 @@ fun ImportResultScreen(
 @Composable
 fun ResultRow(label: String, value: Int) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = AppleTheme.colors.secondaryLabel)
         Text(value.toString(), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
     }
 }
+
+/** PHONE / VCF PACK #4: чтение всей книги без падения. null — нет разрешения (отозвано между проверкой и чтением);
+ *  прочие сбои провайдера — пустой список (экран покажет «контактов не найдено», а не закроется). */
+private suspend fun readDeviceContactsSafely(context: android.content.Context): List<ImportContactCandidate>? =
+    try {
+        withContext(Dispatchers.IO) { ContactImporter.getDeviceContacts(context) }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: SecurityException) {
+        null
+    } catch (e: Exception) {
+        emptyList()
+    }

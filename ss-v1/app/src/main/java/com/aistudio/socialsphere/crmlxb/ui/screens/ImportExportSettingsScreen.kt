@@ -1,11 +1,17 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,15 +23,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.socialsphere.crmlxb.utils.ExportManager
+import com.aistudio.socialsphere.crmlxb.utils.CalendarExporter
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
 import com.aistudio.socialsphere.crmlxb.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportExportSettingsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToImportContacts: () -> Unit
+    onNavigateToImportContacts: () -> Unit,
+    onNavigateToRestorePreview: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope   = rememberCoroutineScope()
@@ -35,8 +47,134 @@ fun ImportExportSettingsScreen(
     var loadingCsv     by remember { mutableStateOf(false) }
     var loadingCompCsv by remember { mutableStateOf(false) }
     var loadingVcf     by remember { mutableStateOf(false) }
+    var loadingToPhone by remember { mutableStateOf(false) }
     var loadingJson    by remember { mutableStateOf(false) }
     var loadingZip     by remember { mutableStateOf(false) }
+    var loadingRestore by remember { mutableStateOf(false) }
+    var loadingSaveJson by remember { mutableStateOf(false) }
+    var loadingCal     by remember { mutableStateOf(false) }
+    var loadingNotesJson    by remember { mutableStateOf(false) }
+    var loadingRestoreNotes by remember { mutableStateOf(false) }
+    var loadingCalJson       by remember { mutableStateOf(false) }
+    var loadingRestoreCal    by remember { mutableStateOf(false) }
+
+    // Восстановление из полного JSON-бэкапа: upsert по id, ничего не удаляет.
+    // Прямое сохранение JSON-бэкапа в файл: открывается выбор папки и имени,
+    // без share-листа.
+    val saveJsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        loadingSaveJson = true
+        scope.launch {
+            try {
+                val json = ExportManager.backupJsonString()
+                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use {
+                        it.write(json.toByteArray())
+                    }
+                }
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_save_done))
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_error, e.localizedMessage ?: ""))
+            } finally {
+                loadingSaveJson = false
+            }
+        }
+    }
+
+    val restoreLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        loadingRestore = true
+        scope.launch {
+            try {
+                val json = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader()?.readText() ?: ""
+                }
+                // RESTORE PREVIEW & SELECTIVE MERGE PACK (2026-09-22, requirement 28 — ключевое изменение
+                // UX): непустая база БОЛЬШЕ НЕ мержится автоматически при выборе файла — сначала READ-ONLY
+                // анализ различий, пользователь явно выбирает, что восстановить, на отдельном экране.
+                // Действительно пустая установка (клин-инсталл, включая tombstones) — короткий путь, как раньше.
+                when (val outcome = ExportManager.analyzeBackupForRestore(json)) {
+                    is ExportManager.RestoreAnalysisOutcome.NotBackup ->
+                        snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_bad_file))
+                    is ExportManager.RestoreAnalysisOutcome.TooNew ->
+                        snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_too_new))
+                    is ExportManager.RestoreAnalysisOutcome.EmptyDatabase -> {
+                        when (val imported = ExportManager.importJsonBackupDetailed(json)) {
+                            is ExportManager.BackupImportOutcome.Restored -> {
+                                val r = imported.result
+                                snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_done, r.contactsInBackup))
+                            }
+                            is ExportManager.BackupImportOutcome.NotBackup ->
+                                snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_bad_file))
+                            is ExportManager.BackupImportOutcome.TooNew ->
+                                snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_too_new))
+                        }
+                    }
+                    is ExportManager.RestoreAnalysisOutcome.Preview -> {
+                        RestorePreviewSession.clear()
+                        RestorePreviewSession.preview = outcome.preview
+                        onNavigateToRestorePreview()
+                    }
+                }
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_error, e.localizedMessage ?: ""))
+            } finally {
+                loadingRestore = false
+            }
+        }
+    }
+
+    // Частичное восстановление (аудит 2026-08-11, жалоба владельца «заметки и
+    // календарь постоянно страдают»): те же кнопки-паттерны, что restoreLauncher
+    // выше, но затрагивают только одну категорию, не всю базу разом.
+    val restoreNotesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        loadingRestoreNotes = true
+        scope.launch {
+            try {
+                val json = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader()?.readText() ?: ""
+                }
+                val n = ExportManager.importNotesJson(json)
+                if (n < 0) snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_bad_file))
+                else snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_notes_done, n))
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_error, e.localizedMessage ?: ""))
+            } finally {
+                loadingRestoreNotes = false
+            }
+        }
+    }
+
+    val restoreCalendarLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        loadingRestoreCal = true
+        scope.launch {
+            try {
+                val json = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader()?.readText() ?: ""
+                }
+                val n = ExportManager.importCalendarJson(json)
+                if (n < 0) snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_bad_file))
+                else snackbarHostState.showSnackbar(context.getString(R.string.ie_restore_calendar_done, n))
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_error, e.localizedMessage ?: ""))
+            } finally {
+                loadingRestoreCal = false
+            }
+        }
+    }
 
     fun runExport(
         setLoading: (Boolean) -> Unit,
@@ -54,19 +192,27 @@ fun ImportExportSettingsScreen(
         }
     }
 
+    // Экспорт событий в системный календарь (после выдачи разрешений)
+    fun doCalendarExport() {
+        runExport({ loadingCal = it }) {
+            val result = withContext(kotlinx.coroutines.Dispatchers.IO) { CalendarExporter.exportAll(context) }
+            if (result.noCalendar)
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_calendar_no_cal))
+            else
+                snackbarHostState.showSnackbar(context.getString(R.string.ie_calendar_done, result.inserted, result.skipped))
+        }
+    }
+
+    val calendarPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        if (perms[Manifest.permission.WRITE_CALENDAR] == true) doCalendarExport()
+        else scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.ie_calendar_no_perm)) }
+    }
+
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.ie_title), fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
+        containerColor = AppleTheme.colors.groupedBackground,
+        topBar = {},
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
@@ -77,6 +223,15 @@ fun ImportExportSettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // ── Шапка Aurelia (круглая кнопка назад + Playfair-заголовок) ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(stringResource(R.string.common_back)) { onNavigateBack() }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.ie_title), fontSize = 28.sp)
+            }
 
             // ── Импорт ────────────────────────────────────────
             ExportSectionCard(stringResource(R.string.ie_import_contacts)) {
@@ -130,8 +285,40 @@ fun ImportExportSettingsScreen(
                     onClick   = {
                         runExport({ loadingVcf = it }) {
                             val file = ExportManager.exportVCard(context)
-                            ExportManager.shareFile(context, file, "text/vcard")
+                            ExportManager.shareFile(context, file, "text/x-vcard")
                         }
+                    }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                // Прямой импорт всех контактов в системные «Контакты» телефона
+                ExportRow(
+                    icon      = Icons.Default.ContactPhone,
+                    text      = stringResource(R.string.ie_to_phone_contacts),
+                    subtitle  = stringResource(R.string.ie_to_phone_sub),
+                    loading   = loadingToPhone,
+                    onClick   = {
+                        runExport({ loadingToPhone = it }) {
+                            val file = ExportManager.exportVCard(context)
+                            val ok = ExportManager.openVcfInContacts(context, file)
+                            if (!ok) ExportManager.shareFile(context, file, "text/x-vcard")
+                        }
+                    }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                // Экспорт событий (ДР/звонки/встречи) в системный календарь
+                ExportRow(
+                    icon      = Icons.Default.EventAvailable,
+                    text      = stringResource(R.string.ie_to_calendar),
+                    subtitle  = stringResource(R.string.ie_to_calendar_sub),
+                    loading   = loadingCal,
+                    onClick   = {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context, Manifest.permission.WRITE_CALENDAR
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) doCalendarExport()
+                        else calendarPermLauncher.launch(
+                            arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+                        )
                     }
                 )
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
@@ -147,6 +334,21 @@ fun ImportExportSettingsScreen(
                         }
                     }
                 )
+                ExportRow(
+                    icon      = Icons.Default.SaveAlt,
+                    text      = stringResource(R.string.ie_save_json),
+                    subtitle  = stringResource(R.string.ie_save_sub),
+                    loading   = loadingSaveJson,
+                    onClick   = { saveJsonLauncher.launch("socialsphere_backup.json") }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                ExportRow(
+                    icon      = Icons.Default.Restore,
+                    text      = stringResource(R.string.ie_restore_json),
+                    subtitle  = stringResource(R.string.ie_restore_sub),
+                    loading   = loadingRestore,
+                    onClick   = { restoreLauncher.launch("*/*") }
+                )
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 ExportRow(
                     icon      = Icons.Default.FolderOpen,
@@ -159,6 +361,51 @@ fun ImportExportSettingsScreen(
                             ExportManager.shareFile(context, file, "application/zip")
                         }
                     }
+                )
+            }
+
+            // ── Частичный бэкап (только заметки / только календарь) ──
+            ExportSectionCard(stringResource(R.string.ie_partial_backup)) {
+                ExportRow(
+                    icon      = Icons.Default.StickyNote2,
+                    text      = stringResource(R.string.ie_notes_json),
+                    subtitle  = stringResource(R.string.ie_notes_json_sub),
+                    loading   = loadingNotesJson,
+                    onClick   = {
+                        runExport({ loadingNotesJson = it }) {
+                            val file = ExportManager.exportNotesJson(context)
+                            ExportManager.shareFile(context, file, "application/json")
+                        }
+                    }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                ExportRow(
+                    icon      = Icons.Default.Restore,
+                    text      = stringResource(R.string.ie_restore_notes),
+                    subtitle  = stringResource(R.string.ie_restore_notes_sub),
+                    loading   = loadingRestoreNotes,
+                    onClick   = { restoreNotesLauncher.launch("*/*") }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                ExportRow(
+                    icon      = Icons.Default.CalendarMonth,
+                    text      = stringResource(R.string.ie_calendar_json),
+                    subtitle  = stringResource(R.string.ie_calendar_json_sub),
+                    loading   = loadingCalJson,
+                    onClick   = {
+                        runExport({ loadingCalJson = it }) {
+                            val file = ExportManager.exportCalendarJson(context)
+                            ExportManager.shareFile(context, file, "application/json")
+                        }
+                    }
+                )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                ExportRow(
+                    icon      = Icons.Default.Restore,
+                    text      = stringResource(R.string.ie_restore_calendar),
+                    subtitle  = stringResource(R.string.ie_restore_calendar_sub),
+                    loading   = loadingRestoreCal,
+                    onClick   = { restoreCalendarLauncher.launch("*/*") }
                 )
             }
 
@@ -180,7 +427,7 @@ fun ImportExportSettingsScreen(
                         Arrangement.SpaceBetween
                     ) {
                         Text(label, style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.secondary)
+                            color = AppleTheme.colors.secondaryLabel)
                         Text(count.toString(), style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold)
                     }
@@ -197,15 +444,15 @@ private fun ExportSectionCard(title: String, content: @Composable ColumnScope.()
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors   = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface),
+            containerColor = AppleTheme.colors.card),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary)
+                color = AppleTheme.colors.brand)
             Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+            HorizontalDivider(color = AppleTheme.colors.separator, thickness = 0.5.dp)
             Spacer(Modifier.height(8.dp))
             content()
         }
@@ -227,19 +474,19 @@ private fun ExportRow(
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+        Icon(icon, null, tint = AppleTheme.colors.brand)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(text, style = MaterialTheme.typography.bodyLarge)
             if (subtitle.isNotEmpty())
                 Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary)
+                    color = AppleTheme.colors.secondaryLabel)
         }
         if (loading) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         } else {
             Icon(Icons.Default.ChevronRight, null,
-                tint = MaterialTheme.colorScheme.secondary)
+                tint = AppleTheme.colors.secondaryLabel)
         }
     }
 }
@@ -260,19 +507,19 @@ fun ActionRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, null,
-            tint = if (enabled) MaterialTheme.colorScheme.primary
-                   else MaterialTheme.colorScheme.outlineVariant)
+            tint = if (enabled) AppleTheme.colors.brand
+                   else AppleTheme.colors.separator)
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(text,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface
-                        else MaterialTheme.colorScheme.outlineVariant)
+                color = if (enabled) AppleTheme.colors.label
+                        else AppleTheme.colors.separator)
             if (subtitle.isNotEmpty())
                 Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary)
+                    color = AppleTheme.colors.secondaryLabel)
         }
         Icon(Icons.Default.ChevronRight, null,
-            tint = MaterialTheme.colorScheme.secondary)
+            tint = AppleTheme.colors.secondaryLabel)
     }
 }

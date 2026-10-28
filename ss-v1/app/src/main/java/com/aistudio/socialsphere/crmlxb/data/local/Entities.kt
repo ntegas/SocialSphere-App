@@ -2,28 +2,45 @@ package com.aistudio.socialsphere.crmlxb.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 
 @Entity(tableName = "contacts")
 data class ContactEntity(
     @PrimaryKey val id: String,
     val firstName: String,
     val lastName: String,
+    val middleName: String? = null,
     val nickname: String? = null,
+    val namePrefix: String? = null,
+    val nameSuffix: String? = null,
+    val phoneticFirstName: String? = null,
+    val phoneticMiddleName: String? = null,
+    val phoneticLastName: String? = null,
     val photoUri: String?,
     val relationshipType: String,
+    val customRelationshipType: String? = null,
+    // v17: второстепенные типы отношений, comma-joined — тот же паттерн, что tags.
+    @ColumnInfo(defaultValue = "") val secondaryRelationshipTypes: String = "",
     val connectionLevel: String,
     val importanceLevel: String,
     val socialRole: String,
     val communicationRhythm: String,
-    val contactStatus: String = "ACTIVE",
+    // v17: «раз в N дней» для communicationRhythm == CUSTOM.
+    val customRhythmDays: Int? = null,
+    @ColumnInfo(defaultValue = "ACTIVE") val contactStatus: String = "ACTIVE",
     val lastContactDate: String? = null,
     val nextStep: String? = null,
-    val tags: String? = null,          // JSON array stored as string
+    val familyNote: String? = null,
+    val profession: String? = null,
+    val tags: String? = null,          // delimiter-joined string (TAG_DELIMITER в Mappers.kt), не JSON
     val canHelpWith: String? = null,
     val iCanHelpWith: String? = null,
     val talkingPoints: String? = null,
     val meetContext: String? = null,
     val meetDate: String? = null,
+    val deviceContactId: String? = null,
+    // v21 (Phone Pack #4): ContactsContract.LOOKUP_KEY — устойчивая связь с контактом телефонной книги.
+    val deviceLookupKey: String? = null,
     val createdAt: String,
     val updatedAt: String
 )
@@ -102,7 +119,9 @@ data class AddressEntity(
     val country: String,
     val comment: String?,
     val latitude: Double?,
-    val longitude: Double?
+    val longitude: Double?,
+    val postalCode: String?,
+    val district: String? = null
 )
 
 @Entity(tableName = "calendar_items")
@@ -120,6 +139,14 @@ data class CalendarItemEntity(
     val importance: String,
     val colorKey: String?,
     val recurrenceRule: String?,
+    // v19: schema-foundation для recurring-completion/explicit-NONE (см. Models.kt
+    // CalendarItem — тот же смысл полей, здесь только storage-зеркало).
+    val lastCompletedOccurrenceDate: String?,
+    @ColumnInfo(defaultValue = "0") val recurrenceExplicitlySet: Boolean = false,
+    // v20: persistence-foundation для postpone одного occurrence — тот же смысл
+    // полей, что в Models.kt CalendarItem, здесь только storage-зеркало.
+    val postponedFromOccurrenceDate: String? = null,
+    val postponedToDate: String? = null,
     val createdAt: String,
     val updatedAt: String
 )
@@ -153,6 +180,11 @@ data class NoteEntity(
     val text: String,
     val date: String?,
     val isImportant: Boolean,
+    // v14: приватность — отдельно от isImportant (важность = попадает в Обзор/
+    // Шпаргалку и красная рамка; isLocked = скрывается блюром под «Защитой
+    // записей»). Раньше это было одно и то же поле — заметка "не секретная,
+    // но важная" пряталась, а реально приватная без галочки важности видна.
+    @ColumnInfo(defaultValue = "0") val isLocked: Boolean = false,
     val createdAt: String,
     val updatedAt: String
 )
@@ -196,4 +228,49 @@ data class ContactRelationEntity(
      val firstRole: String,
      val secondRole: String,
      val note: String?
+)
+
+@Entity(tableName = "contact_groups")
+data class ContactGroupEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val createdAt: String,
+    val updatedAt: String
+)
+
+@Entity(tableName = "contact_group_members")
+data class ContactGroupMemberEntity(
+    @PrimaryKey val id: String,
+    val groupId: String,
+    val contactId: String
+)
+
+@Entity(tableName = "tags")
+data class TagEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val category: String?,
+    val createdAt: String,
+    val updatedAt: String
+)
+
+@Entity(tableName = "contact_tag_members")
+data class ContactTagMemberEntity(
+    @PrimaryKey val id: String,
+    val tagId: String,
+    val contactId: String
+)
+
+/**
+ * EXPLICIT RECOVERY PACK (v22): история намеренных удалений. PRIMARY KEY — сама пара (entityType, entityId),
+ * не суррогатный id: ровно одна запись на «эта сущность этого типа была удалена», второе удаление того же id
+ * (не должно происходить — id одноразовые в этой схеме, но на всякий случай) идемпотентно REPLACE, не дублирует.
+ * deletedAt — только диагностика/сортировка списка восстановления, НЕ метаданные победителя (см. RestoreMerge.kt:
+ * у Room в этом проекте нет надёжных часов между устройствами — deletedAt не участвует ни в каком сравнении «кто новее»).
+ */
+@Entity(tableName = "tombstones", primaryKeys = ["entityType", "entityId"])
+data class TombstoneEntity(
+    val entityType: String,
+    val entityId: String,
+    val deletedAt: String,
 )

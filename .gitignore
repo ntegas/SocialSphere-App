@@ -1,0 +1,27 @@
+
+# Release signing (никогда не коммитим)
+keystore.properties
+*.jks
+*.keystore
+!debug.keystore
+
+# Handoff-архивы. ss-v1.zip в корне содержал release-upload.jks,
+# keystore.properties и local.properties — такой архив не должен иметь
+# ни единого шанса попасть в индекс через `git add .`
+*.zip
+
+# Языковые данные Tesseract — крупные бинарники, докачиваются задачей
+# downloadTessData при сборке (см. app/build.gradle.kts)
+ss-v1/app/src/main/assets/tessdata/*.traineddata
+
+# Не часть приложения: локальные инструменты, резервные копии, сборки для магазина, внутренние заметки
+.idea/
+.claude/
+.codex/
+_releases/
+_backup/
+playstore_*
+SOCIALSPHERE_KNOWLEDGE.md
+*_PROMPT.md
+REDESIGN_V2_PLAN.md
+VOICE_PHASE1_MANUAL_TEST.md

@@ -3,15 +3,17 @@
 package com.aistudio.socialsphere.crmlxb.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -34,6 +36,7 @@ import com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape
 import com.aistudio.socialsphere.crmlxb.utils.*
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -56,7 +59,6 @@ fun CompaniesScreen(
     var cityFilter        by remember { mutableStateOf("") }
     var showFilterSheet   by remember { mutableStateOf(false) }
     var sortOrder         by remember { mutableStateOf(CompanySortOrder.NAME_AZ) }
-    var showSortSheet     by remember { mutableStateOf(false) }
 
     val hasActiveFilters = filterIndustries.isNotEmpty() || cityFilter.isNotBlank()
 
@@ -72,39 +74,15 @@ fun CompaniesScreen(
         }
     }
 
-    // ── Sort sheet ────────────────────────────────────────────
-    if (showSortSheet) {
-        ModalBottomSheet(onDismissRequest = { showSortSheet = false }, shape = SocialShape.Sheet) {
-            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.contacts_sort_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                CompanySortOrder.values().forEach { order ->
-                    val label = when (order) {
-                        CompanySortOrder.NAME_AZ        -> stringResource(R.string.comp_sort_name_az)
-                        CompanySortOrder.NAME_ZA        -> stringResource(R.string.comp_sort_name_za)
-                        CompanySortOrder.MOST_CONTACTS  -> stringResource(R.string.comp_sort_most)
-                        CompanySortOrder.RECENTLY_ADDED -> stringResource(R.string.home_recently_added)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { sortOrder = order; showSortSheet = false }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
-                        if (sortOrder == order) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
-                    }
-                    if (order != CompanySortOrder.values().last()) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                }
-                Spacer(Modifier.height(32.dp))
-            }
-        }
-    }
-
     // ── Filter sheet ──────────────────────────────────────────
     if (showFilterSheet) {
         ModalBottomSheet(onDismissRequest = { showFilterSheet = false }, shape = SocialShape.Sheet) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+                modifier = Modifier.fillMaxWidth()
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState())
+                    .imePadding()
+                    .padding(horizontal = 24.dp).padding(bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
@@ -112,9 +90,23 @@ fun CompaniesScreen(
                     TextButton(onClick = { filterIndustries = emptySet(); cityFilter = "" }) { Text(stringResource(R.string.contacts_reset_all)) }
                 }
 
+                // Сортировка (была отдельным рядом чипов над списком — перенесена
+                // сюда, в один узел контролов вместе с фильтрами, по макету Contacts)
+                FilterSection(stringResource(R.string.contacts_sort_title)) {
+                    CompanySortOrder.values().forEach { order ->
+                        val label = when (order) {
+                            CompanySortOrder.NAME_AZ        -> stringResource(R.string.comp_sort_name_az)
+                            CompanySortOrder.NAME_ZA        -> stringResource(R.string.comp_sort_name_za)
+                            CompanySortOrder.MOST_CONTACTS  -> stringResource(R.string.comp_sort_most)
+                            CompanySortOrder.RECENTLY_ADDED -> stringResource(R.string.home_recently_added)
+                        }
+                        MultiSelectChip(label, sortOrder == order) { sortOrder = order }
+                    }
+                }
+
                 // Industry multi-select
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.comp_industry), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.comp_industry), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Industry.values().forEach { ind ->
                             FilterChip(
@@ -129,7 +121,7 @@ fun CompaniesScreen(
 
                 // City
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.filter_city), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.filter_city), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.brand)
                     OutlinedTextField(
                         value = cityFilter, onValueChange = { cityFilter = it },
                         modifier = Modifier.fillMaxWidth(),
@@ -149,11 +141,13 @@ fun CompaniesScreen(
 
     Scaffold(
         modifier = modifier,
+        containerColor = AppleTheme.colors.groupedBackground,
         topBar = {
+          if (searchActive) {
             TopAppBar(
                 title = {
                     if (!searchActive) {
-                        Text(stringResource(R.string.comp_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.comp_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, fontFamily = com.aistudio.socialsphere.crmlxb.ui.theme.aureliaSerifFor(stringResource(R.string.comp_title)))
                     } else {
                         TextField(
                             value = searchQuery,
@@ -186,23 +180,38 @@ fun CompaniesScreen(
                     }
                     IconButton(onClick = { showFilterSheet = true }) {
                         BadgedBox(badge = {
-                            if (hasActiveFilters) Badge(containerColor = MaterialTheme.colorScheme.error) {}
+                            if (hasActiveFilters) Badge(containerColor = AppleTheme.colors.red) {}
                         }) { Icon(Icons.Default.FilterList, stringResource(R.string.contacts_filters)) }
                     }
-                    IconButton(onClick = { showSortSheet = true }) {
-                        Icon(Icons.Default.Sort, stringResource(R.string.contacts_sort_title))
-                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppleTheme.colors.groupedBackground)
             )
+          }
         },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onNavigateToCreateCompany, containerColor = MaterialTheme.colorScheme.primary) {
-                Icon(Icons.Default.Add, stringResource(R.string.comp_add))
-            }
-        }
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+
+            // Header + капсула поиска показываются только когда поиск НЕ активен —
+            // в активном режиме поле ввода живёт в TopAppBar, иначе было два поля.
+            if (!searchActive) {
+                // Header по макету: заголовок + круглая «+»
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
+                ) {
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(stringResource(R.string.comp_title))
+                    com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleButton(
+                        Icons.Default.Add, stringResource(R.string.comp_add),
+                        style = com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCircleStyle.Filled
+                    ) { onNavigateToCreateCompany() }
+                }
+                Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
+                    Row(Modifier.fillMaxWidth().height(40.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R13).background(AppleTheme.colors.neutralFill).clickable { searchActive = true }.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Search, null, tint = AppleTheme.colors.tertiaryLabel, modifier = Modifier.size(17.dp))
+                        Text(stringResource(R.string.comp_search_hint), fontSize = 16.sp, color = AppleTheme.colors.tertiaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
 
             // ── Active filter chips ───────────────────────────
             val chips = buildList {
@@ -214,7 +223,7 @@ fun CompaniesScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(chips.size) { idx ->
+                    items(chips.size, key = { chips[it].first }) { idx ->
                         val (label, remove) = chips[idx]
                         InputChip(
                             selected = true, onClick = remove,
@@ -226,27 +235,23 @@ fun CompaniesScreen(
                 }
             }
 
-            // ── Count row ─────────────────────────────────────
+            // Сегментные чипы по отраслям (по макету) + один круглый значок фильтра
+            // справа (в нём же теперь живёт сортировка — как в ContactsScreen.kt)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    if (searchQuery.isBlank() && !hasActiveFilters) stringResource(R.string.comp_count, AppStateStore.companies.size)
-                    else stringResource(R.string.contacts_count_of, filteredCompanies.size, AppStateStore.companies.size),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                val sortLabel = when (sortOrder) {
-                    CompanySortOrder.NAME_AZ        -> stringResource(R.string.contacts_sort_chip_az)
-                    CompanySortOrder.NAME_ZA        -> stringResource(R.string.contacts_sort_chip_za)
-                    CompanySortOrder.MOST_CONTACTS  -> stringResource(R.string.comp_sort_chip_most)
-                    CompanySortOrder.RECENTLY_ADDED -> stringResource(R.string.contacts_sort_chip_new)
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CompaniesSegChip(stringResource(R.string.contacts_seg_all) + " · " + AppStateStore.companies.size, filterIndustries.isEmpty()) { filterIndustries = emptySet() }
+                    AppStateStore.companies.map { it.industry }.distinct().forEach { ind ->
+                        CompaniesSegChip(ind.label(ctxLabel), filterIndustries.contains(ind)) {
+                            filterIndustries = if (filterIndustries.contains(ind)) emptySet() else setOf(ind)
+                        }
+                    }
                 }
-                TextButton(onClick = { showSortSheet = true }, contentPadding = PaddingValues(horizontal = 4.dp)) {
-                    Text(sortLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    Icon(Icons.Default.UnfoldMore, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                Box(Modifier.size(34.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.neutralFill).clickable { showFilterSheet = true }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Tune, null, Modifier.size(18.dp), tint = AppleTheme.colors.brand)
+                    if (hasActiveFilters) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AppleTheme.colors.red))
                 }
             }
 
@@ -254,23 +259,48 @@ fun CompaniesScreen(
             if (filteredCompanies.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outlineVariant)
+                        Icon(Icons.Outlined.SearchOff, null, Modifier.size(56.dp), tint = AppleTheme.colors.separator)
                         Text(
                             if (searchQuery.isNotBlank()) stringResource(R.string.home_nothing_found, searchQuery)
                             else stringResource(R.string.comp_no_filtered),
-                            color = MaterialTheme.colorScheme.secondary
+                            color = AppleTheme.colors.secondaryLabel
                         )
                         if (hasActiveFilters) TextButton(onClick = { filterIndustries = emptySet(); cityFilter = "" }) { Text(stringResource(R.string.contacts_reset_filters)) }
                     }
                 }
             } else {
+                // Счётчик «N компаний» над списком (прототип: 13px 700 tx2)
+                Text(
+                    stringResource(R.string.comp_count, filteredCompanies.size),
+                    fontSize = 13.sp, fontWeight = FontWeight.W700,
+                    color = AppleTheme.colors.secondaryLabel,
+                    modifier = Modifier.padding(start = 24.dp, bottom = 7.dp)
+                )
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    modifier            = Modifier.fillMaxSize()
+                    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 0.dp, bottom = 24.dp),
+                    modifier       = Modifier.fillMaxSize()
                 ) {
-                    items(filteredCompanies, key = { it.id }) { company ->
-                        CompanyCardItem(company = company, onClick = { onNavigateToCompany(company.id) })
+                    // Сгруппированная inset-карточка со строками компаний (по макету Aurelia):
+                    // лого + имя + «отрасль · город» + пилюля «N чел.», строки с разделителем.
+                    item {
+                        Card(
+                            modifier  = Modifier.fillMaxWidth(),
+                            shape     = com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R22,
+                            colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+                            elevation = CardDefaults.cardElevation(1.dp)
+                        ) {
+                            Column {
+                                filteredCompanies.forEachIndexed { idx, company ->
+                                    CompanyRow(company = company, onClick = { onNavigateToCompany(company.id) })
+                                    if (idx < filteredCompanies.lastIndex)
+                                        HorizontalDivider(
+                                            modifier  = Modifier.padding(start = 74.dp),
+                                            color     = AppleTheme.colors.separator,
+                                            thickness = 0.5.dp
+                                        )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -278,122 +308,72 @@ fun CompaniesScreen(
     }
 }
 
-// ─── Company card (moved here from CompaniesScreen old) ──────
+// ─── Строка компании в сгруппированной карточке (по макету Aurelia) ──────
+// Простая строка: лого-квадрат + имя + «отрасль · город» + пилюля «N чел.».
+// Заменила тяжёлую карточку с 3 стат-боксами (контакты/ключевые/важные) и
+// шевроном — макет таких блоков не содержит (детали — в карточке компании).
 @Composable
-fun CompanyCardItem(company: Company, onClick: () -> Unit) {
-    val ctx = LocalContext.current
-    // Пересчёт только при смене данных, а не на каждой рекомпозиции при скролле
+fun CompanyRow(company: Company, onClick: () -> Unit) {
+    val ctxLabel = LocalContext.current
     val addresses by remember(company.id) {
         derivedStateOf {
             AppStateStore.addresses.filter { it.ownerId == company.id && it.ownerType == AddressOwnerType.COMPANY }
         }
     }
-    val relations by remember(company.id) {
-        derivedStateOf {
-            AppStateStore.companyRelations.filter { it.companyId == company.id }
-        }
+    val peopleCount by remember(company.id) {
+        derivedStateOf { AppStateStore.companyRelations.count { it.companyId == company.id } }
     }
     val mainCity = addresses.firstOrNull { it.addressType == AddressType.OFFICE || it.addressType == AddressType.LEGAL }?.city
         ?: addresses.firstOrNull()?.city ?: ""
-    val peopleCount = relations.size
-    val peopleSample = relations.take(2).mapNotNull {
-        AppStateStore.getContact(it.contactId)?.let { c -> "${c.firstName} ${c.lastName}" }
-    }.joinToString(", ")
-
-    Card(
-        onClick   = onClick,
-        modifier  = Modifier.fillMaxWidth(),
-        shape     = SocialShape.Card,
-        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 15.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Icon / logo
-                Box(
-                    modifier = Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        company.name.take(2).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(company.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(company.industry.label(ctxLabel), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
-                        if (mainCity.isNotEmpty()) {
-                            Text("·", color = MaterialTheme.colorScheme.outlineVariant)
-                            Text(mainCity, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                        }
-                    }
-                }
-
-                // People count badge
-                if (peopleCount > 0) {
-                    Box(
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)).padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Default.People, null, Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
-                            Text("$peopleCount", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                        }
-                    }
-                }
-            }
-
-            // People sample
-            if (peopleSample.isNotEmpty()) {
+        // Лого 46/r14 — общая палитра компаний (AureliaAvatars.companyBrushFor)
+        Box(
+            modifier = Modifier.size(46.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R14)
+                .background(com.aistudio.socialsphere.crmlxb.ui.theme.AureliaAvatars.companyBrushFor(company.id)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(company.name.take(1).uppercase(), fontWeight = FontWeight.W700, fontSize = 17.sp, color = Color.White)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(company.name, fontSize = 16.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val sub = listOf(company.industry.label(ctxLabel), mainCity).filter { it.isNotEmpty() }.joinToString(" · ")
+            if (sub.isNotEmpty())
+                Text(sub, fontSize = 13.sp, color = AppleTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+        }
+        if (peopleCount > 0) {
+            Box(
+                Modifier.clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.R11)
+                    .background(AppleTheme.colors.brand.copy(alpha = 0.10f))
+                    .padding(horizontal = 9.dp, vertical = 4.dp)
+            ) {
                 Text(
-                    peopleSample + if (peopleCount > 2) " " + stringResource(R.string.comp_and_more, peopleCount - 2) else "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                    stringResource(R.string.comp_people_n, peopleCount),
+                    fontSize = 12.sp, fontWeight = FontWeight.W700, color = AppleTheme.colors.brand
                 )
             }
-
-            // Description snippet
-            if (!company.description.isNullOrBlank()) {
-                Text(company.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-
-            // Action row
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!company.website.isNullOrBlank()) {
-                    OutlinedButton(
-                        onClick = { ExternalActionHandler.openWebsite(ctx, company.website) },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(30.dp),
-                        shape = SocialShape.Full
-                    ) {
-                        Icon(Icons.Default.Language, null, Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.comp_website), fontSize = 11.sp)
-                    }
-                }
-                if (addresses.isNotEmpty()) {
-                    OutlinedButton(
-                        onClick = {
-                            val a = addresses.firstOrNull()
-                            if (a != null) {
-                                if (a.latitude != null && a.longitude != null) ExternalActionHandler.openRouteByCoordinates(ctx, a.latitude, a.longitude)
-                                else ExternalActionHandler.openRoute(ctx, "${a.addressLine}, ${a.city}, ${a.country}")
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(30.dp),
-                        shape = SocialShape.Full
-                    ) {
-                        Icon(Icons.Default.Directions, null, Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.map_route), fontSize = 11.sp)
-                    }
-                }
-            }
         }
+    }
+}
+
+// Сегмент-чип (прототип: неактивный — card + inset-кольцо rgba(line,.06))
+@Composable
+private fun CompaniesSegChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.height(32.dp).clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
+            .background(if (active) AppleTheme.colors.brand else AppleTheme.colors.card)
+            .then(
+                if (!active) Modifier.border(1.dp, AppleTheme.colors.separator,
+                    com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Large)
+                else Modifier
+            )
+            .clickable { onClick() }.padding(horizontal = 15.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 14.sp, fontWeight = if (active) FontWeight.W700 else FontWeight.SemiBold,
+            color = if (active) Color.White else AppleTheme.colors.label)
     }
 }

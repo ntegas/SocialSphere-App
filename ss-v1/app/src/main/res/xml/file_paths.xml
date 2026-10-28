@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Аудит 2026-07-02: FileProvider отдаёт ТОЛЬКО подпапку экспортов, а не весь
+     cache (раньше path="." + неиспользуемый external-cache-path). -->
 <paths>
-    <cache-path name="cache" path="." />
-    <external-cache-path name="external_cache" path="." />
+    <cache-path name="exports" path="exports/" />
 </paths>

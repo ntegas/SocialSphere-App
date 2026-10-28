@@ -2,26 +2,51 @@ package com.aistudio.socialsphere.crmlxb.data.local
 
 import com.aistudio.socialsphere.crmlxb.model.*
 
+// Безопасный разбор enum из строки БД. Если значение отсутствует в enum
+// (переименование, кривой импорт CSV/vCard, ручная правка БД) — возвращаем
+// дефолт вместо IllegalArgumentException, который ронял весь reloadFromDb().
+inline fun <reified T : Enum<T>> safeEnum(value: String?, default: T): T =
+    value?.let { runCatching { enumValueOf<T>(it) }.getOrNull() } ?: default
+
+// ФИКС (аудит 2026-08-18): Contact.tags раньше join/split-ился по "," — обычная
+// запятая печатается с клавиатуры, так что тег "Boston, MA" молча превращался
+// в два тега при следующей загрузке из БД. "###" — маловероятная в обычном
+// теге, но безопасная по кодировке (обычный ASCII, не control-символ) замена.
+private const val TAG_DELIMITER = "###"
+
 fun Contact.toEntity(): ContactEntity = ContactEntity(
     id                = id,
     firstName         = firstName,
     lastName          = lastName,
+    middleName        = middleName,
     nickname          = nickname,
+    namePrefix        = namePrefix,
+    nameSuffix        = nameSuffix,
+    phoneticFirstName = phoneticFirstName,
+    phoneticMiddleName = phoneticMiddleName,
+    phoneticLastName  = phoneticLastName,
     photoUri          = photoUri,
     relationshipType  = relationshipType.name,
+    customRelationshipType = customRelationshipType,
+    secondaryRelationshipTypes = if (secondaryRelationshipTypes.isEmpty()) "" else secondaryRelationshipTypes.joinToString(",") { it.name },
     connectionLevel   = connectionLevel.name,
     importanceLevel   = importanceLevel.name,
     socialRole        = socialRole.name,
     communicationRhythm = communicationRhythm.name,
+    customRhythmDays  = customRhythmDays,
     contactStatus     = contactStatus.name,
     lastContactDate   = lastContactDate,
     nextStep          = nextStep,
-    tags              = if (tags.isEmpty()) null else tags.joinToString(","),
+    familyNote        = familyNote,
+    profession        = profession,
+    tags              = if (tags.isEmpty()) null else tags.joinToString(TAG_DELIMITER),
     canHelpWith       = canHelpWith,
     iCanHelpWith      = iCanHelpWith,
     talkingPoints     = talkingPoints,
     meetContext       = meetContext,
     meetDate          = meetDate,
+    deviceContactId   = deviceContactId,
+    deviceLookupKey   = deviceLookupKey,
     createdAt         = createdAt,
     updatedAt         = updatedAt
 )
@@ -114,6 +139,22 @@ fun ContactRelation.toEntity(): ContactRelationEntity = ContactRelationEntity(
     note = note
 )
 
+fun ContactGroup.toEntity(): ContactGroupEntity = ContactGroupEntity(
+    id = id, name = name, createdAt = createdAt, updatedAt = updatedAt
+)
+
+fun ContactGroupMember.toEntity(): ContactGroupMemberEntity = ContactGroupMemberEntity(
+    id = id, groupId = groupId, contactId = contactId
+)
+
+fun Tag.toEntity(): TagEntity = TagEntity(
+    id = id, name = name, category = category, createdAt = createdAt, updatedAt = updatedAt
+)
+
+fun ContactTagMember.toEntity(): ContactTagMemberEntity = ContactTagMemberEntity(
+    id = id, tagId = tagId, contactId = contactId
+)
+
 fun Address.toEntity(): AddressEntity = AddressEntity(
     id = id,
     ownerType = ownerType.name,
@@ -124,7 +165,9 @@ fun Address.toEntity(): AddressEntity = AddressEntity(
     country = country,
     comment = comment,
     latitude = latitude,
-    longitude = longitude
+    longitude = longitude,
+    postalCode = postalCode,
+    district = district
 )
 
 fun CalendarItem.toEntity(): CalendarItemEntity = CalendarItemEntity(
@@ -141,6 +184,10 @@ fun CalendarItem.toEntity(): CalendarItemEntity = CalendarItemEntity(
     importance = importance.name,
     colorKey = colorKey,
     recurrenceRule = recurrenceRule,
+    lastCompletedOccurrenceDate = lastCompletedOccurrenceDate,
+    recurrenceExplicitlySet = recurrenceExplicitlySet,
+    postponedFromOccurrenceDate = postponedFromOccurrenceDate,
+    postponedToDate = postponedToDate,
     createdAt = createdAt,
     updatedAt = updatedAt
 )
@@ -171,6 +218,7 @@ fun Note.toEntity(): NoteEntity = NoteEntity(
     text = text,
     date = date,
     isImportant = isImportant,
+    isLocked = isLocked,
     createdAt = createdAt,
     updatedAt = updatedAt
 )
@@ -182,7 +230,13 @@ fun GiftIdea.toEntity(): GiftIdeaEntity = GiftIdeaEntity(
     note = note,
     link = link,
     date = date,
-    reminderId = reminderId,
+    // ФИКС (2026-08-17, задача #113 — мёртвое поле): reminderId никогда не
+    // заполнялся ни одним UI (не было экрана, который создавал бы напоминание
+    // для подарка и записывал его id сюда) и нигде не читался для отмены
+    // будильника при удалении. Убрано из домена GiftIdea целиком — колонка в
+    // Entity/БД оставлена как есть (не трогаем схему/миграции ради мёртвого
+    // поля, которое и так всегда было null), просто больше не заполняется.
+    reminderId = null,
     status = status.name
 )
 
@@ -207,22 +261,46 @@ fun ContactEntity.toDomain(): Contact = Contact(
     id                  = id,
     firstName           = firstName,
     lastName            = lastName,
+    middleName          = middleName,
     nickname            = nickname,
+    namePrefix          = namePrefix,
+    nameSuffix          = nameSuffix,
+    phoneticFirstName   = phoneticFirstName,
+    phoneticMiddleName  = phoneticMiddleName,
+    phoneticLastName    = phoneticLastName,
     photoUri            = photoUri,
-    relationshipType    = RelationshipType.valueOf(relationshipType),
-    connectionLevel     = ConnectionLevel.valueOf(connectionLevel),
-    importanceLevel     = ImportanceLevel.valueOf(importanceLevel),
-    socialRole          = SocialRole.valueOf(socialRole),
-    communicationRhythm = CommunicationRhythm.valueOf(communicationRhythm),
-    contactStatus       = try { ContactStatus.valueOf(contactStatus) } catch (e: Exception) { ContactStatus.ACTIVE },
+    relationshipType    = safeEnum(relationshipType, RelationshipType.OTHER),
+    customRelationshipType = customRelationshipType,
+    secondaryRelationshipTypes = secondaryRelationshipTypes
+        ?.split(",")
+        ?.filter { it.isNotBlank() }
+        ?.map { safeEnum(it, RelationshipType.OTHER) }
+        ?: emptyList(),
+    connectionLevel     = safeEnum(connectionLevel, ConnectionLevel.NORMAL),
+    importanceLevel     = safeEnum(importanceLevel, ImportanceLevel.NORMAL),
+    socialRole          = safeEnum(socialRole, SocialRole.REGULAR),
+    communicationRhythm = safeEnum(communicationRhythm, CommunicationRhythm.NOT_TRACKED),
+    customRhythmDays    = customRhythmDays,
+    contactStatus       = safeEnum(contactStatus, ContactStatus.ACTIVE),
     lastContactDate     = lastContactDate,
     nextStep            = nextStep,
-    tags                = tags?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+    familyNote          = familyNote,
+    profession          = profession,
+    // Обратная совместимость: старые записи (до фикса TAG_DELIMITER) сохранены
+    // через запятую — если нового разделителя в строке нет, парсим как раньше,
+    // иначе существующие контакты с 2+ тегами схлопнулись бы в один тег.
+    tags                = when {
+        tags.isNullOrBlank() -> emptyList()
+        tags.contains(TAG_DELIMITER) -> tags.split(TAG_DELIMITER).filter { it.isNotBlank() }
+        else -> tags.split(",").filter { it.isNotBlank() }
+    },
     canHelpWith         = canHelpWith,
     iCanHelpWith        = iCanHelpWith,
     talkingPoints       = talkingPoints,
     meetContext         = meetContext,
     meetDate            = meetDate,
+    deviceContactId     = deviceContactId,
+    deviceLookupKey     = deviceLookupKey,
     createdAt           = createdAt,
     updatedAt           = updatedAt
 )
@@ -231,7 +309,7 @@ fun CompanyEntity.toDomain(): Company = Company(
     id = id,
     name = name,
     logoUri = logoUri,
-    industry = Industry.valueOf(industry),
+    industry = safeEnum(industry, Industry.OTHER),
     description = description,
     website = website,
     createdAt = createdAt,
@@ -242,7 +320,7 @@ fun ContactPhoneEntity.toDomain(): ContactPhone = ContactPhone(
     id = id,
     contactId = contactId ?: "", // or companyId
     number = number,
-    type = PhoneType.valueOf(type),
+    type = safeEnum(type, PhoneType.MOBILE),
     isPrimary = isPrimary,
     comment = comment
 )
@@ -251,15 +329,27 @@ fun ContactEmailEntity.toDomain(): ContactEmail = ContactEmail(
     id = id,
     contactId = contactId ?: "",
     email = email,
-    type = EmailType.valueOf(type),
+    type = safeEnum(type, EmailType.PERSONAL),
     isPrimary = isPrimary,
     comment = comment
+)
+
+fun Tombstone.toEntity(): TombstoneEntity = TombstoneEntity(
+    entityType = entityType.name,
+    entityId = entityId,
+    deletedAt = deletedAt,
+)
+
+fun TombstoneEntity.toDomain(): Tombstone = Tombstone(
+    entityType = safeEnum(entityType, TombstoneEntityType.CONTACT),
+    entityId = entityId,
+    deletedAt = deletedAt,
 )
 
 fun MessengerEntity.toDomain(): Messenger = Messenger(
     id = id,
     contactId = contactId,
-    type = MessengerType.valueOf(type),
+    type = safeEnum(type, MessengerType.OTHER),
     value = value,
     link = link,
     isPrimary = isPrimary,
@@ -273,7 +363,7 @@ fun ContactCompanyRelationEntity.toDomain(): ContactCompanyRelation = ContactCom
     position = position,
     department = department,
     role = role,
-    employmentStatus = EmploymentStatus.valueOf(employmentStatus),
+    employmentStatus = safeEnum(employmentStatus, EmploymentStatus.CURRENT),
     startDate = startDate,
     endDate = endDate,
     responsibilities = responsibilities,
@@ -292,33 +382,55 @@ fun ContactRelationEntity.toDomain(): ContactRelation = ContactRelation(
     note = note
 )
 
+fun ContactGroupEntity.toDomain(): ContactGroup = ContactGroup(
+    id = id, name = name, createdAt = createdAt, updatedAt = updatedAt
+)
+
+fun ContactGroupMemberEntity.toDomain(): ContactGroupMember = ContactGroupMember(
+    id = id, groupId = groupId, contactId = contactId
+)
+
+fun TagEntity.toDomain(): Tag = Tag(
+    id = id, name = name, category = category, createdAt = createdAt, updatedAt = updatedAt
+)
+
+fun ContactTagMemberEntity.toDomain(): ContactTagMember = ContactTagMember(
+    id = id, tagId = tagId, contactId = contactId
+)
+
 fun AddressEntity.toDomain(): Address = Address(
     id = id,
-    ownerType = AddressOwnerType.valueOf(ownerType),
+    ownerType = safeEnum(ownerType, AddressOwnerType.CONTACT),
     ownerId = ownerId,
-    addressType = AddressType.valueOf(addressType),
+    addressType = safeEnum(addressType, AddressType.OTHER),
     addressLine = addressLine,
     city = city,
     country = country,
     comment = comment,
     latitude = latitude,
-    longitude = longitude
+    longitude = longitude,
+    postalCode = postalCode,
+    district = district
 )
 
 fun CalendarItemEntity.toDomain(): CalendarItem = CalendarItem(
     id = id,
     title = title,
     description = description,
-    type = CalendarItemType.valueOf(type),
+    type = safeEnum(type, CalendarItemType.NOTE),
     startDate = startDate,
     startTime = startTime,
     endDate = endDate,
     endTime = endTime,
     isAllDay = isAllDay,
-    status = CalendarItemStatus.valueOf(status),
-    importance = ImportanceLevel.valueOf(importance),
+    status = safeEnum(status, CalendarItemStatus.ACTIVE),
+    importance = safeEnum(importance, ImportanceLevel.NORMAL),
     colorKey = colorKey,
     recurrenceRule = recurrenceRule,
+    lastCompletedOccurrenceDate = lastCompletedOccurrenceDate,
+    recurrenceExplicitlySet = recurrenceExplicitlySet,
+    postponedFromOccurrenceDate = postponedFromOccurrenceDate,
+    postponedToDate = postponedToDate,
     createdAt = createdAt,
     updatedAt = updatedAt
 )
@@ -326,16 +438,16 @@ fun CalendarItemEntity.toDomain(): CalendarItem = CalendarItem(
 fun CalendarItemLinkEntity.toDomain(): CalendarItemLink = CalendarItemLink(
     id = id,
     calendarItemId = calendarItemId,
-    targetType = CalendarTargetType.valueOf(targetType),
+    targetType = safeEnum(targetType, CalendarTargetType.CONTACT),
     targetId = targetId
 )
 
 fun ReminderRuleEntity.toDomain(): ReminderRule = ReminderRule(
     id = id,
     calendarItemId = calendarItemId,
-    reminderType = ReminderType.valueOf(reminderType),
+    reminderType = safeEnum(reminderType, ReminderType.NONE),
     offsetValue = offsetValue,
-    offsetUnit = offsetUnit?.let { ReminderOffsetUnit.valueOf(it) },
+    offsetUnit = offsetUnit?.let { safeEnum(it, ReminderOffsetUnit.MINUTES) },
     exactDateTime = exactDateTime
 )
 
@@ -345,10 +457,11 @@ fun NoteEntity.toDomain(): Note = Note(
     companyId = companyId,
     calendarItemId = calendarItemId,
     giftId = giftId,
-    type = NoteType.valueOf(type),
+    type = safeEnum(type, NoteType.GENERAL),
     text = text,
     date = date,
     isImportant = isImportant,
+    isLocked = isLocked,
     createdAt = createdAt,
     updatedAt = updatedAt
 )
@@ -360,8 +473,7 @@ fun GiftIdeaEntity.toDomain(): GiftIdea = GiftIdea(
     note = note,
     link = link,
     date = date,
-    reminderId = reminderId,
-    status = GiftStatus.valueOf(status)
+    status = safeEnum(status, GiftStatus.IDEA)
 )
 
 fun SizeInfoEntity.toDomain(): SizeInfo = SizeInfo(
@@ -376,7 +488,7 @@ fun SizeInfoEntity.toDomain(): SizeInfo = SizeInfo(
 fun PersonalDetailEntity.toDomain(): PersonalDetail = PersonalDetail(
     id = id,
     contactId = contactId,
-    category = PersonalDetailCategory.valueOf(category),
+    category = safeEnum(category, PersonalDetailCategory.OTHER),
     value = value,
     note = note
 )

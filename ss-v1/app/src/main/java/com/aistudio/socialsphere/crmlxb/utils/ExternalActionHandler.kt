@@ -7,6 +7,8 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import com.aistudio.socialsphere.crmlxb.model.Messenger
+import android.provider.ContactsContract
+import com.aistudio.socialsphere.crmlxb.R
 
 object ExternalActionHandler {
 
@@ -41,7 +43,7 @@ object ExternalActionHandler {
 
     fun openDialer(context: Context, phoneNumber: String?) {
         if (phoneNumber.isNullOrBlank()) {
-            Toast.makeText(context, "Телефон не указан", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ext_phone_not_set), Toast.LENGTH_SHORT).show()
             return
         }
         val intent = Intent(Intent.ACTION_DIAL).apply {
@@ -52,7 +54,7 @@ object ExternalActionHandler {
 
     fun openSms(context: Context, phoneNumber: String?) {
         if (phoneNumber.isNullOrBlank()) {
-            Toast.makeText(context, "Телефон не указан", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ext_phone_not_set), Toast.LENGTH_SHORT).show()
             return
         }
         val intent = Intent(Intent.ACTION_SENDTO).apply {
@@ -63,7 +65,7 @@ object ExternalActionHandler {
 
     fun openEmail(context: Context, email: String?) {
         if (email.isNullOrBlank()) {
-            Toast.makeText(context, "Email не указан", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ext_email_not_set), Toast.LENGTH_SHORT).show()
             return
         }
         val intent = Intent(Intent.ACTION_SENDTO).apply {
@@ -74,12 +76,19 @@ object ExternalActionHandler {
 
     fun openWebsite(context: Context, url: String?) {
         if (url.isNullOrBlank()) {
-            Toast.makeText(context, "Сайт не указан", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ext_website_not_set), Toast.LENGTH_SHORT).show()
             return
         }
-        var formattedUrl = url
+        var formattedUrl = url.trim()
         if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
             formattedUrl = "https://$formattedUrl"
+        }
+        // Белый список схем: только http/https. Защищает от javascript:/intent:/
+        // file:/content: из сохранённого поля сайта (в т.ч. из чужого бэкапа).
+        val scheme = Uri.parse(formattedUrl).scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") {
+            Toast.makeText(context, context.getString(R.string.ext_invalid_link), Toast.LENGTH_SHORT).show()
+            return
         }
         val intent = Intent(Intent.ACTION_VIEW).apply {
             data = Uri.parse(formattedUrl)
@@ -89,7 +98,7 @@ object ExternalActionHandler {
 
     fun openRoute(context: Context, address: String?) {
         if (address.isNullOrBlank()) {
-            Toast.makeText(context, "Адрес не указан", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ext_address_not_set), Toast.LENGTH_SHORT).show()
             return
         }
         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -112,15 +121,21 @@ object ExternalActionHandler {
 
     fun openMessenger(context: Context, messenger: Messenger?) {
         if (messenger == null || messenger.value.isBlank()) {
-            Toast.makeText(context, "Мессенджер не настроен", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ext_messenger_not_set), Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Use explicit link if provided
+        // Use explicit link if provided — но только с безопасной схемой
+        // (skill: insecure-storage / deeplink): поле link могло прийти из чужого
+        // бэкапа; не пускаем file:/content:/intent:/javascript: в ACTION_VIEW.
         if (!messenger.link.isNullOrBlank()) {
-            safelyStartIntent(context, Intent(Intent.ACTION_VIEW).apply {
-                data = Uri.parse(messenger.link)
-            })
+            if (isSafeMessengerScheme(messenger.link)) {
+                safelyStartIntent(context, Intent(Intent.ACTION_VIEW).apply {
+                    data = Uri.parse(messenger.link)
+                })
+            } else {
+                Toast.makeText(context, context.getString(R.string.ext_invalid_link), Toast.LENGTH_SHORT).show()
+            }
             return
         }
 
@@ -157,6 +172,13 @@ object ExternalActionHandler {
             com.aistudio.socialsphere.crmlxb.model.MessengerType.MESSENGER -> {
                 "https://m.me/$value"
             }
+            // Соцсети (2026-07-12): value — username/handle без ссылки, link (если
+            // задан владельцем) уже обработан выше и имеет приоритет над этим блоком.
+            com.aistudio.socialsphere.crmlxb.model.MessengerType.INSTAGRAM -> "https://instagram.com/$value"
+            com.aistudio.socialsphere.crmlxb.model.MessengerType.FACEBOOK -> "https://facebook.com/$value"
+            com.aistudio.socialsphere.crmlxb.model.MessengerType.VK -> "https://vk.com/$value"
+            com.aistudio.socialsphere.crmlxb.model.MessengerType.LINKEDIN -> "https://linkedin.com/in/$value"
+            com.aistudio.socialsphere.crmlxb.model.MessengerType.X -> "https://x.com/$value"
             com.aistudio.socialsphere.crmlxb.model.MessengerType.OTHER -> {
                 // Try as URL if it looks like one
                 if (value.startsWith("http") || value.startsWith("t.me") || value.startsWith("www."))
@@ -178,13 +200,58 @@ object ExternalActionHandler {
                 safelyStartIntent(context, intent)
             }
         } else {
-            Toast.makeText(context, "Не удалось открыть ${messenger.type.labelKey()}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ext_messenger_open_failed, messenger.type.labelKey()), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * Способ A: запись контакта в телефонную книгу через системный экран.
+     * ACTION_INSERT_OR_EDIT даёт пользователю выбрать «создать новый» или
+     * «дополнить существующий», поэтому дубли не плодятся. Особых разрешений
+     * (WRITE_CONTACTS) НЕ требуется — пользователь сам подтверждает сохранение.
+     */
+    fun saveToPhoneContacts(
+        context: Context,
+        fullName: String,
+        phones: List<String>,
+        emails: List<String>,
+        company: String? = null,
+        jobTitle: String? = null
+    ) {
+        fun Intent.fillContact(): Intent = apply {
+            if (fullName.isNotBlank()) putExtra(ContactsContract.Intents.Insert.NAME, fullName)
+            phones.getOrNull(0)?.takeIf { it.isNotBlank() }?.let { putExtra(ContactsContract.Intents.Insert.PHONE, it) }
+            phones.getOrNull(1)?.takeIf { it.isNotBlank() }?.let { putExtra(ContactsContract.Intents.Insert.SECONDARY_PHONE, it) }
+            phones.getOrNull(2)?.takeIf { it.isNotBlank() }?.let { putExtra(ContactsContract.Intents.Insert.TERTIARY_PHONE, it) }
+            emails.getOrNull(0)?.takeIf { it.isNotBlank() }?.let { putExtra(ContactsContract.Intents.Insert.EMAIL, it) }
+            emails.getOrNull(1)?.takeIf { it.isNotBlank() }?.let { putExtra(ContactsContract.Intents.Insert.SECONDARY_EMAIL, it) }
+            company?.takeIf { it.isNotBlank() }?.let { putExtra(ContactsContract.Intents.Insert.COMPANY, it) }
+            jobTitle?.takeIf { it.isNotBlank() }?.let { putExtra(ContactsContract.Intents.Insert.JOB_TITLE, it) }
+        }
+        // INSERT_OR_EDIT — выбрать новый или дополнить существующий
+        val editIntent = Intent(Intent.ACTION_INSERT_OR_EDIT).apply {
+            type = ContactsContract.Contacts.CONTENT_ITEM_TYPE
+        }.fillContact()
+        if (startIntentSafely(context, editIntent)) return
+        // Фолбэк ACTION_INSERT — всегда открывает экран создания контакта
+        val insertIntent = Intent(Intent.ACTION_INSERT).apply {
+            type = ContactsContract.Contacts.CONTENT_TYPE
+        }.fillContact()
+        if (!startIntentSafely(context, insertIntent)) {
+            Toast.makeText(context, context.getString(R.string.ext_no_contacts_app), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Белый список схем для ссылок мессенджеров. Блокирует
+     *  file:/content:/intent:/javascript:/data: из произвольного поля link. */
+    private fun isSafeMessengerScheme(link: String): Boolean {
+        val scheme = Uri.parse(link.trim()).scheme?.lowercase() ?: return false
+        return scheme in setOf("http", "https", "tg", "viber", "whatsapp", "sgnl", "mailto", "tel")
     }
 
     private fun safelyStartIntent(context: Context, intent: Intent) {
         if (!startIntentSafely(context, intent)) {
-            Toast.makeText(context, "Нет приложения для выполнения действия", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ext_no_app_for_action), Toast.LENGTH_SHORT).show()
         }
     }
 }

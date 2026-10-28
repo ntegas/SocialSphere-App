@@ -3,6 +3,7 @@ package com.aistudio.socialsphere.crmlxb.utils
 import android.content.Context
 import android.database.Cursor
 import android.provider.ContactsContract
+import com.aistudio.socialsphere.crmlxb.data.ContactChannelDedup
 import com.aistudio.socialsphere.crmlxb.model.*
 import java.util.UUID
 
@@ -13,10 +14,44 @@ enum class DuplicateStatus {
     SKIPPED
 }
 
+/** Смежный контакт из телефонной книги: имя + роль (уже по-русски, как ContactRelation). */
+data class ImportedRelation(val name: String, val role: String)
+
+/** Android Relation.TYPE (int) → русская роль. Используется как ContactRelation.role
+ *  (данные, не локализуются, см. §16 базы знаний) и как читаемый текст заметки,
+ *  если контакт с таким именем не найден в приложении. */
+private fun androidRelationRole(type: Int, customLabel: String?): String = when (type) {
+    // Пол неизвестен из данных Android — "Партнёр" уже в закрытом словаре ролей
+    // (§16 базы знаний), не изобретаем новое значение вроде "Супруг(а)"
+    ContactsContract.CommonDataKinds.Relation.TYPE_SPOUSE,
+    ContactsContract.CommonDataKinds.Relation.TYPE_DOMESTIC_PARTNER,
+    ContactsContract.CommonDataKinds.Relation.TYPE_PARTNER -> "Партнёр"
+    ContactsContract.CommonDataKinds.Relation.TYPE_FATHER -> "Отец"
+    ContactsContract.CommonDataKinds.Relation.TYPE_MOTHER -> "Мать"
+    ContactsContract.CommonDataKinds.Relation.TYPE_BROTHER -> "Брат"
+    ContactsContract.CommonDataKinds.Relation.TYPE_SISTER -> "Сестра"
+    ContactsContract.CommonDataKinds.Relation.TYPE_FRIEND -> "Друг"
+    ContactsContract.CommonDataKinds.Relation.TYPE_MANAGER,
+    ContactsContract.CommonDataKinds.Relation.TYPE_ASSISTANT -> "Коллега"
+    ContactsContract.CommonDataKinds.Relation.TYPE_CUSTOM -> customLabel?.trim()?.takeIf { it.isNotBlank() } ?: "Родственник"
+    // CHILD/PARENT/RELATIVE/REFERRED_BY — пол/точная роль неизвестны из данных Android
+    else -> "Родственник"
+}
+
 data class ImportContactCandidate(
     val id: String = UUID.randomUUID().toString(),
     val firstName: String = "",
     val lastName: String = "",
+    /** Отчество/среднее имя. */
+    val middleName: String = "",
+    /** Структура имени как в Android (v13) — раньше приставка/суффикс молча
+     *  склеивались в middleName, теряя структуру (фидбэк владельца: «хочу как
+     *  в андроид, идентично»). */
+    val namePrefix: String = "",
+    val nameSuffix: String = "",
+    val phoneticFirstName: String = "",
+    val phoneticMiddleName: String = "",
+    val phoneticLastName: String = "",
     val phones: List<ContactPhone> = emptyList(),
     val emails: List<ContactEmail> = emptyList(),
     val companyName: String? = null,
@@ -24,61 +59,168 @@ data class ImportContactCandidate(
     val addresses: List<Address> = emptyList(),
     val birthday: String? = null,
     val notes: String? = null,
+    /** Названия групп телефонной книги («Семья», «Работа»…) — фидбэк 2026-07-04:
+     *  «При импорте ты группой импортируешь телефона?» Системные авто-группы
+     *  Google («System Group: My Contacts» и т.п.) отфильтрованы. */
+    val groupNames: List<String> = emptyList(),
+    /** Смежные контакты/семья (ContactsContract.CommonDataKinds.Relation) —
+     *  «жена: Анна», «друг: Олег» и т.п. Раньше не читались вообще (фидбэк
+     *  владельца 2026-07-04). role — Русская строка-данные (см. §16
+     *  SOCIALSPHERE_KNOWLEDGE.md: роли семьи не локализуются, это данные). */
+    val relations: List<ImportedRelation> = emptyList(),
     val source: String = "Телефонная книга",
     var duplicateStatus: DuplicateStatus = DuplicateStatus.NEW,
     var selectedForImport: Boolean = true,
-    var matchedContactId: String? = null
+    var matchedContactId: String? = null,
+    /** Проверка «уже есть в приложении» для этого кандидата выполнена (см. ImportDuplicateCheck) — второй раз не трогаем. */
+    val duplicateChecked: Boolean = false,
+    /** PHONE PACK #4: LOOKUP_KEY контакта телефонной книги (только у кандидатов «из книги устройства»). */
+    val deviceLookupKey: String? = null
 )
 
 object ContactImporter {
 
+    private const val TAG = "ContactImporter"
+
+    /** Явный список колонок Data вместо `null` (= ВСЕ колонки всех строк книги): меньше памяти и не зависит
+     *  от того, какие лишние колонки отдаёт конкретный ContactsProvider. StructuredPostal/Organization/
+     *  Relation читаются теми же DATA1..DATA10 (STREET=data4, NEIGHBORHOOD=data6, CITY=data7, COUNTRY=data10). */
+    internal val DATA_PROJECTION: Array<String> = arrayOf(
+        ContactsContract.Data.CONTACT_ID, ContactsContract.Data.MIMETYPE, ContactsContract.Data.LOOKUP_KEY,
+        ContactsContract.Data.DATA1, ContactsContract.Data.DATA2, ContactsContract.Data.DATA3,
+        ContactsContract.Data.DATA4, ContactsContract.Data.DATA5, ContactsContract.Data.DATA6,
+        ContactsContract.Data.DATA7, ContactsContract.Data.DATA8, ContactsContract.Data.DATA9,
+        ContactsContract.Data.DATA10,
+    )
+
+    private fun Cursor.str(i: Int): String? = if (i < 0 || isNull(i)) null else getString(i)
+    private fun Cursor.int(i: Int): Int = if (i < 0 || isNull(i)) 0 else getInt(i)
+
+    /** Карта GROUP_ROW_ID → название группы, с фильтром авто-групп Google
+     *  («System Group: My Contacts», «Starred in Android» и т.п.). */
+    private fun readGroupTitles(context: Context): Map<Long, String> {
+        val map = mutableMapOf<Long, String>()
+        context.contentResolver.query(
+            ContactsContract.Groups.CONTENT_URI,
+            arrayOf(ContactsContract.Groups._ID, ContactsContract.Groups.TITLE, ContactsContract.Groups.AUTO_ADD, ContactsContract.Groups.FAVORITES),
+            null, null, null
+        )?.use { c ->
+            val idIdx = c.getColumnIndex(ContactsContract.Groups._ID)
+            val titleIdx = c.getColumnIndex(ContactsContract.Groups.TITLE)
+            val autoIdx = c.getColumnIndex(ContactsContract.Groups.AUTO_ADD)
+            val favIdx = c.getColumnIndex(ContactsContract.Groups.FAVORITES)
+            if (idIdx < 0 || titleIdx < 0) return map           // курсор без нужных колонок — группы просто не читаем
+            while (c.moveToNext()) {
+                val title = c.str(titleIdx)?.trim() ?: continue
+                val isAuto = autoIdx >= 0 && c.int(autoIdx) != 0
+                val isFav = favIdx >= 0 && c.int(favIdx) != 0
+                if (title.isBlank() || title.startsWith("System Group:") || isAuto || isFav) continue
+                map[c.getLong(idIdx)] = title
+            }
+        }
+        return map
+    }
+
+    /**
+     * Вся телефонная книга (массовый импорт и выбор контакта для связи).
+     * Бросает [SecurityException], если READ_CONTACTS не выдано/отозвано — вызывающий обязан показать
+     * состояние «нужно разрешение», а не падать. Всё остальное (курсор без колонки, null-поля, битые
+     * строки) — читается безопасно, ничего наружу не бросает.
+     */
     fun getDeviceContacts(context: Context): List<ImportContactCandidate> {
-        val candidates = mutableMapOf<String, ImportContactCandidate>()
-
-        val contentResolver = context.contentResolver
-        val cursor: Cursor? = contentResolver.query(
-            ContactsContract.Data.CONTENT_URI,
-            null,
-            null,
-            null,
-            null
+        val groupTitles = readGroupTitles(context)
+        val cursor: Cursor? = context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI, DATA_PROJECTION, null, null, null
         )
+        val candidates = cursor?.use { readDataRows(it, groupTitles) } ?: emptyMap()
 
-        cursor?.use {
-            val contactIdIdx = it.getColumnIndex(ContactsContract.Data.CONTACT_ID)
-            val mimeTypeIdx = it.getColumnIndex(ContactsContract.Data.MIMETYPE)
-            
-            // Name
-            val data1Idx = it.getColumnIndex(ContactsContract.Data.DATA1)
-            val data2Idx = it.getColumnIndex(ContactsContract.Data.DATA2)
-            val data3Idx = it.getColumnIndex(ContactsContract.Data.DATA3)
-            val data4Idx = it.getColumnIndex(ContactsContract.Data.DATA4) // sometimes used
-            
-            while (it.moveToNext()) {
-                val contactId = it.getString(contactIdIdx)
-                val mimeType = it.getString(mimeTypeIdx)
+        // ФИКС (аудит 2026-08-11, жалоба владельца: «постоянно добавляются какие-то
+        // контакты типа групп/компаний, непонятно что»): getDeviceContacts() отдавал ВСЕ строки
+        // ContactsContract.Data, включая ярлыки групп синхронизации, WhatsApp/другие сервис-аккаунты
+        // и прочие непользовательские записи без единого телефона/email. Тот же фильтр, что уже в
+        // parseVCard/parseCsv.
+        return candidates.values.filter { it.phones.isNotEmpty() || it.emails.isNotEmpty() }
+    }
 
-                val candidate = candidates.getOrPut(contactId) {
-                    ImportContactCandidate(id = "device_contact_$contactId")
+    /**
+     * Общий разбор строк Data → кандидаты по CONTACT_ID (массовый импорт И чтение ОДНОГО связанного
+     * контакта). Устойчив к битым данным: нет колонки CONTACT_ID/MIMETYPE — пустой результат; строка
+     * без contact_id/mimetype или с исключением при чтении — пропускается, остальные читаются.
+     */
+    internal fun readDataRows(it: Cursor, groupTitles: Map<Long, String>): MutableMap<String, ImportContactCandidate> {
+        val candidates = mutableMapOf<String, ImportContactCandidate>()
+        val contactIdIdx = it.getColumnIndex(ContactsContract.Data.CONTACT_ID)
+        val mimeTypeIdx = it.getColumnIndex(ContactsContract.Data.MIMETYPE)
+        if (contactIdIdx < 0 || mimeTypeIdx < 0) {
+            android.util.Log.w(TAG, "Data cursor without contact_id/mimetype columns — nothing to read")
+            return candidates
+        }
+        val lookupIdx = it.getColumnIndex(ContactsContract.Data.LOOKUP_KEY)
+        val data1Idx = it.getColumnIndex(ContactsContract.Data.DATA1)
+        val data2Idx = it.getColumnIndex(ContactsContract.Data.DATA2)
+        val data3Idx = it.getColumnIndex(ContactsContract.Data.DATA3)
+        val data4Idx = it.getColumnIndex(ContactsContract.Data.DATA4)
+        val data5Idx = it.getColumnIndex(ContactsContract.Data.DATA5)
+        val data6Idx = it.getColumnIndex(ContactsContract.Data.DATA6)
+        val data7Idx = it.getColumnIndex(ContactsContract.Data.DATA7)
+        val data8Idx = it.getColumnIndex(ContactsContract.Data.DATA8)
+        val data9Idx = it.getColumnIndex(ContactsContract.Data.DATA9)
+        val data10Idx = it.getColumnIndex(ContactsContract.Data.DATA10)
+
+        while (it.moveToNext()) {
+            try {
+                val contactId = it.str(contactIdIdx) ?: continue
+                val mimeType = it.str(mimeTypeIdx) ?: continue
+                val lookup = it.str(lookupIdx)?.takeIf { k -> k.isNotBlank() }
+
+                var candidate = candidates.getOrPut(contactId) {
+                    ImportContactCandidate(id = "device_contact_$contactId", deviceLookupKey = lookup)
+                }
+                if (candidate.deviceLookupKey == null && lookup != null) {
+                    candidate = candidate.copy(deviceLookupKey = lookup); candidates[contactId] = candidate
                 }
 
                 when (mimeType) {
                     ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE -> {
-                        val givenName = it.getString(data2Idx)
-                        val familyName = it.getString(data3Idx)
-                        val displayName = it.getString(data1Idx)
-                        
-                        val first = givenName ?: if (!familyName.isNullOrBlank()) "" else displayName ?: ""
-                        val last = familyName ?: ""
-                        
+                        // Полная структура StructuredName, как в Android-контактах:
+                        // DATA2=имя, DATA3=фамилия, DATA4=приставка, DATA5=отчество,
+                        // DATA6=суффикс, DATA7=фонетическое имя, DATA9=фонетическая фамилия.
+                        val givenName  = it.str(data2Idx)
+                        val familyName = it.str(data3Idx)
+                        val displayName = it.str(data1Idx)
+                        val middle = it.str(data5Idx) ?: ""
+                        val prefix = it.str(data4Idx) ?: ""
+                        val suffix = it.str(data6Idx) ?: ""
+                        val phoneticFirst = it.str(data7Idx) ?: ""
+                        val phoneticMiddle = it.str(data8Idx) ?: ""
+                        val phoneticLast  = it.str(data9Idx) ?: ""
+
+                        var first  = (givenName ?: "").trim()
+                        var last   = (familyName ?: "").trim()
+                        var mid    = middle.trim()
+                        // Структурных полей нет — раскладываем displayName без потерь:
+                        // 1 слово → имя; 2 → имя+фамилия; 3+ → имя + середина + фамилия
+                        if (first.isBlank() && last.isBlank() && !displayName.isNullOrBlank()) {
+                            val words = displayName.trim().split(Regex("\\s+"))
+                            first = words.first()
+                            last  = if (words.size >= 2) words.last() else ""
+                            if (mid.isBlank() && words.size >= 3)
+                                mid = words.subList(1, words.size - 1).joinToString(" ")
+                        }
                         candidates[contactId] = candidate.copy(
-                            firstName = candidate.firstName.takeIf { it.isNotBlank() } ?: first.trim(),
-                            lastName = candidate.lastName.takeIf { it.isNotBlank() } ?: last.trim()
+                            firstName  = candidate.firstName.takeIf { n -> n.isNotBlank() } ?: first,
+                            lastName   = candidate.lastName.takeIf { n -> n.isNotBlank() } ?: last,
+                            middleName = candidate.middleName.takeIf { n -> n.isNotBlank() } ?: mid,
+                            namePrefix = candidate.namePrefix.takeIf { n -> n.isNotBlank() } ?: prefix.trim(),
+                            nameSuffix = candidate.nameSuffix.takeIf { n -> n.isNotBlank() } ?: suffix.trim(),
+                            phoneticFirstName = candidate.phoneticFirstName.takeIf { n -> n.isNotBlank() } ?: phoneticFirst.trim(),
+                            phoneticMiddleName = candidate.phoneticMiddleName.takeIf { n -> n.isNotBlank() } ?: phoneticMiddle.trim(),
+                            phoneticLastName  = candidate.phoneticLastName.takeIf { n -> n.isNotBlank() } ?: phoneticLast.trim()
                         )
                     }
                     ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE -> {
-                        val phoneNumber = it.getString(data1Idx)
-                        val type = it.getInt(data2Idx)
+                        val phoneNumber = it.str(data1Idx)
+                        val type = it.int(data2Idx)
                         if (!phoneNumber.isNullOrBlank()) {
                             val phoneType = when (type) {
                                 ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE -> PhoneType.MOBILE
@@ -93,12 +235,16 @@ object ContactImporter {
                                 type = phoneType,
                                 isPrimary = candidate.phones.isEmpty()
                             )
-                            candidates[contactId] = candidate.copy(phones = candidate.phones + cp)
+                            // Контакт книги = несколько raw-контактов (Google/WhatsApp/SIM…), каждый со
+                            // своей строкой Data с ТЕМ ЖЕ номером -> без схлопывания номер дублируется.
+                            candidates[contactId] = candidate.copy(
+                                phones = ContactChannelDedup.dedupePhones(candidate.phones + cp)
+                            )
                         }
                     }
                     ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE -> {
-                        val email = it.getString(data1Idx)
-                        val type = it.getInt(data2Idx)
+                        val email = it.str(data1Idx)
+                        val type = it.int(data2Idx)
                         if (!email.isNullOrBlank()) {
                             val emailType = when (type) {
                                 ContactsContract.CommonDataKinds.Email.TYPE_WORK -> EmailType.WORK
@@ -112,170 +258,89 @@ object ContactImporter {
                                 type = emailType,
                                 isPrimary = candidate.emails.isEmpty()
                             )
-                            candidates[contactId] = candidate.copy(emails = candidate.emails + ce)
+                            candidates[contactId] = candidate.copy(
+                                emails = ContactChannelDedup.dedupeEmails(candidate.emails + ce)
+                            )
                         }
                     }
                     ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE -> {
-                        val company = it.getString(data1Idx)
-                        val title = it.getString(data4Idx)
                         candidates[contactId] = candidate.copy(
-                            companyName = company,
-                            jobTitle = title
+                            companyName = it.str(data1Idx),
+                            jobTitle = it.str(data4Idx)
                         )
                     }
                     ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE -> {
-                        val streetIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.STREET)
-                        val cityIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.CITY)
-                        val countryIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.COUNTRY)
-                        val formattedAddrIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS)
+                        val street = it.str(data4Idx)
+                        val city = it.str(data7Idx)
+                        val country = it.str(data10Idx)
+                        val formattedAddress = it.str(data1Idx)
+                        // Район (2026-07-13) — StructuredPostal.NEIGHBORHOOD (data6)
+                        val neighborhood = it.str(data6Idx)
 
-                        val street = if (streetIdx >= 0) it.getString(streetIdx) else null
-                        val city = if (cityIdx >= 0) it.getString(cityIdx) else null
-                        val country = if (countryIdx >= 0) it.getString(countryIdx) else null
-                        val formattedAddress = if (formattedAddrIdx >= 0) it.getString(formattedAddrIdx) else null
-                        
                         val addrLine = street ?: formattedAddress ?: ""
                         if (addrLine.isNotBlank() || !city.isNullOrBlank() || !country.isNullOrBlank()) {
+                            // Тип адреса — реальный TYPE_HOME/TYPE_WORK/TYPE_OTHER (DATA2), не хардкод HOME
+                            val addressType = when (it.int(data2Idx)) {
+                                ContactsContract.CommonDataKinds.StructuredPostal.TYPE_WORK -> AddressType.WORK
+                                ContactsContract.CommonDataKinds.StructuredPostal.TYPE_HOME -> AddressType.HOME
+                                else -> AddressType.OTHER
+                            }
                             val addr = Address(
                                 id = UUID.randomUUID().toString(),
                                 addressLine = addrLine,
+                                district = neighborhood?.takeIf { n -> n.isNotBlank() },
                                 city = city ?: "",
                                 country = country ?: "",
                                 ownerId = candidate.id,
                                 ownerType = AddressOwnerType.CONTACT,
-                                addressType = AddressType.HOME
+                                addressType = addressType
                             )
                             candidates[contactId] = candidate.copy(addresses = candidate.addresses + addr)
                         }
                     }
                     ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE -> {
-                        val type = it.getInt(data2Idx)
-                        if (type == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
-                            val raw = it.getString(data1Idx)
-                            // Телефонная книга часто отдаёт «--MM-DD» (без года) —
-                            // такой формат ломал парсинг и события исчезали
-                            val date = normalizeBirthday(raw)
-                            if (date != null) {
-                                candidates[contactId] = candidate.copy(birthday = date)
-                            }
+                        if (it.int(data2Idx) == ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY) {
+                            // Телефонная книга часто отдаёт «--MM-DD» (без года)
+                            val date = normalizeBirthday(it.str(data1Idx))
+                            if (date != null) candidates[contactId] = candidate.copy(birthday = date)
                         }
                     }
                     ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE -> {
-                        val text = it.getString(data1Idx)
-                        if (!text.isNullOrBlank()) {
-                            candidates[contactId] = candidate.copy(notes = text)
+                        val text = it.str(data1Idx)
+                        if (!text.isNullOrBlank()) candidates[contactId] = candidate.copy(notes = text)
+                    }
+                    ContactsContract.CommonDataKinds.Relation.CONTENT_ITEM_TYPE -> {
+                        // DATA1 = имя смежного контакта, DATA2 = TYPE (int), DATA3 = свой label
+                        val relName = it.str(data1Idx)?.trim()
+                        if (!relName.isNullOrBlank()) {
+                            val role = androidRelationRole(it.int(data2Idx), it.str(data3Idx))
+                            candidates[contactId] = candidate.copy(relations = candidate.relations + ImportedRelation(relName, role))
+                        }
+                    }
+                    ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE -> {
+                        // DATA1 = GROUP_ROW_ID (ссылка на ContactsContract.Groups._ID)
+                        val title = it.str(data1Idx)?.toLongOrNull()?.let { gid -> groupTitles[gid] }
+                        if (title != null && title !in candidate.groupNames) {
+                            candidates[contactId] = candidate.copy(groupNames = candidate.groupNames + title)
                         }
                     }
                 }
+            } catch (e: RuntimeException) {
+                // Одна битая строка не должна ронять чтение всей книги/связанного контакта
+                android.util.Log.w(TAG, "skipping malformed Data row", e)
             }
         }
-        
-        return candidates.values.toList()
+        return candidates
     }
 }
 
 // ─── vCard (.vcf) parser ──────────────────────────────────────
-fun parseVCard(content: String): List<ImportContactCandidate> {
-    val results = mutableListOf<ImportContactCandidate>()
-    // Split on BEGIN:VCARD
-    val cards = content.split("BEGIN:VCARD").drop(1)
-    cards.forEach { card ->
-        var firstName = ""
-        var lastName  = ""
-        val phones    = mutableListOf<ContactPhone>()
-        val emails    = mutableListOf<ContactEmail>()
-        var company   = ""
-        var title     = ""
-        var birthday  = ""
-        val id        = UUID.randomUUID().toString()
-
-        card.lines().forEach { raw ->
-            val line = raw.trim()
-            when {
-                // N:LastName;FirstName;;;
-                line.startsWith("N:") -> {
-                    val parts = line.removePrefix("N:").split(";")
-                    lastName  = parts.getOrElse(0) { "" }.trim()
-                    firstName = parts.getOrElse(1) { "" }.trim()
-                }
-                // FN: full name fallback
-                line.startsWith("FN:") && firstName.isBlank() && lastName.isBlank() -> {
-                    val full = line.removePrefix("FN:").trim().split(" ")
-                    firstName = full.firstOrNull() ?: ""
-                    lastName  = full.drop(1).joinToString(" ")
-                }
-                // TEL
-                line.startsWith("TEL") -> {
-                    val number = line.substringAfter(":").trim()
-                    if (number.isNotBlank()) {
-                        val phoneType = when {
-                            line.contains("WORK", ignoreCase = true)   -> PhoneType.WORK
-                            line.contains("HOME", ignoreCase = true)   -> PhoneType.HOME
-                            else                                        -> PhoneType.MOBILE
-                        }
-                        phones.add(ContactPhone(
-                            id        = UUID.randomUUID().toString(),
-                            contactId = id,
-                            number    = number,
-                            type      = phoneType,
-                            isPrimary = phones.isEmpty()
-                        ))
-                    }
-                }
-                // EMAIL
-                line.startsWith("EMAIL") -> {
-                    val addr = line.substringAfter(":").trim()
-                    if (addr.isNotBlank()) {
-                        val emailType = when {
-                            line.contains("WORK", ignoreCase = true) -> EmailType.WORK
-                            else                                      -> EmailType.PERSONAL
-                        }
-                        emails.add(ContactEmail(
-                            id        = UUID.randomUUID().toString(),
-                            contactId = id,
-                            email     = addr,
-                            type      = emailType,
-                            isPrimary = emails.isEmpty()
-                        ))
-                    }
-                }
-                // ORG
-                // Урок 45: vCard ORG = «Компания;Отдел;…» — берём только первое поле;
-                // плюс поддержка параметров вида ORG;CHARSET=UTF-8:
-                line.startsWith("ORG:") || line.startsWith("ORG;") ->
-                    company = line.substringAfter(":", "").substringBefore(";").trim()
-                line.startsWith("TITLE:") || line.startsWith("TITLE;") ->
-                    title = line.substringAfter(":", "").trim()
-                // BDAY: 19900312 or 1990-03-12
-                line.startsWith("BDAY:") -> {
-                    val raw = line.removePrefix("BDAY:").trim()
-                    val pre = when {
-                        raw.length == 8 && !raw.contains("-") ->
-                            "${raw.take(4)}-${raw.substring(4, 6)}-${raw.takeLast(2)}"
-                        else -> raw
-                    }
-                    birthday = normalizeBirthday(pre) ?: ""
-                }
-            }
-        }
-
-        // Only add if we have at least a name or phone
-        if (firstName.isNotBlank() || lastName.isNotBlank() || phones.isNotEmpty()) {
-            results.add(ImportContactCandidate(
-                id          = id,
-                firstName   = firstName,
-                lastName    = lastName,
-                phones      = phones,
-                emails      = emails,
-                companyName = company.ifBlank { null },
-                jobTitle    = title.ifBlank { null },
-                birthday    = birthday.ifBlank { null },
-                source      = "vCard"
-            ))
-        }
-    }
-    return results
-}
+/**
+ * Разбор УЖЕ ДЕКОДИРОВАННОГО текста vCard. PHONE / VCF PACK #4: вся логика (RFC-разворачивание, QP, CHARSET,
+ * base64, группы `item1.`, ADR…) живёт в [VcfImport]; входы приложения (Share и ручной выбор файла) читают БАЙТЫ
+ * через [VcfImport.load]/[VcfImport.parse] и сюда не ходят. Эта функция остаётся для текстового ввода и тестов.
+ */
+fun parseVCard(content: String): List<ImportContactCandidate> = VcfImport.parseText(content)
 
 // ─── CSV parser ───────────────────────────────────────────────
 // Expected columns (flexible, detects by header):
@@ -309,6 +374,7 @@ fun parseCsv(content: String): List<ImportContactCandidate> {
     val idxFirst   = colIdx("имя", "firstname", "first name", "given name", "name", "название",
                             exclude = listOf("org", "company", "файл", "middle"))
     val idxLast    = colIdx("фамилия", "lastname", "last name", "family name", "surname")
+    val idxMiddle  = colIdx("отчество", "middle name", "middlename", "additional name")
     val idxPhone   = colIdx("телефон", "phone", "mobile", "tel")
     val idxEmail   = colIdx("email", "почта", "e-mail")
     val idxCompany = colIdx("компания", "company", "организация", "org",
@@ -324,6 +390,7 @@ fun parseCsv(content: String): List<ImportContactCandidate> {
 
         val firstName = col(idxFirst)
         val lastName  = col(idxLast)
+        val middle    = col(idxMiddle)
         val phone     = col(idxPhone)
         val email     = col(idxEmail)
         val company   = col(idxCompany)
@@ -343,6 +410,7 @@ fun parseCsv(content: String): List<ImportContactCandidate> {
             id          = id,
             firstName   = firstName,
             lastName    = lastName,
+            middleName  = middle,
             phones      = phones,
             emails      = emails,
             companyName = company.ifBlank { null },
@@ -377,19 +445,44 @@ private fun splitCsvLine(line: String): List<String> {
 }
 
 /** Нормализация дня рождения из телефонной книги / vCard.
- *  «--MM-DD» и «--MMDD» (без года) → «1972-MM-DD» (1972 високосный —
- *  29 февраля валидно); «yyyy-MM-dd…» → первые 10 символов; иначе null. */
+ *  «--MM-DD» и «--MMDD» (без года) сохраняются КАК «--MM-DD» — год неизвестен,
+ *  и раньше подставлявшийся фиктивный 1972 показывал ложный возраст. Формат
+ *  «--MM-DD» понимают parseFlexibleDate/displayEventDate (CalendarUtils).
+ *  «yyyy-MM-dd…» → первые 10 символов; иначе пробуем нестрогий числовой
+ *  dd<sep>MM<sep>yyyy — некоторые OEM-синки (Xiaomi/Samsung/Huawei и т.п.)
+ *  пишут Event.START_DATE не по ISO, тот же класс формата, что уже учтён в
+ *  parseFlexibleDate (CalendarUtils.kt) для отображения, но раньше не был учтён
+ *  здесь — из-за строгого LocalDate.parse(ISO) такие дни рождения тихо
+ *  пропускались при импорте (баг, найден по жалобе владельца: «не все дни
+ *  рождения проимпортировались»). */
 internal fun normalizeBirthday(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
-    val candidate = when {
-        raw.startsWith("--") && raw.length >= 7 && raw[4] == '-' ->
-            "1972-" + raw.substring(2, 7)                       // --MM-DD
-        raw.startsWith("--") && raw.length >= 6 ->
-            "1972-" + raw.substring(2, 4) + "-" + raw.substring(4, 6) // --MMDD
-        raw.length >= 10 -> raw.take(10)
-        else -> return null
+    val s = raw.trim()
+    val yearless = when {
+        s.startsWith("--") && s.length >= 7 && s[4] == '-' ->
+            s.substring(2, 7)                                   // --MM-DD → MM-DD
+        s.startsWith("--") && s.length >= 6 ->
+            s.substring(2, 4) + "-" + s.substring(4, 6)         // --MMDD → MM-DD
+        else -> null
     }
-    return try {
-        java.time.LocalDate.parse(candidate); candidate
-    } catch (e: Exception) { null }
+    if (yearless != null) {
+        // Валидация через високосный год (29 февраля — валидная дата без года)
+        return try {
+            java.time.LocalDate.parse("1972-$yearless"); "--$yearless"
+        } catch (e: Exception) { null }
+    }
+    if (s.length >= 10) {
+        val candidate = s.take(10)
+        try {
+            java.time.LocalDate.parse(candidate)
+            return candidate
+        } catch (e: Exception) { /* falls through to legacy numeric formats */ }
+    }
+    Regex("""^(\d{1,2})[ ./](\d{1,2})[ ./](\d{4})$""").find(s)?.let { m ->
+        val (d, mo, y) = m.destructured
+        return try {
+            java.time.LocalDate.of(y.toInt(), mo.toInt(), d.toInt()).toString()
+        } catch (e: Exception) { null }
+    }
+    return null
 }

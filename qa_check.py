@@ -2,14 +2,49 @@
 # -*- coding: utf-8 -*-
 """
 QA v2 для SocialSphere — статический ловец ошибок компиляции.
-Кодирует уроки 31–43 из SOCIALSPHERE_RULES.md (Раздел 8).
-Запуск: python3 qa_check.py  (из корня репо, рядом с ss-v1/)
+Кодирует уроки 31–54 (см. SOCIALSPHERE_KNOWLEDGE.md, разделы 5 и 17).
+Запуск: PYTHONIOENCODING=utf-8 python qa_check.py  (из корня репо, рядом с ss-v1/)
 Выход: код 0 = все проверки зелёные; 1 = есть нарушения.
 """
 import os, re, sys
 
 SRC = 'ss-v1/app/src/main/java'
 errors = []
+
+# У57: не-иконочный символ используется без импорта (обобщение У32).
+# Класс ошибки «token-swap без импорта»: Apple-миграция меняла colorScheme→AppleTheme
+# и вставляла Color(...) без import — qa был зелёным, а compileDebugKotlin падал на
+# Unresolved reference. Исключения: полное имя (a.b.Color), wildcard-импорт,
+# само-определение символа в файле.
+def symbol_needs_import(s, use_re, imp, wilds, defmark):
+    if defmark and re.search(defmark, s):
+        return False
+    if not re.search(use_re, s):
+        return False           # либо не используется, либо только как полное имя
+    if imp in s:
+        return False
+    return not any(w in s for w in wilds)
+
+SYMBOL_IMPORTS = [
+    ('AppleTheme', r'(?<![\w.])AppleTheme\.',
+     'import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme',
+     ['import com.aistudio.socialsphere.crmlxb.ui.theme.*'],
+     r'object AppleTheme\b'),
+    ('Color', r'(?<![\w.])Color[(.]',
+     'import androidx.compose.ui.graphics.Color',
+     ['import androidx.compose.ui.graphics.*'],
+     r'(?:class|object|typealias) Color\b'),
+]
+# self-tests У57
+_at = SYMBOL_IMPORTS[0][1:]
+assert symbol_needs_import('val x = AppleTheme.colors.brand', *_at) is True, 'У57 neg'
+assert symbol_needs_import('import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme\nAppleTheme.colors', *_at) is False, 'У57 import'
+assert symbol_needs_import('object AppleTheme {}\nAppleTheme.colors', *_at) is False, 'У57 self-def'
+assert symbol_needs_import('NavigationBar(x = com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme.colors.card)', *_at) is False, 'У57 fqcn'
+_co = SYMBOL_IMPORTS[1][1:]
+assert symbol_needs_import('Box(Modifier.background(Color(0xFF112233)))', *_co) is True, 'У57 color neg'
+assert symbol_needs_import('val c = androidx.compose.ui.graphics.Color.Transparent', *_co) is False, 'У57 color fqcn'
+assert symbol_needs_import('NavigationBar(containerColor = AppleTheme.colors.card)', *_co) is False, 'У57 color suffix'
 
 def kt_files():
     for root, _, files in os.walk(SRC):
@@ -74,7 +109,10 @@ for path in kt_files():
     # на BOM 2024.09.03 обычный ArrowBack deprecated, AutoMirrored — правильный выбор (урок 47)
     AUTOMIRROR_OK = ('ArrowBack', 'ArrowForward', 'ArrowLeft', 'ArrowRight',
                      'ExitToApp', 'Login', 'Logout', 'Send', 'List', 'Help', 'Sort',
-                     'Undo', 'Redo', 'Reply', 'ReplyAll', 'Comment', 'Chat', 'Message')
+                     'Undo', 'Redo', 'Reply', 'ReplyAll', 'Comment', 'Chat', 'Message',
+                     # BOM 2024.09.03 пометил эти как deprecated в пользу AutoMirrored
+                     # (направление-зависимые, зеркалятся в RTL) — урок 47
+                     'FormatListBulleted', 'Label', 'MergeType', 'Notes')
     for m in re.finditer(r'Icons\.AutoMirrored\.\w+\.(\w+)', s):
         if m.group(1) not in AUTOMIRROR_OK:
             errors.append(f'{rel}: Icons.AutoMirrored.{m.group(1)} — AutoMirrored только для зеркальных иконок')
@@ -82,9 +120,15 @@ for path in kt_files():
         errors.append(f'{rel}: resolveActivity запрещён (Android 11+)')
     if re.search(r'database!!', s):
         errors.append(f'{rel}: database!! запрещён')
-    for m in re.finditer(r'(\w)!!(?!=)', s):
+    # Ловим force-unwrap после слова И после закрывающих скобок: }!! )!! ]!!
+    for m in re.finditer(r'([\w)\]}])!!(?!=)', s):
         line = s[:m.start()].count('\n') + 1
         errors.append(f'{rel}:{line}: force unwrap !! запрещён')
+
+    # У57: не-иконочный символ без импорта (AppleTheme/Color и т.п.)
+    for name, use_re, imp, wilds, defmark in SYMBOL_IMPORTS:
+        if symbol_needs_import(s, use_re, imp, wilds, defmark):
+            errors.append(f'{rel}: {name} используется без импорта ({imp})')
 
     # У38: дубли импортов
     imports = [l for l in s.splitlines() if l.startswith('import ')]
@@ -123,6 +167,25 @@ if os.path.exists(MANIFEST):
             if not os.path.exists(rel_path):
                 errors.append(f'{MANIFEST}: компонент {name} -> класс не найден ({rel_path}) — ClassNotFoundException')
 
+# У53: все .webp-ресурсы целы (ненулевой размер + сигнатура RIFF/WEBP).
+# Ловит битьё иконки при упаковке ZIP. NB: «does not exist / Access is denied»
+# при сборке на Windows из Downloads — это OneDrive Files-On-Demand или Defender,
+# НЕ наша проблема (файл в ZIP валиден); лечится переносом проекта в C:\dev\.
+RES_DIR = 'ss-v1/app/src/main/res'
+if os.path.isdir(RES_DIR):
+    for root, _, fnames in os.walk(RES_DIR):
+        for fn in fnames:
+            if fn.endswith('.webp'):
+                p = os.path.join(root, fn)
+                size = os.path.getsize(p)
+                if size == 0:
+                    errors.append(f'{p}: webp нулевого размера — битый ресурс')
+                    continue
+                with open(p, 'rb') as fh:
+                    head = fh.read(16)
+                if not (head[:4] == b'RIFF' and b'WEBP' in head):
+                    errors.append(f'{p}: webp без сигнатуры RIFF/WEBP — битый ресурс')
+
 # У52: при isMinifyEnabled=true манифестные компоненты должны быть в -keep,
 # иначе R8 вырежет их из release-dex (ClassNotFoundException на boot)
 bg = 'ss-v1/app/build.gradle.kts'
@@ -134,7 +197,7 @@ if os.path.exists(bg) and 'isMinifyEnabled = true' in open(bg, encoding='utf-8')
 
 # У50: дубликаты <string name="..."> внутри одного strings.xml — AAPT error
 for path in ['ss-v1/app/src/main/res/values/strings.xml',
-              'ss-v1/app/src/main/res/values-en/strings.xml',
+              'ss-v1/app/src/main/res/values-ru/strings.xml',
               'ss-v1/app/src/main/res/values-el/strings.xml']:
     if not os.path.exists(path):
         continue
@@ -143,18 +206,63 @@ for path in ['ss-v1/app/src/main/res/values/strings.xml',
     if dups:
         errors.append(f'{path}: дубликаты ключей strings.xml: {dups}')
 
-# У49: ЛОКАЛИЗОВАННЫЕ экраны — ноль кириллицы в строковых литералах
-# (пополняется по мере прохождения серии локализации)
-LOCALIZED_FILES = ['HomeScreen.kt', 'ContactsScreen.kt', 'ContactDetailScreen.kt', 'CalendarScreen.kt', 'MapScreen.kt',
-                   'SettingsScreen.kt', 'AppearanceSettingsScreen.kt', 'LanguageSettingsScreen.kt',
-                   'NotificationSettingsScreen.kt', 'PrivacySettingsScreen.kt',
-                   'CalendarSettingsScreen.kt', 'ImportExportSettingsScreen.kt',
-                   'CompaniesScreen.kt', 'CompanyDetailScreen.kt', 'ContactEditScreen.kt', 'CompanyEditScreen.kt', 'CalendarItemDetailScreen.kt',
-                   'CalendarItemEditScreen.kt', 'CheatSheetScreen.kt', 'ImportScreens.kt']
-ROLE_DATA_OK = {'Муж','Жена','Партнёр','Отец','Мать','Брат','Сестра','Сын','Дочь','Родственник','Друг','Коллега'}
+    # У54: незаэкранированные ' и & в значениях <string> — AAPT2 роняет
+    # mergeDebugResources с «Invalid unicode escape sequence / not a valid string».
+    # Апостроф обязан быть \' (или строка в "кавычках"); & обязан быть &amp; и т.п.
+    raw = open(path, encoding='utf-8').read()
+    for m in re.finditer(r'<string\b[^>]*>(.*?)</string>', raw, re.S):
+        name_m = re.search(r'name="(\w+)"', m.group(0))
+        nm = name_m.group(1) if name_m else '?'
+        val = m.group(1)
+        quoted = val.strip().startswith('"') and val.strip().endswith('"')
+        if not quoted and re.search(r"(?<!\\)'", val):
+            errors.append(f'{path}: string/{nm} — незаэкранированный апостроф, нужен \\\'')
+        if re.search(r'&(?!amp;|lt;|gt;|quot;|apos;|#)', val):
+            errors.append(f'{path}: string/{nm} — незаэкранированный &, нужен &amp;')
+
+# У58 (аудит локализации 2026-07-11): паритет КЛЮЧЕЙ между тремя strings.xml.
+# У50 ловит дубли ВНУТРИ одного файла, но не ловит ключ, добавленный в values/
+# и забытый в values-ru/values-el (или наоборот) — а именно так тихо появляются
+# непереведённые строки. Каждый новый <string name="..."> обязан сразу попасть
+# во все три файла (см. правило в SOCIALSPHERE_KNOWLEDGE.md).
+# ИСПРАВЛЕНО 2026-07-23: список ссылался на несуществующий values-en/ (реальная
+# англ. база лежит без квалификатора — values/) и вообще не включал values-ru/ —
+# из-за этого all(os.path.exists(...)) был всегда False и проверка молча не
+# выполнялась ни для одного языка.
+_STRINGS_PATHS = ['ss-v1/app/src/main/res/values/strings.xml',
+                   'ss-v1/app/src/main/res/values-ru/strings.xml',
+                   'ss-v1/app/src/main/res/values-el/strings.xml']
+if all(os.path.exists(p) for p in _STRINGS_PATHS):
+    key_sets = {
+        p: set(re.findall(r'<string name="(\w+)"', open(p, encoding='utf-8').read()))
+        for p in _STRINGS_PATHS
+    }
+    all_keys = set.union(*key_sets.values())
+    for p, keys in key_sets.items():
+        missing = sorted(all_keys - keys)
+        if missing:
+            others = ', '.join(os.path.basename(os.path.dirname(o)) for o in _STRINGS_PATHS if o != p)
+            errors.append(f'{p}: не хватает {len(missing)} ключей, которые есть в ({others}): {missing[:10]}')
+
+# У49: ЛОКАЛИЗОВАННЫЕ экраны — ноль кириллицы в строковых литералах.
+# ФИКС (аудит локализации 2026-07-11): раньше это был allowlist, который нужно
+# было руками пополнять для каждого нового файла — именно так новые экраны
+# (ContactDisplaySettingsScreen.kt, AppLockComponents.kt и др.) молча оставались
+# без проверки. Теперь denylist: проверяются ВСЕ файлы ui/screens + ui/components,
+# кроме явно перечисленных как заведомо не-UI/не-переводимых.
+UI_DIRS = ['ui/screens', 'ui/components']
+NOT_LOCALIZED = {
+    'SettingsState.kt',        # хранит енамы/настройки, не рисует Text()
+    'ImportSession.kt',        # модель данных сессии импорта, не Composable-экран
+}
+ROLE_DATA_OK = {'Муж','Жена','Партнёр','Отец','Мать','Брат','Сестра','Сын','Дочь','Родственник','Друг','Коллега',
+                'Подруга','Знакомый','Сосед','Одноклассник','Однокурсник','Партнёр по бизнесу','Наставник','Клиент'}
 for path in kt_files():
     fn = os.path.basename(path)
-    if fn not in LOCALIZED_FILES:
+    rel_dir = path.replace('\\', '/').split('java/')[-1].rsplit('/', 1)[0]
+    if not any(rel_dir.endswith(d) for d in UI_DIRS):
+        continue
+    if fn in NOT_LOCALIZED:
         continue
     for i, line in enumerate(open(path, encoding='utf-8').read().splitlines(), 1):
         code = line.split('//')[0]  # комментарии не считаем
@@ -186,6 +294,85 @@ for path in kt_files():
             if m.group(1) not in values and m.group(1) != 'values'.upper():
                 errors.append(f'{path.split("java/")[-1]}: {ename}.{m.group(1)} не существует '
                               f'(есть: {", ".join(sorted(values)[:6])}...)')
+
+# У55: @Database(version = N) ⇒ в addMigrations(...) есть полная цепочка
+# MIGRATION_1_2 … MIGRATION_(N-1)_N. Ловит «голый» бамп версии без миграции
+# (как был v5→v6). fallbackToDestructiveMigration() убран из кода (2026-07-07,
+# см. базу знаний §26) — без миграции Room теперь падает с явным исключением
+# при апдейте, а не тихо стирает БД, но лучше поймать пропуск здесь, на сборке,
+# чем ждать крэш у владельца.
+def missing_migrations(src):
+    """Возвращает список недостающих MIGRATION_x_(x+1) для объявленной version."""
+    vm = re.search(r'version\s*=\s*(\d+)', src)
+    if not vm:
+        return []
+    version = int(vm.group(1))
+    am = re.search(r'addMigrations\(([^)]*)\)', src)
+    registered = set(re.findall(r'MIGRATION_(\d+)_(\d+)', am.group(1))) if am else set()
+    missing = []
+    for v in range(1, version):
+        if (str(v), str(v + 1)) not in registered:
+            missing.append(f'MIGRATION_{v}_{v + 1}')
+    return missing
+
+# негативный тест: версия 6, но цепочка обрывается на 4_5 — гард ОБЯЗАН поймать
+_neg = '''@Database(version = 6) .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)'''
+assert missing_migrations(_neg) == ['MIGRATION_5_6'], 'У55 self-test провален'
+# позитивный тест: полная цепочка — пусто
+_pos = '''@Database(version = 6) .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)'''
+assert missing_migrations(_pos) == [], 'У55 self-test (позитив) провален'
+
+DB_FILE = os.path.join(SRC, 'com/aistudio/socialsphere/crmlxb/data/local/SocialsphereDatabase.kt')
+if os.path.exists(DB_FILE):
+    miss = missing_migrations(open(DB_FILE, encoding='utf-8').read())
+    if miss:
+        errors.append(f'SocialsphereDatabase.kt: version поднят без миграций {miss} '
+                      f'— апдейт «поверх» упадёт с исключением Room (нет destructive fallback)')
+
+# У56: `private fun` — область ОДНОГО файла. Если функцию вызывают из другого
+# файла того же пакета (как ActionSquare/GiftMenu после выноса вкладок), K2 даёт
+# "Cannot access … it is private in file". Ловим до сборки: для каждого
+# `private fun NAME` проверяем, не зовут ли NAME( из другого файла, который сам
+# NAME не определяет.
+def cross_file_private(files):
+    """files: dict {path: source}. Возвращает [(name, def_file, [caller_files])]."""
+    defs = {}          # name -> file где есть private fun
+    defines_any = {}   # name -> set(files где есть любой fun NAME / val NAME)
+    for f, src in files.items():
+        for m in re.finditer(r'private fun (?:[\w.]+\.)?(\w+)\s*\(', src):
+            defs.setdefault(m.group(1), f)
+        for m in re.finditer(r'\bfun (?:[\w.]+\.)?(\w+)\s*\(|\bval (\w+)\b', src):
+            nm = m.group(1) or m.group(2)
+            defines_any.setdefault(nm, set()).add(f)
+    out = []
+    for name, deffile in defs.items():
+        callers = []
+        for f, src in files.items():
+            if f == deffile:
+                continue
+            if f in defines_any.get(name, set()):
+                continue  # этот файл объявляет свой NAME — не cross-file
+            if re.search(rf'(?<![\w.]){name}\s*\(', src):
+                callers.append(f)
+        if callers:
+            out.append((name, deffile, callers))
+    return out
+
+# self-test
+_neg_files = {'A.kt': 'private fun ActionSquare() {}', 'B.kt': 'fun x() { ActionSquare() }'}
+assert cross_file_private(_neg_files) == [('ActionSquare', 'A.kt', ['B.kt'])], 'У56 neg self-test провален'
+_pos_files = {'A.kt': 'internal fun ActionSquare() {}', 'B.kt': 'fun x() { ActionSquare() }'}
+assert cross_file_private(_pos_files) == [], 'У56 pos self-test провален'
+_own_files = {'A.kt': 'private fun Foo() {}', 'B.kt': 'private fun Foo() {}\nfun x(){Foo()}'}
+assert cross_file_private(_own_files) == [], 'У56 own-def self-test провален'
+
+SCREENS_DIR = os.path.join(SRC, 'com/aistudio/socialsphere/crmlxb/ui/screens')
+if os.path.isdir(SCREENS_DIR):
+    sfiles = {fn: open(os.path.join(SCREENS_DIR, fn), encoding='utf-8').read()
+              for fn in os.listdir(SCREENS_DIR) if fn.endswith('.kt')}
+    for name, deffile, callers in cross_file_private(sfiles):
+        errors.append(f'{deffile}: private fun {name} зовётся из {callers} — '
+                      f'смени на internal (K2: "it is private in file")')
 
 print(f'QA v2: проверено файлов: {sum(1 for _ in kt_files())}')
 if errors:

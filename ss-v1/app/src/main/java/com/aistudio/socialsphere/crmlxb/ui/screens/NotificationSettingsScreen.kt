@@ -1,12 +1,18 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package com.aistudio.socialsphere.crmlxb.ui.screens
+import com.aistudio.socialsphere.crmlxb.ui.theme.AppleTheme
+import androidx.compose.ui.platform.LocalContext
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,11 +22,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.aistudio.socialsphere.crmlxb.R
+import com.aistudio.socialsphere.crmlxb.data.AppStateStore
 import com.aistudio.socialsphere.crmlxb.model.ReminderTime
+import com.aistudio.socialsphere.crmlxb.utils.NotificationScheduler
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
+    val ctxLabel = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // ── Read/write from AppSettings ───────────────────────────
     var notificationsEnabled   by remember { AppSettings.isNotificationsEnabled }
@@ -31,37 +42,65 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
     var callTime               by remember { AppSettings.callReminderTime }
     var showOverdue            by remember { AppSettings.showOverdue }
     var repeatOverdue          by remember { AppSettings.repeatOverdueVisually }
+    var remindStale            by remember { AppSettings.remindStaleContacts }
+    var remindBday             by remember { AppSettings.remindBirthdays }
+    var remindNoStep           by remember { AppSettings.remindNoNextStep }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.notif_title), fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        }
+        containerColor = AppleTheme.colors.groupedBackground,
+        topBar = {}
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Шапка: круг-назад + заголовок (по макету) ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaBackButton(stringResource(R.string.common_back)) { onNavigateBack() }
+                com.aistudio.socialsphere.crmlxb.ui.theme.AureliaScreenTitle(text = stringResource(R.string.notif_title), fontSize = 28.sp)
+            }
 
             // ── Общие ─────────────────────────────────────────
             NotifCard(stringResource(R.string.notif_general)) {
                 SwitchRow(
                     label   = stringResource(R.string.notif_enable),
                     checked = notificationsEnabled,
-                    onCheckedChange = { notificationsEnabled = it }
+                    icon    = Icons.Default.Notifications,
+                    onCheckedChange = { enabled ->
+                        // Флаг — ДО побочных эффектов: и cancel, и (через
+                        // rescheduleAll→scheduleReminder) reconcile читают
+                        // именно его. UI не знает requestCode ни одного типа
+                        // будильника — только canonical вызовы NotificationScheduler.
+                        // Оба направления — Room-backed (cancelAllUserDataAlarmsFromRoom/
+                        // reconcileAllUserDataAlarms), не полагаются на то, что
+                        // AppStateStore.calendarItems уже загружена (cold state).
+                        // wipeAllData() продолжает использовать отдельный
+                        // in-memory снимок cancelAllUserDataAlarms(List<CalendarItem>) —
+                        // ему нужен снимок ИМЕННО до удаления Room, эта функция
+                        // не менялась и не трогается здесь.
+                        notificationsEnabled = enabled
+                        if (enabled) {
+                            coroutineScope.launch {
+                                NotificationScheduler.reconcileAllUserDataAlarms(
+                                    ctxLabel, AppStateStore.databaseFor(ctxLabel)
+                                )
+                            }
+                        } else {
+                            coroutineScope.launch {
+                                NotificationScheduler.cancelAllUserDataAlarmsFromRoom(
+                                    ctxLabel, AppStateStore.databaseFor(ctxLabel)
+                                )
+                            }
+                        }
+                    }
                 )
 
                 if (notificationsEnabled) {
@@ -69,7 +108,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                     Text(
                         stringResource(R.string.notif_default_reminder),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = AppleTheme.colors.brand
                     )
                     Spacer(Modifier.height(6.dp))
                     // FIX: single-select, saves to AppSettings
@@ -82,12 +121,70 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
             }
 
             if (notificationsEnabled) {
+                // ── Пора связаться (по ритму общения) ─────────
+                NotifCard(stringResource(R.string.notif_general)) {
+                    SwitchRow(
+                        label   = stringResource(R.string.set_remind_stale),
+                        checked = remindStale,
+                        onCheckedChange = {
+                            remindStale = it
+                            NotificationScheduler.scheduleStaleCheck(ctxLabel)
+                        }
+                    )
+                    SwitchRow(
+                        label   = stringResource(R.string.set_remind_birthdays),
+                        checked = remindBday,
+                        onCheckedChange = {
+                            remindBday = it
+                            NotificationScheduler.scheduleStaleCheck(ctxLabel)
+                        }
+                    )
+                    SwitchRow(
+                        label   = stringResource(R.string.set_remind_no_next_step),
+                        checked = remindNoStep,
+                        onCheckedChange = {
+                            remindNoStep = it
+                            NotificationScheduler.scheduleStaleCheck(ctxLabel)
+                        }
+                    )
+                }
+
+                // ── Точные напоминания (Android 12+) ──────────
+                // USE_EXACT_ALARM убран (политика Play). На 12+ при отсутствии
+                // разрешения показываем кнопку перехода в системные настройки.
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    val am = ctxLabel.getSystemService(android.content.Context.ALARM_SERVICE)
+                        as android.app.AlarmManager
+                    if (!am.canScheduleExactAlarms()) {
+                        NotifCard(stringResource(R.string.notif_general)) {
+                            Text(
+                                stringResource(R.string.set_exact_alarms_hint),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleTheme.colors.secondaryLabel
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            OutlinedButton(onClick = {
+                                // КРАШ-ФИКС (фидбэк 2026-07-04): ctxLabel — локализованный
+                                // контекст (не Activity), прямой startActivity без NEW_TASK
+                                // роняет приложение. Единый безопасный запуск.
+                                com.aistudio.socialsphere.crmlxb.utils.ExternalActionHandler.startIntentSafely(
+                                    ctxLabel,
+                                    android.content.Intent(
+                                        android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                        android.net.Uri.parse("package:" + ctxLabel.packageName)
+                                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }) { Text(stringResource(R.string.set_exact_alarms)) }
+                        }
+                    }
+                }
+
                 // ── Дни рождения ──────────────────────────────
                 NotifCard(stringResource(R.string.notif_birthdays)) {
                     Text(
                         stringResource(R.string.notif_multi_hint),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = AppleTheme.colors.secondaryLabel
                     )
                     Spacer(Modifier.height(6.dp))
                     // FIX: multi-select, saves to AppSettings
@@ -153,7 +250,7 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                        containerColor = AppleTheme.colors.brand.copy(alpha = 0.10f).copy(alpha = 0.4f)
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -161,14 +258,14 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
                             stringResource(R.string.notif_current),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppleTheme.colors.brand
                         )
                         Spacer(Modifier.height(4.dp))
-                        Text(stringResource(R.string.notif_cur_birthdays, birthdayTimes.joinToString(", ") { it.label() }),
+                        Text(stringResource(R.string.notif_cur_birthdays, birthdayTimes.joinToString(", ") { it.label(ctxLabel) }),
                             style = MaterialTheme.typography.bodySmall)
-                        Text(stringResource(R.string.notif_cur_meetings, meetingTime.label()),
+                        Text(stringResource(R.string.notif_cur_meetings, meetingTime.label(ctxLabel)),
                             style = MaterialTheme.typography.bodySmall)
-                        Text(stringResource(R.string.notif_cur_gifts, giftTime.label()),
+                        Text(stringResource(R.string.notif_cur_gifts, giftTime.label(ctxLabel)),
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -182,65 +279,91 @@ fun NotificationSettingsScreen(onNavigateBack: () -> Unit) {
 // ─── Helpers ─────────────────────────────────────────────────
 @Composable
 private fun NotifCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier  = Modifier.fillMaxWidth(),
-        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-            content()
+    // По макету: капс-заголовок секции над плоской inset-картой.
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        com.aistudio.socialsphere.crmlxb.ui.theme.AureliaCapsLabel(
+            title,
+            modifier = Modifier.padding(start = 6.dp)
+        )
+        Card(
+            modifier  = Modifier.fillMaxWidth(),
+            colors    = CardDefaults.cardColors(containerColor = AppleTheme.colors.card),
+            elevation = CardDefaults.cardElevation(1.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                content()
+            }
         }
     }
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SwitchRow(
+    label: String,
+    checked: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    tile: androidx.compose.ui.graphics.Color = AppleTheme.colors.alarmRed,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        // Опциональная плитка-иконка 30/r8 (прототип: мастер-переключатель с колокольчиком)
+        if (icon != null) {
+            Box(
+                Modifier.size(30.dp)
+                    .clip(com.aistudio.socialsphere.crmlxb.ui.theme.SocialShape.Small)
+                    .background(tile),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, Modifier.size(16.dp), tint = androidx.compose.ui.graphics.Color.White)
+            }
+        }
+        Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = AppleTheme.colors.label, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = AppleTheme.colors.brand)
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-fun ReminderTime.label(): String = when (this) {
-    ReminderTime.NONE     -> stringResource(R.string.rt_none)
-    ReminderTime.AT_EVENT -> stringResource(R.string.rt_at_event)
-    ReminderTime.ON_DAY   -> stringResource(R.string.rt_on_day)
-    ReminderTime.MIN_10   -> stringResource(R.string.rt_min_10)
-    ReminderTime.MIN_30   -> stringResource(R.string.rt_min_30)
-    ReminderTime.HOUR_1   -> stringResource(R.string.rt_hour_1)
-    ReminderTime.DAY_1    -> stringResource(R.string.rt_day_1)
-    ReminderTime.DAY_3    -> stringResource(R.string.rt_day_3)
-    ReminderTime.WEEK_1   -> stringResource(R.string.rt_week_1)
+fun ReminderTime.label(context: android.content.Context): String = when (this) {
+    ReminderTime.NONE     -> context.getString(R.string.rt_none)
+    ReminderTime.AT_EVENT -> context.getString(R.string.rt_at_event)
+    ReminderTime.ON_DAY   -> context.getString(R.string.rt_on_day)
+    ReminderTime.MIN_10   -> context.getString(R.string.rt_min_10)
+    ReminderTime.MIN_30   -> context.getString(R.string.rt_min_30)
+    ReminderTime.HOUR_1   -> context.getString(R.string.rt_hour_1)
+    ReminderTime.DAY_1    -> context.getString(R.string.rt_day_1)
+    ReminderTime.DAY_3    -> context.getString(R.string.rt_day_3)
+    ReminderTime.WEEK_1   -> context.getString(R.string.rt_week_1)
 }
 
 // Обёртки: работают на enum, маппинг label<->enum внутри —
 // чтобы call-site не дублировал поиск, а строки оставались только в label()
 @Composable
 private fun ReminderChips(options: List<ReminderTime>, selected: ReminderTime, onSelect: (ReminderTime) -> Unit) {
-    val labels = options.map { it.label() }
+    val ctxLabel = LocalContext.current
+    val labels = options.map { it.label(ctxLabel) }
     SingleSelectChips(
         options = labels,
-        selected = selected.label(),
-        onSelect = { lbl -> options.find { it.label() == lbl }?.let(onSelect) }
+        selected = selected.label(ctxLabel),
+        onSelect = { lbl -> options.find { it.label(ctxLabel) == lbl }?.let(onSelect) }
     )
 }
 
 @Composable
 private fun ReminderMultiChips(options: List<ReminderTime>, selected: Set<ReminderTime>, onToggle: (ReminderTime) -> Unit) {
-    val selLabels = selected.map { it.label() }.toSet()
+    val ctxLabel = LocalContext.current
+    val selLabels = selected.map { it.label(ctxLabel) }.toSet()
     MultiSelectChips(
-        options = options.map { it.label() },
+        options = options.map { it.label(ctxLabel) },
         selected = selLabels,
-        onToggle = { lbl -> options.find { it.label() == lbl }?.let(onToggle) }
+        onToggle = { lbl -> options.find { it.label(ctxLabel) == lbl }?.let(onToggle) }
     )
 }
 

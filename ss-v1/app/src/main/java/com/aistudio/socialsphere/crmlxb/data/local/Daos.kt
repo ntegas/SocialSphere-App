@@ -1,6 +1,7 @@
 package com.aistudio.socialsphere.crmlxb.data.local
 
 import androidx.room.*
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ContactDao {
@@ -67,6 +68,19 @@ interface ContactDao {
     @Query("DELETE FROM contact_company_relations WHERE contactId = :contactId")
     suspend fun deleteCompanyRelationsForContact(contactId: String)
 
+    // Обратный каскад: при удалении КОМПАНИИ нужно убрать её связи с
+    // контактами тоже — раньше строки оставались сиротами и «оживали»
+    // после reloadFromDb() (баг §35, найден повторным аудитом).
+    @Query("DELETE FROM contact_company_relations WHERE companyId = :companyId")
+    suspend fun deleteCompanyRelationsForCompany(companyId: String)
+
+    // Точечное удаление одной связи — нужно mergeCompanies(): при слиянии
+    // компаний "чужая" связь-дубликат (тот же contactId+position, что уже
+    // есть у итоговой компании) удаляется отдельно от себя, не каскадом по
+    // contactId (иначе снесло бы и связь с самой итоговой компанией).
+    @Query("DELETE FROM contact_company_relations WHERE id = :relationId")
+    suspend fun deleteCompanyRelation(relationId: String)
+
     @Query("DELETE FROM contact_relations WHERE id = :relationId")
     suspend fun deleteContactRelation(relationId: String)
 
@@ -78,6 +92,72 @@ interface ContactDao {
 
     @Query("UPDATE contacts SET lastContactDate = :date, updatedAt = :updatedAt WHERE id = :contactId")
     suspend fun updateLastContactDate(contactId: String, date: String, updatedAt: String)
+
+    /** BATCH 5B (5B-001): гасит потреблённое легаси-поле тегов у уже
+     *  реконсилированных контактов. Точечный UPDATE одной колонки, а не
+     *  перезапись строки контакта — чтобы не трогать остальные поля и не
+     *  требовать пересборки сущности. Схема не меняется, колонка остаётся. */
+    @Query("UPDATE contacts SET tags = NULL WHERE id IN (:contactIds)")
+    suspend fun clearLegacyTagsForContacts(contactIds: List<String>)
+
+    // ── Группы контактов (как в телефонной книге) ──
+    @Query("SELECT * FROM contact_groups")
+    suspend fun getContactGroups(): List<ContactGroupEntity>
+
+    @Query("SELECT * FROM contact_group_members")
+    suspend fun getContactGroupMembers(): List<ContactGroupMemberEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContactGroup(group: ContactGroupEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContactGroupMembers(members: List<ContactGroupMemberEntity>)
+
+    @Query("DELETE FROM contact_groups WHERE id = :groupId")
+    suspend fun deleteContactGroup(groupId: String)
+
+    @Query("DELETE FROM contact_group_members WHERE groupId = :groupId")
+    suspend fun deleteGroupMembersForGroup(groupId: String)
+
+    @Query("DELETE FROM contact_group_members WHERE contactId = :contactId")
+    suspend fun deleteGroupMembersForContact(contactId: String)
+
+    @Query("DELETE FROM contact_group_members WHERE id = :memberId")
+    suspend fun deleteGroupMember(memberId: String)
+
+    // ── Теги контакта (плоский управляемый список, зеркало групп) ──
+    @Query("SELECT * FROM tags")
+    fun getTags(): Flow<List<TagEntity>>
+
+    @Query("SELECT * FROM contact_tag_members")
+    fun getContactTagMembers(): Flow<List<ContactTagMemberEntity>>
+
+    // BACKUP PACK #3: те же таблицы обычным suspend-чтением. Flow.first() внутри
+    // db.withTransaction ждёт запрос на ДРУГОМ потоке, а транзакция держит единственное
+    // соединение — согласованный снимок Room (RoomSnapshot) читает теги только так.
+    @Query("SELECT * FROM tags")
+    suspend fun getTagsOnce(): List<TagEntity>
+
+    @Query("SELECT * FROM contact_tag_members")
+    suspend fun getContactTagMembersOnce(): List<ContactTagMemberEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTag(tag: TagEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContactTagMembers(members: List<ContactTagMemberEntity>)
+
+    @Query("DELETE FROM tags WHERE id = :tagId")
+    suspend fun deleteTag(tagId: String)
+
+    @Query("DELETE FROM contact_tag_members WHERE tagId = :tagId")
+    suspend fun deleteTagMembersForTag(tagId: String)
+
+    @Query("DELETE FROM contact_tag_members WHERE contactId = :contactId")
+    suspend fun deleteTagMembersForContact(contactId: String)
+
+    @Query("DELETE FROM contact_tag_members WHERE id = :id")
+    suspend fun deleteTagMember(id: String)
 }
 
 @Dao
@@ -126,6 +206,22 @@ interface CalendarDao {
 
     @Query("DELETE FROM reminder_rules WHERE calendarItemId = :itemId")
     suspend fun deleteRemindersForItem(itemId: String)
+}
+
+/** EXPLICIT RECOVERY PACK: история намеренных удалений (см. TombstoneEntity). */
+@Dao
+interface TombstoneDao {
+    @Query("SELECT * FROM tombstones")
+    suspend fun getAll(): List<TombstoneEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(tombstone: TombstoneEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(tombstones: List<TombstoneEntity>)
+
+    @Query("DELETE FROM tombstones WHERE entityType = :entityType AND entityId = :entityId")
+    suspend fun delete(entityType: String, entityId: String)
 }
 
 @Dao
